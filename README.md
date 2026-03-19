@@ -301,5 +301,5 @@ uv run mypy src/rosettastone/    # type check
 </p>
 
 <p align="center">
-  <a href="https://github.com/ashwinchidambaram"><img src="assets/ac-logo.svg" alt="Built by Ashwin Chidambaram" width="140" /></a>
+  <a href="https://github.com/ashwinchidambaram"><img src="assets/ac-logo.svg" alt="Built by Ashwin Chidambaram" width="260" /></a>
 </p>
