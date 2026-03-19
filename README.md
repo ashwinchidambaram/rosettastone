@@ -72,10 +72,7 @@ export ANTHROPIC_API_KEY=sk-ant-... # if migrating to an Anthropic model
 
 ### Usage
 
-<details>
-<summary><strong>CLI</strong></summary>
-
-<br />
+**CLI**
 
 ```bash
 # run a full migration with the included sample data
@@ -98,12 +95,7 @@ rosettastone preflight \
   --to anthropic/claude-sonnet-4
 ```
 
-</details>
-
-<details>
-<summary><strong>Python Library</strong></summary>
-
-<br />
+**Python Library**
 
 ```python
 from rosettastone import Migrator, MigrationConfig
@@ -118,8 +110,6 @@ print(f"Confidence: {result.confidence_score:.0%}")
 print(f"Improvement: +{result.improvement:.0%}")
 print(f"Cost: ${result.cost_usd:.2f}")
 ```
-
-</details>
 
 ---
 
@@ -247,16 +237,13 @@ src/rosettastone/
 └── utils/              Logging (never logs prompt content), LiteLLM helpers
 ```
 
-<details>
-<summary><strong>Design Principles</strong></summary>
+**Design Principles:**
 
 - **Provider-agnostic** — supports 100+ models through [LiteLLM](https://github.com/BerriAI/litellm)
 - **Pluggable** — abstract base classes for data adapters, optimizers, and evaluators. Adding a new data source or metric means implementing one interface.
 - **CLI = Library** — both paths construct a `MigrationConfig` and call `Migrator.run()`. No divergent code paths.
 - **Lazy optional deps** — `bert-score`, `sentence-transformers`, and `redis` only load when called, with graceful fallbacks.
 - **Additive phases** — each phase adds new files without rewriting existing ones. Phase 1 code stays stable through Phase 5.
-
-</details>
 
 ---
 
@@ -288,11 +275,11 @@ src/rosettastone/
 
 ---
 
-## Prior Art & References
+## References
 
-- [Dropbox — DSPy + GEPA in production](https://dropbox.tech/machine-learning/optimizing-dropbox-dash-relevance-judge-with-dspy)
-- [AWS — Prompt migration with DSPy MIPROv2](https://aws.amazon.com/blogs/machine-learning/improve-amazon-nova-migration-performance-with-data-aware-prompt-optimization/)
-- [GEPA paper](https://arxiv.org/abs/2507.19457) (ICLR 2026 Oral)
+- **[GEPA paper](https://arxiv.org/abs/2507.19457)** (ICLR 2026 Oral) — The core optimization algorithm behind RosettaStone. Introduces reflective prompt evolution that outperforms MIPROv2 by 10%+ while using ~35× fewer API calls.
+- **[Dropbox — DSPy + GEPA in production](https://dropbox.tech/machine-learning/optimizing-dropbox-dash-relevance-judge-with-dspy)** — Production case study validating that GEPA + DSPy can optimize real-world LLM systems at scale, not just benchmarks.
+- **[AWS — Prompt migration with DSPy MIPROv2](https://aws.amazon.com/blogs/machine-learning/improve-amazon-nova-migration-performance-with-data-aware-prompt-optimization/)** — AWS's reference architecture for data-aware prompt migration. Demonstrates the general pattern RosettaStone builds on, using the previous-generation optimizer.
 
 ---
 

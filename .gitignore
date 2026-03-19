@@ -44,5 +44,10 @@ migration_output/
 .DS_Store
 Thumbs.db
 
-# Worklog (session-specific)
-.claude/worklog.md
+# Claude Code
+.claude/
+CLAUDE.md
+claude_agents/
+
+# Build docs (private)
+docs/
