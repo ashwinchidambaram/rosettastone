@@ -1,7 +1,5 @@
-<h1 align="center">RosettaStone</h1>
-
 <p align="center">
-  <strong>Translate your LLM prompts from one model to another — automatically.</strong>
+  <img src="assets/logo.png" alt="RosettaStone Logo" width="400" />
 </p>
 
 <p align="center">

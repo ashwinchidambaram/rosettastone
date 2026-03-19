@@ -51,3 +51,6 @@ claude_agents/
 
 # Build docs (private)
 docs/
+
+# Source images (keep assets/ for repo-facing files)
+images/
