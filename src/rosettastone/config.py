@@ -1,0 +1,44 @@
+from enum import Enum
+from pathlib import Path
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
+
+class EvalStrategy(str, Enum):
+    AUTO = "auto"
+    BERTSCORE = "bertscore"
+    EMBEDDING = "embedding"
+    EXACT = "exact"
+    JSON = "json"
+
+
+class OptimizerChoice(str, Enum):
+    GEPA = "gepa"
+    MIPRO = "mipro"  # Phase 2
+
+
+class MigrationConfig(BaseModel):
+    # Required
+    source_model: str
+    target_model: str
+    data_path: Path
+
+    # Optional with smart defaults
+    output_dir: Path = Path("./migration_output")
+    eval_strategy: EvalStrategy = EvalStrategy.AUTO
+    optimizer: OptimizerChoice = OptimizerChoice.GEPA
+    train_split: float = Field(default=0.2, ge=0.1, le=0.5)
+    val_split: float = Field(default=0.8, ge=0.5, le=0.9)
+    min_pairs: int = 20
+    recommended_pairs: int = 100
+
+    # GEPA configuration
+    gepa_auto: str = "light"
+    reflection_model: str = "openai/gpt-4o"
+    num_threads: int = 4
+
+    # Pre-flight
+    dry_run: bool = False
+    skip_preflight: bool = False
+    max_context_usage: float = 0.75

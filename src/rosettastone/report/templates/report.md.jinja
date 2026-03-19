@@ -1,0 +1,56 @@
+# Migration Report
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Source Model | {{ config.get('source_model', 'N/A') }} |
+| Target Model | {{ config.get('target_model', 'N/A') }} |
+| Confidence Score | {{ "%.1f" | format(confidence_score * 100) }}% |
+| Baseline Score | {{ "%.1f" | format(baseline_score * 100) }}% |
+| Improvement | +{{ "%.1f" | format(improvement * 100) }}% |
+| Test Cases | {{ total_test_cases }} |
+| Wins | {{ wins }}/{{ total_test_cases }} |
+| API Cost | ${{ "%.2f" | format(cost_usd) }} |
+| Duration | {{ "%.1f" | format(duration_seconds) }}s |
+
+{% if warnings %}
+## Warnings
+
+{% for w in warnings %}
+- {{ w }}
+{% endfor %}
+{% endif %}
+
+## Optimized Prompt
+
+```
+{{ optimized_prompt }}
+```
+
+## Per-Case Results
+
+| # | Composite Score | Win | Top Metric |
+|---|-----------------|-----|------------|
+{% for r in validation_results %}
+| {{ loop.index }} | {{ "%.2f" | format(r.composite_score) }} | {{ "Yes" if r.is_win else "No" }} | {{ r.scores.keys() | list | first if r.scores else "N/A" }}: {{ "%.2f" | format(r.scores.values() | list | first) if r.scores else "N/A" }} |
+{% endfor %}
+
+{% if validation_results %}
+## Worst Regressions
+
+{% for r in validation_results | sort(attribute='composite_score') | batch(3) | first %}
+### Case {{ loop.index }} (Score: {{ "%.2f" | format(r.composite_score) }})
+
+**Expected:**
+```
+{{ r.prompt_pair.response[:500] }}
+```
+
+**Got:**
+```
+{{ r.new_response[:500] }}
+```
+
+{% endfor %}
+{% endif %}

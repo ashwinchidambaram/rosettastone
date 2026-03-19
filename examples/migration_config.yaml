@@ -1,0 +1,22 @@
+# Example migration configuration
+source_model: "openai/gpt-4o"
+target_model: "anthropic/claude-sonnet-4"
+data_path: "examples/sample_data.jsonl"
+output_dir: "./migration_output"
+
+# Evaluation
+eval_strategy: "auto"
+
+# Optimization
+optimizer: "gepa"
+gepa_auto: "light"  # "light", "medium", "heavy"
+reflection_model: "openai/gpt-4o"
+num_threads: 4
+
+# Data splits
+train_split: 0.2
+val_split: 0.8
+min_pairs: 20
+
+# Pre-flight
+max_context_usage: 0.75

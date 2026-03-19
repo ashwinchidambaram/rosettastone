@@ -1,0 +1,60 @@
+[project]
+name = "rosettastone"
+version = "0.1.0"
+description = "Automated LLM model migration using production data and GEPA optimization"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "dspy>=2.6",
+    "litellm>=1.50",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "typer>=0.12",
+    "jinja2>=3.1",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+eval = [
+    "bert-score>=0.3.13",
+    "sentence-transformers>=3.0",
+]
+redis = [
+    "redis[hiredis]>=5.0",
+    "redisvl>=0.3",
+]
+all = [
+    "rosettastone[eval,redis]",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "mypy>=1.8",
+    "ruff>=0.3",
+]
+
+[project.scripts]
+rosettastone = "rosettastone.cli.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rosettastone"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
