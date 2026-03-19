@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="800" height="300">
-  <!-- Full-width black background with rounded corners -->
-  <rect x="0" y="0" width="800" height="300" rx="12" ry="12" fill="#0a0a0a" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320">
+  <!-- Full-width black background -->
+  <rect x="0" y="0" width="1200" height="320" rx="12" ry="12" fill="#0a0a0a" />
 
   <defs>
     <linearGradient id="jet-improved-a-unique" x1="50%" y1="50%" x2="100%" y2="0%">
@@ -36,7 +36,8 @@
     </filter>
   </defs>
 
-  <g transform="translate(300, 50)">
+  <!-- Logo centered: 1200/2 - 200/2 = 500, 320/2 - 200/2 = 60 -->
+  <g transform="translate(500, 60)">
     <!-- Enhanced quasar jets -->
     <polygon points="100,100 188,12 180,20 92,108" fill="url(#jet-improved-a-unique)" opacity="0.75" filter="url(#glow-quasar-unique)" />
     <polygon points="100,100 108,92 196,4 188,12" fill="url(#jet-improved-a-unique)" opacity="0.55" />
