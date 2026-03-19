@@ -299,3 +299,7 @@ uv run mypy src/rosettastone/    # type check
 <p align="center">
   <strong>MIT License</strong> — see <a href="LICENSE">LICENSE</a>
 </p>
+
+<p align="center">
+  <a href="https://github.com/ashwinchidambaram"><img src="assets/ac-logo.svg" alt="Built by Ashwin Chidambaram" width="36" /></a>
+</p>
