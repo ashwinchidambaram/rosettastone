@@ -62,4 +62,3 @@ strict = true
 [[tool.mypy.overrides]]
 module = ["dspy", "dspy.*", "bert_score", "bert_score.*", "sentence_transformers", "sentence_transformers.*", "litellm", "litellm.*"]
 ignore_missing_imports = true
-ignore_errors = true

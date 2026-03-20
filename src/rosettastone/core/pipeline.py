@@ -92,6 +92,16 @@ def build_result(
     baseline_score = baseline_wins / max(len(baseline), 1)
     confidence_score = validation_wins / total
 
+    warnings: list[str] = []
+    if not validation:
+        warnings.append(
+            "All validation pairs were skipped — check target model configuration and API keys."
+        )
+    if not baseline:
+        warnings.append(
+            "All baseline pairs were skipped — check target model configuration and API keys."
+        )
+
     return MigrationResult(
         config=config.model_dump(mode="json"),
         optimized_prompt=optimized_prompt,
@@ -102,7 +112,7 @@ def build_result(
         improvement=confidence_score - baseline_score,
         cost_usd=0.0,  # TODO: track actual cost via LiteLLM callbacks
         duration_seconds=duration,
-        warnings=[],
+        warnings=warnings,
     )
 
 
