@@ -64,3 +64,6 @@ class MigrationConfig(BaseModel):
         "short_text": 0.80,
         "long_text": 0.75,
     }
+
+    # Phase 3: Web UI content storage
+    store_prompt_content: bool = False
