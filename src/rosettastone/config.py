@@ -38,6 +38,9 @@ class MigrationConfig(BaseModel):
     reflection_model: str = "openai/gpt-4o"
     num_threads: int = 4
 
+    # MIPROv2 configuration (fallback optimizer)
+    mipro_auto: Literal["light", "medium", "heavy"] | None = None
+
     # Pre-flight
     dry_run: bool = False
     skip_preflight: bool = False
