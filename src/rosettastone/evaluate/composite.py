@@ -37,7 +37,7 @@ class CompositeEvaluator:
             if isinstance(pair.prompt, str):
                 messages: list[dict[str, str]] = [{"role": "user", "content": pair.prompt}]
             else:
-                messages = pair.prompt  # type: ignore[assignment]
+                messages = pair.prompt  # type: ignore[assignment,unused-ignore]
 
             if optimized_prompt:
                 messages = [{"role": "system", "content": optimized_prompt}] + messages

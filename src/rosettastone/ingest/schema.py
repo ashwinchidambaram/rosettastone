@@ -1,6 +1,6 @@
 """Pydantic models for the universal JSONL schema."""
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, model_validator
 
@@ -13,11 +13,11 @@ class PromptPairInput(BaseModel):
     source_model: str
 
     # Optional enrichment
-    input_tokens: Optional[int] = None
-    output_tokens: Optional[int] = None
-    timestamp: Optional[str] = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    timestamp: str | None = None
     metadata: dict[str, Any] = {}
-    feedback: Optional[str] = None
+    feedback: str | None = None
 
     @model_validator(mode="after")
     def normalize_response(self) -> "PromptPairInput":

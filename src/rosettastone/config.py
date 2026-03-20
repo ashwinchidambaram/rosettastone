@@ -1,11 +1,11 @@
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
-class EvalStrategy(str, Enum):
+class EvalStrategy(StrEnum):
     AUTO = "auto"
     BERTSCORE = "bertscore"
     EMBEDDING = "embedding"
@@ -13,7 +13,7 @@ class EvalStrategy(str, Enum):
     JSON = "json"
 
 
-class OptimizerChoice(str, Enum):
+class OptimizerChoice(StrEnum):
     GEPA = "gepa"
     MIPRO = "mipro"  # Phase 2
 
@@ -34,7 +34,7 @@ class MigrationConfig(BaseModel):
     recommended_pairs: int = 100
 
     # GEPA configuration
-    gepa_auto: str = "light"
+    gepa_auto: Literal["light", "medium", "heavy"] = "light"
     reflection_model: str = "openai/gpt-4o"
     num_threads: int = 4
 

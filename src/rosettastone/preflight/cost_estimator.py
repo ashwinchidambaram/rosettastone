@@ -50,7 +50,7 @@ def estimate_cost(config: MigrationConfig) -> list[str]:
 
     if estimated_cost > 20:
         warnings.append(
-            f"Estimated cost exceeds $20. Consider using --auto light or reducing dataset size."
+            "Estimated cost exceeds $20. Consider using --auto light or reducing dataset size."
         )
 
     return warnings

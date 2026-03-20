@@ -38,9 +38,7 @@ def check_token_budget(config: MigrationConfig) -> tuple[list[str], list[str]]:
         for i, pair in enumerate(pairs[:5]):
             prompt_text = pair.prompt if isinstance(pair.prompt, str) else str(pair.prompt)
             try:
-                token_count = litellm.token_counter(
-                    model=config.target_model, text=prompt_text
-                )
+                token_count = litellm.token_counter(model=config.target_model, text=prompt_text)
             except Exception:
                 continue
 

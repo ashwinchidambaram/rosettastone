@@ -1,10 +1,10 @@
-from enum import Enum
-from typing import Any, Optional
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel
 
 
-class OutputType(str, Enum):
+class OutputType(StrEnum):
     JSON = "json"
     CLASSIFICATION = "classification"
     SHORT_TEXT = "short_text"
@@ -16,8 +16,8 @@ class PromptPair(BaseModel):
     response: str
     source_model: str
     metadata: dict[str, Any] = {}
-    feedback: Optional[str] = None
-    output_type: Optional[OutputType] = None
+    feedback: str | None = None
+    output_type: OutputType | None = None
 
 
 class EvalResult(BaseModel):

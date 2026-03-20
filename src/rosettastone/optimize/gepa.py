@@ -15,6 +15,12 @@ if TYPE_CHECKING:
     from rosettastone.core.types import PromptPair
 
 
+class InstructionExtractionError(Exception):
+    """Raised when optimized instructions cannot be extracted from a compiled DSPy program."""
+
+    pass
+
+
 class GEPAOptimizer(Optimizer):
     def optimize(
         self,
@@ -24,9 +30,7 @@ class GEPAOptimizer(Optimizer):
     ) -> str:
         # Configure LMs
         target_lm = dspy.LM(config.target_model)
-        reflection_lm = dspy.LM(
-            config.reflection_model, temperature=1.0, max_tokens=16000
-        )
+        reflection_lm = dspy.LM(config.reflection_model, temperature=1.0, max_tokens=16000)
 
         # Build DSPy program
         program = MigrationProgram()
@@ -36,9 +40,7 @@ class GEPAOptimizer(Optimizer):
 
         # Convert to DSPy Examples
         trainset = [
-            dspy.Example(
-                prompt=p.prompt, expected_response=p.response
-            ).with_inputs("prompt")
+            dspy.Example(prompt=p.prompt, expected_response=p.response).with_inputs("prompt")
             for p in train_set
         ]
 
@@ -68,4 +70,6 @@ def _extract_optimized_instructions(compiled: dspy.Module) -> str:
         if hasattr(module, "signature") and hasattr(module.signature, "instructions"):
             return str(module.signature.instructions)
 
-    return "Could not extract optimized instructions from compiled program."
+    raise InstructionExtractionError(
+        "Could not extract optimized instructions from compiled program."
+    )

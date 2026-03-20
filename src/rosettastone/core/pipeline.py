@@ -53,18 +53,14 @@ def load_and_split_data(
     return split_data(pairs, config.train_split, config.val_split)
 
 
-def optimize_prompt(
-    train: list[PromptPair], val: list[PromptPair], config: MigrationConfig
-) -> str:
+def optimize_prompt(train: list[PromptPair], val: list[PromptPair], config: MigrationConfig) -> str:
     from rosettastone.optimize.gepa import GEPAOptimizer
 
     optimizer = GEPAOptimizer()
     return optimizer.optimize(train, val, config)
 
 
-def evaluate_baseline(
-    test: list[PromptPair], config: MigrationConfig
-) -> list[EvalResult]:
+def evaluate_baseline(test: list[PromptPair], config: MigrationConfig) -> list[EvalResult]:
     from rosettastone.evaluate.composite import CompositeEvaluator
 
     evaluator = CompositeEvaluator(config)

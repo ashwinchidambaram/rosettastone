@@ -26,9 +26,7 @@ class JSONEvaluator(Evaluator):
                 key_overlap = len(expected_keys & actual_keys) / len(expected_keys)
                 # Check value matches for shared keys
                 shared = expected_keys & actual_keys
-                value_matches = sum(
-                    1 for k in shared if expected_obj[k] == actual_obj[k]
-                )
+                value_matches = sum(1 for k in shared if expected_obj[k] == actual_obj[k])
                 value_score = value_matches / max(len(shared), 1)
                 field_match = (key_overlap + value_score) / 2
             else:

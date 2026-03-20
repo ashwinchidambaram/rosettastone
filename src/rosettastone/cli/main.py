@@ -26,19 +26,19 @@ def migrate(
         data_path=data,
         output_dir=output,
         dry_run=dry_run,
-        gepa_auto=auto_mode,
+        gepa_auto=auto_mode,  # type: ignore[arg-type]
     )
     migrator = Migrator(config)
     result = migrator.run()
 
-    console.print(f"\n[bold green]Migration complete![/bold green]")
+    console.print("\n[bold green]Migration complete![/bold green]")
     console.print(f"Confidence score: {result.confidence_score:.0%}")
     console.print(f"Baseline score:   {result.baseline_score:.0%}")
     console.print(f"Improvement:      +{result.improvement:.0%}")
     console.print(f"Cost:             ${result.cost_usd:.2f}")
     console.print(f"Duration:         {result.duration_seconds:.1f}s")
     if result.warnings:
-        console.print(f"\n[yellow]Warnings:[/yellow]")
+        console.print("\n[yellow]Warnings:[/yellow]")
         for w in result.warnings:
             console.print(f"  - {w}")
 
