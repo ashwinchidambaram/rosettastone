@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -13,10 +13,26 @@ if TYPE_CHECKING:
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
+def _stats_to_dict(stats: Any) -> dict[str, Any]:
+    """Convert a TypeStats dataclass (or already-a-dict) to a plain dict for Jinja2."""
+    if isinstance(stats, dict):
+        return stats
+    if hasattr(stats, "__dataclass_fields__"):
+        import dataclasses
+
+        d = dataclasses.asdict(stats)
+        return d
+    return {}
+
+
 def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
     """Generate a markdown migration report and write it to output_dir."""
     env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
     template = env.get_template("report.md.jinja")
+
+    # Convert per_type_scores dataclasses to plain dicts for Jinja2.
+    raw_per_type: dict[str, Any] = getattr(result, "per_type_scores", {}) or {}
+    per_type_scores = {k: _stats_to_dict(v) for k, v in raw_per_type.items()}
 
     report_content = template.render(
         config=result.config,
@@ -31,6 +47,11 @@ def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
         warnings=result.warnings,
         total_test_cases=len(result.validation_results),
         wins=sum(1 for r in result.validation_results if r.is_win),
+        # New decision-layer fields (fall back gracefully if absent).
+        recommendation=getattr(result, "recommendation", None),
+        recommendation_reasoning=getattr(result, "recommendation_reasoning", None),
+        per_type_scores=per_type_scores,
+        safety_warnings=getattr(result, "safety_warnings", []),
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

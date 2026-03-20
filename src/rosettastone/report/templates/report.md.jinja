@@ -1,46 +1,68 @@
 # Migration Report
 
-## Summary
+## Executive Summary
 
-| Metric | Value |
-|--------|-------|
-| Source Model | {{ config.get('source_model', 'N/A') }} |
-| Target Model | {{ config.get('target_model', 'N/A') }} |
-| Confidence Score | {{ "%.1f" | format(confidence_score * 100) }}% |
-| Baseline Score | {{ "%.1f" | format(baseline_score * 100) }}% |
-| Improvement | +{{ "%.1f" | format(improvement * 100) }}% |
-| Test Cases | {{ total_test_cases }} |
-| Wins | {{ wins }}/{{ total_test_cases }} |
-| API Cost | ${{ "%.2f" | format(cost_usd) }} |
-| Duration | {{ "%.1f" | format(duration_seconds) }}s |
+{% set rec = result.get('recommendation', 'N/A') if result is defined else recommendation | default('N/A') -%}
+{% set source = config.get('source_model', 'N/A') -%}
+{% set target = config.get('target_model', 'N/A') -%}
+{% set badge_map = {'GO': '✅ GO', 'NO_GO': '🚫 NO_GO', 'CONDITIONAL': '⚠️ CONDITIONAL'} -%}
+{% set badge = badge_map.get(recommendation | default('') | string, recommendation | default('N/A') | string) -%}
+Migration from **{{ source }}** to **{{ target }}** — recommendation: **{{ badge }}**.
+Confidence score: {{ "%.1f" | format(confidence_score * 100) }}%,
+baseline score: {{ "%.1f" | format(baseline_score * 100) }}%,
+improvement: +{{ "%.1f" | format(improvement * 100) }}%,
+total cost: ${{ "%.4f" | format(cost_usd) }}.
 
-{% if warnings %}
-## Warnings
+---
 
-{% for w in warnings %}
-- {{ w }}
+## Recommendation
+
+**{{ badge }}**
+
+{{ recommendation_reasoning | default('No reasoning provided.') }}
+
+---
+
+## Per-Output-Type Breakdown
+
+{% if per_type_scores %}
+| Output Type | Win Rate | Threshold | Samples | P10 | P50 | P90 | CI (95%) |
+|-------------|----------|-----------|---------|-----|-----|-----|----------|
+{% for type_name, stats in per_type_scores.items() -%}
+{% set threshold = config.get('win_thresholds', {}).get(type_name, 0.80) -%}
+| {{ type_name }} | {{ "%.1f" | format((stats.get('win_rate', 0) * 100)) }}% | {{ "%.1f" | format(threshold * 100) }}% | {{ stats.get('sample_count', 0) }} | {{ "%.3f" | format(stats.get('p10', 0)) }} | {{ "%.3f" | format(stats.get('p50', 0)) }} | {{ "%.3f" | format(stats.get('p90', 0)) }} | [{{ "%.3f" | format(stats.get('confidence_interval', [0, 0])[0]) }}, {{ "%.3f" | format(stats.get('confidence_interval', [0, 0])[1]) }}] |
 {% endfor %}
+{% else %}
+_No per-type statistics available._
 {% endif %}
 
-## Optimized Prompt
+---
 
-```
-{{ optimized_prompt }}
-```
+## Score Distributions
 
-## Per-Case Results
+{% if per_type_scores %}
+{% for type_name, stats in per_type_scores.items() %}
+### {{ type_name }}
 
-| # | Composite Score | Win | Top Metric |
-|---|-----------------|-----|------------|
-{% for r in validation_results %}
-| {{ loop.index }} | {{ "%.2f" | format(r.composite_score) }} | {{ "Yes" if r.is_win else "No" }} | {{ r.scores.keys() | list | first if r.scores else "N/A" }}: {{ "%.2f" | format(r.scores.values() | list | first) if r.scores else "N/A" }} |
+- **P10** (worst decile): {{ "%.4f" | format(stats.get('p10', 0)) }}
+- **P50** (median): {{ "%.4f" | format(stats.get('p50', 0)) }}
+- **P90** (best decile): {{ "%.4f" | format(stats.get('p90', 0)) }}
+- Range: {{ "%.4f" | format(stats.get('min_score', 0)) }} – {{ "%.4f" | format(stats.get('max_score', 0)) }}
+- Mean: {{ "%.4f" | format(stats.get('mean', 0)) }}
+
 {% endfor %}
+{% else %}
+_No distribution data available._
+{% endif %}
 
-{% if validation_results %}
+---
+
 ## Worst Regressions
 
-{% for r in validation_results | sort(attribute='composite_score') | batch(3) | first %}
-### Case {{ loop.index }} (Score: {{ "%.2f" | format(r.composite_score) }})
+{% if validation_results %}
+{% set sorted_results = validation_results | sort(attribute='composite_score') %}
+{% for r in sorted_results[:5] %}
+### Regression {{ loop.index }} (Score: {{ "%.4f" | format(r.composite_score) }})
 
 **Expected:**
 ```
@@ -52,5 +74,92 @@
 {{ r.new_response[:500] }}
 ```
 
+{% endfor %}
+{% else %}
+_No validation results available._
+{% endif %}
+
+---
+
+## Safety Findings
+
+{% if safety_warnings %}
+{% for w in safety_warnings %}
+{% if w is mapping %}
+- **[{{ w.get('severity', 'INFO') }}]** {{ w.get('message') or w.get('msg') or w | string }}
+{% else %}
+- {{ w }}
+{% endif %}
+{% endfor %}
+{% else %}
+No issues found.
+{% endif %}
+
+---
+
+## Cost Summary
+
+{% set costs = config.get('costs', {}) %}
+{% if costs %}
+| Phase | Cost (USD) |
+|-------|-----------|
+{% for phase, cost in costs.items() -%}
+| {{ phase }} | ${{ "%.4f" | format(cost) }} |
+{% endfor %}
+| **Total** | **${{ "%.4f" | format(cost_usd) }}** |
+{% else %}
+| Phase | Cost (USD) |
+|-------|-----------|
+| Total | ${{ "%.4f" | format(cost_usd) }} |
+{% endif %}
+
+---
+
+## Optimized Prompt
+
+```
+{{ optimized_prompt }}
+```
+
+---
+
+## Configuration
+
+| Setting | Value |
+|---------|-------|
+| Source Model | {{ config.get('source_model', 'N/A') }} |
+| Target Model | {{ config.get('target_model', 'N/A') }} |
+| Eval Strategy | {{ config.get('eval_strategy', 'auto') }} |
+| Optimizer | {{ config.get('optimizer', 'gepa') }} |
+| Train Split | {{ config.get('train_split', 0.2) }} |
+| Val Split | {{ config.get('val_split', 0.8) }} |
+| Min Pairs | {{ config.get('min_pairs', 20) }} |
+| GEPA Intensity | {{ config.get('gepa_auto', 'light') }} |
+| Dry Run | {{ config.get('dry_run', false) }} |
+
+---
+
+## Caveats & Limitations
+
+{% if config.get('local_only', false) %}
+> **LOCAL_ONLY mode**: Evaluations were performed without calling external APIs. Results may
+> differ from production behaviour.
+{% endif %}
+
+- All statistics are computed on the validation split only; generalisation to production traffic
+  may vary.
+{% if validation_results | length < 30 %}
+- **Small sample warning**: only {{ validation_results | length }} validation case(s) available.
+  Results may not be statistically representative. Aim for at least 30 validation examples for
+  reliable conclusions.
+{% endif %}
+- Prompt content is never logged; scores and metadata only.
+- Rate-limiting and transient API errors may cause some pairs to be skipped. Check warnings above.
+
+{% if warnings %}
+### Pipeline Warnings
+
+{% for w in warnings %}
+- {{ w }}
 {% endfor %}
 {% endif %}

@@ -24,6 +24,8 @@ class SafetyWarning:
 
 @dataclass
 class TypeStats:
+    """Aggregate statistics for a single output type."""
+
     win_rate: float = 0.0
     mean: float = 0.0
     median: float = 0.0
