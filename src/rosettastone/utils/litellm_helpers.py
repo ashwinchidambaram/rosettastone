@@ -10,7 +10,7 @@ import litellm
 def get_model_info(model: str) -> dict[str, Any]:
     """Get model metadata from LiteLLM."""
     try:
-        return litellm.get_model_info(model)
+        return dict(litellm.get_model_info(model))
     except Exception:
         return {}
 
@@ -18,7 +18,7 @@ def get_model_info(model: str) -> dict[str, Any]:
 def count_tokens(model: str, text: str) -> int:
     """Count tokens for a given model."""
     try:
-        return litellm.token_counter(model=model, text=text)
+        return int(litellm.token_counter(model=model, text=text))
     except Exception:
         # Rough fallback: ~4 chars per token
         return len(text) // 4

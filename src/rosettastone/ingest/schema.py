@@ -8,8 +8,8 @@ from pydantic import BaseModel, model_validator
 class PromptPairInput(BaseModel):
     """Schema for a single line in the JSONL input file."""
 
-    prompt: str | list[dict]
-    response: str | dict
+    prompt: str | list[dict[str, Any]]
+    response: str | dict[str, Any]
     source_model: str
 
     # Optional enrichment
