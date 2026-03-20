@@ -18,7 +18,7 @@ def extract_optimized_instructions(compiled: dspy.Module) -> str:
         if hasattr(sig, "instructions"):
             return str(sig.instructions)
 
-    # Fallback: inspect the compiled program's state
+    # Fallback: inspect the compiled program's state via named_predictors
     for _name, module in compiled.named_predictors():
         if hasattr(module, "signature") and hasattr(module.signature, "instructions"):
             return str(module.signature.instructions)
