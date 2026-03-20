@@ -40,3 +40,8 @@ class MigrationResult(BaseModel):
     cost_usd: float
     duration_seconds: float
     warnings: list[str]
+    # Decision-layer fields (optional — populated by make_recommendation).
+    recommendation: str | None = None
+    recommendation_reasoning: str | None = None
+    per_type_scores: dict[str, Any] = {}
+    safety_warnings: list[Any] = []
