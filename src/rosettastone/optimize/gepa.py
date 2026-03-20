@@ -69,5 +69,7 @@ def _extract_optimized_instructions(compiled: dspy.Module) -> str:
             return str(module.signature.instructions)
 
     raise InstructionExtractionError(
-
+        "Could not extract optimized instructions from compiled program. "
+        "This may indicate a DSPy version incompatibility. "
+        "Check that dspy>=2.6 is installed."
     )
