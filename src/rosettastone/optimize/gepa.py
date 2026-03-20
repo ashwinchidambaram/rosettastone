@@ -18,8 +18,6 @@ if TYPE_CHECKING:
 class InstructionExtractionError(Exception):
     """Raised when optimized instructions cannot be extracted from a compiled DSPy program."""
 
-    pass
-
 
 class GEPAOptimizer(Optimizer):
     def optimize(
@@ -71,5 +69,5 @@ def _extract_optimized_instructions(compiled: dspy.Module) -> str:
             return str(module.signature.instructions)
 
     raise InstructionExtractionError(
-        "Could not extract optimized instructions from compiled program."
+
     )
