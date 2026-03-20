@@ -7,7 +7,6 @@ from pydantic import ValidationError
 
 from rosettastone.ingest.schema import PromptPairInput
 
-
 # ---------------------------------------------------------------------------
 # Happy path: valid inputs
 # ---------------------------------------------------------------------------
@@ -127,12 +126,8 @@ def test_optional_fields_accept_provided_values():
     }
     result = PromptPairInput.model_validate(data)
 
-    assert result.input_tokens == 12, (
-        f"Expected input_tokens=12, got: {result.input_tokens}"
-    )
-    assert result.output_tokens == 5, (
-        f"Expected output_tokens=5, got: {result.output_tokens}"
-    )
+    assert result.input_tokens == 12, f"Expected input_tokens=12, got: {result.input_tokens}"
+    assert result.output_tokens == 5, f"Expected output_tokens=5, got: {result.output_tokens}"
     assert result.timestamp == "2024-01-01T00:00:00Z", (
         f"Expected timestamp preserved, got: {result.timestamp!r}"
     )

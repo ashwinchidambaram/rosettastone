@@ -7,7 +7,7 @@ logic, not DSPy's internal behavior.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -19,10 +19,10 @@ from rosettastone.optimize.gepa import (
     _extract_optimized_instructions,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_config(tmp_path) -> MigrationConfig:
     data_file = tmp_path / "data.jsonl"
@@ -49,6 +49,7 @@ def _make_pairs(n: int = 2) -> list[PromptPair]:
 # ---------------------------------------------------------------------------
 # _extract_optimized_instructions — primary path
 # ---------------------------------------------------------------------------
+
 
 class TestExtractOptimizedInstructionsPrimaryPath:
     """Instructions should be read from compiled.predict.signature.instructions."""
@@ -90,6 +91,7 @@ class TestExtractOptimizedInstructionsPrimaryPath:
 # _extract_optimized_instructions — fallback path
 # ---------------------------------------------------------------------------
 
+
 class TestExtractOptimizedInstructionsFallback:
     """When predict.signature is absent, named_predictors() is the fallback."""
 
@@ -102,9 +104,7 @@ class TestExtractOptimizedInstructionsFallback:
 
         result = _extract_optimized_instructions(mock_compiled)
 
-        assert result == "Fallback instructions", (
-            f"Expected fallback instructions, got {result!r}"
-        )
+        assert result == "Fallback instructions", f"Expected fallback instructions, got {result!r}"
 
     def test_fallback_uses_first_matching_predictor(self) -> None:
         """When multiple predictors exist, the first with instructions is used."""
@@ -126,6 +126,7 @@ class TestExtractOptimizedInstructionsFallback:
 # ---------------------------------------------------------------------------
 # _extract_optimized_instructions — error path
 # ---------------------------------------------------------------------------
+
 
 class TestExtractOptimizedInstructionsError:
     """InstructionExtractionError must be raised when no instructions can be found."""
@@ -167,6 +168,7 @@ class TestExtractOptimizedInstructionsError:
 # GEPAOptimizer.optimize() — wiring tests
 # ---------------------------------------------------------------------------
 
+
 class TestGEPAOptimizerOptimize:
     """GEPAOptimizer must wire dspy.LM, dspy.GEPA, and dspy.context correctly."""
 
@@ -180,7 +182,7 @@ class TestGEPAOptimizerOptimize:
         mock_compiled.predict.signature.instructions = "Optimized instructions"
 
         with (
-            patch("rosettastone.optimize.gepa.dspy.LM") as mock_lm,
+            patch("rosettastone.optimize.gepa.dspy.LM"),
             patch("rosettastone.optimize.gepa.dspy.GEPA") as mock_gepa_cls,
             patch("rosettastone.optimize.gepa.dspy.context") as mock_ctx,
         ):
@@ -218,8 +220,7 @@ class TestGEPAOptimizerOptimize:
         # First call to dspy.LM should be with target_model
         first_call_args = mock_lm.call_args_list[0]
         assert first_call_args[0][0] == config.target_model, (
-            f"Expected dspy.LM called with '{config.target_model}', "
-            f"got: {first_call_args}"
+            f"Expected dspy.LM called with '{config.target_model}', got: {first_call_args}"
         )
 
     def test_uses_reflection_model_for_reflection_lm(self, tmp_path) -> None:
@@ -248,16 +249,13 @@ class TestGEPAOptimizerOptimize:
         )
         second_call_args = mock_lm.call_args_list[1]
         assert second_call_args[0][0] == config.reflection_model, (
-            f"Expected reflection LM with '{config.reflection_model}', "
-            f"got: {second_call_args}"
+            f"Expected reflection LM with '{config.reflection_model}', got: {second_call_args}"
         )
 
     def test_gepa_constructed_with_config_params(self, tmp_path) -> None:
         """GEPA must be initialized with the metric, auto mode, and num_threads from config."""
         config = _make_config(tmp_path)
-        config_with_custom = config.model_copy(
-            update={"gepa_auto": "medium", "num_threads": 8}
-        )
+        config_with_custom = config.model_copy(update={"gepa_auto": "medium", "num_threads": 8})
         train = _make_pairs(2)
         val = _make_pairs(1)
 

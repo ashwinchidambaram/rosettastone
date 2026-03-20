@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from rosettastone.evaluate.exact_match import ExactMatchEvaluator, string_similarity
 
 

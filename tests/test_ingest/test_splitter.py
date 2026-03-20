@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import random
 
-import pytest
-
 from rosettastone.core.types import PromptPair
 from rosettastone.ingest.splitter import deduplicate, split_data
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -50,9 +47,7 @@ def test_deduplicate_preserves_all_unique_pairs():
 
     result = deduplicate(pairs)
 
-    assert len(result) == 5, (
-        f"Expected 5 unique pairs preserved, got {len(result)}"
-    )
+    assert len(result) == 5, f"Expected 5 unique pairs preserved, got {len(result)}"
 
 
 def test_deduplicate_mixed_duplicates_and_uniques():
@@ -88,9 +83,7 @@ def test_deduplicate_same_response_different_prompt_not_removed():
 
     result = deduplicate([pair1, pair2])
 
-    assert len(result) == 2, (
-        f"Expected both pairs preserved (different prompts), got {len(result)}"
-    )
+    assert len(result) == 2, f"Expected both pairs preserved (different prompts), got {len(result)}"
 
 
 def test_deduplicate_empty_list_returns_empty():
@@ -157,9 +150,7 @@ def test_split_data_train_set_is_not_empty():
 
     train, val, test = split_data(pairs)
 
-    assert len(train) >= 1, (
-        f"Expected non-empty train set, got {len(train)} items"
-    )
+    assert len(train) >= 1, f"Expected non-empty train set, got {len(train)} items"
 
 
 def test_split_data_val_set_is_not_empty():
@@ -168,9 +159,7 @@ def test_split_data_val_set_is_not_empty():
 
     train, val, test = split_data(pairs)
 
-    assert len(val) >= 1, (
-        f"Expected non-empty val set, got {len(val)} items"
-    )
+    assert len(val) >= 1, f"Expected non-empty val set, got {len(val)} items"
 
 
 def test_split_data_test_set_is_not_empty():
@@ -179,9 +168,7 @@ def test_split_data_test_set_is_not_empty():
 
     train, val, test = split_data(pairs)
 
-    assert len(test) >= 1, (
-        f"Expected non-empty test set, got {len(test)} items"
-    )
+    assert len(test) >= 1, f"Expected non-empty test set, got {len(test)} items"
 
 
 def test_split_data_no_overlap_between_sets():
@@ -238,13 +225,9 @@ def test_split_data_2_pairs_all_sets_nonempty():
     train, val, test = split_data(pairs)
 
     total = len(train) + len(val) + len(test)
-    assert total == 2, (
-        f"Expected train+val+test=2, got {total}"
-    )
+    assert total == 2, f"Expected train+val+test=2, got {total}"
     assert len(train) >= 1, f"Expected non-empty train, got {len(train)}"
-    assert len(test) >= 1, (
-        f"Expected non-empty test (pop-from-val fallback), got {len(test)}"
-    )
+    assert len(test) >= 1, f"Expected non-empty test (pop-from-val fallback), got {len(test)}"
 
 
 def test_split_data_1_pair_does_not_crash():
@@ -300,9 +283,7 @@ def test_split_data_deduplicates_before_splitting():
     train, val, test = split_data(pairs)
 
     total = len(train) + len(val) + len(test)
-    assert total == 1, (
-        f"Expected total of 1 after dedup of 10 identical pairs, got {total}"
-    )
+    assert total == 1, f"Expected total of 1 after dedup of 10 identical pairs, got {total}"
 
 
 def test_split_data_returns_tuple_of_three_lists():
@@ -326,14 +307,8 @@ def test_split_data_all_elements_are_prompt_pairs():
     train, val, test = split_data(pairs)
 
     for i, pair in enumerate(train):
-        assert isinstance(pair, PromptPair), (
-            f"train[{i}] is {type(pair)}, expected PromptPair"
-        )
+        assert isinstance(pair, PromptPair), f"train[{i}] is {type(pair)}, expected PromptPair"
     for i, pair in enumerate(val):
-        assert isinstance(pair, PromptPair), (
-            f"val[{i}] is {type(pair)}, expected PromptPair"
-        )
+        assert isinstance(pair, PromptPair), f"val[{i}] is {type(pair)}, expected PromptPair"
     for i, pair in enumerate(test):
-        assert isinstance(pair, PromptPair), (
-            f"test[{i}] is {type(pair)}, expected PromptPair"
-        )
+        assert isinstance(pair, PromptPair), f"test[{i}] is {type(pair)}, expected PromptPair"

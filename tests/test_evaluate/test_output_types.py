@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from rosettastone.core.types import OutputType
 from rosettastone.evaluate.types import detect_output_type
 
@@ -17,7 +15,7 @@ class TestDetectOutputType:
         assert detect_output_type("42") == OutputType.JSON
 
     def test_json_array_string(self) -> None:
-        assert detect_output_type('[1, 2, 3]') == OutputType.JSON
+        assert detect_output_type("[1, 2, 3]") == OutputType.JSON
 
     def test_json_boolean_string(self) -> None:
         assert detect_output_type("true") == OutputType.JSON

@@ -20,10 +20,10 @@ import pytest
 from rosettastone.config import MigrationConfig
 from rosettastone.optimize.metric import build_migration_metric
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_config(tmp_path) -> MigrationConfig:
     """Minimal valid MigrationConfig backed by a real (empty) file."""
@@ -47,6 +47,7 @@ def _make_prediction(response: str = "Paris") -> dspy.Prediction:
 # ---------------------------------------------------------------------------
 # Return-type tests
 # ---------------------------------------------------------------------------
+
 
 class TestMetricReturnType:
     """The metric must always return a dspy.Prediction with score and feedback."""
@@ -102,9 +103,7 @@ class TestMetricReturnType:
         assert isinstance(result.score, float), (
             f"Expected score to be float, got {type(result.score).__name__}"
         )
-        assert 0.0 <= result.score <= 1.0, (
-            f"Score {result.score} is outside [0.0, 1.0]"
-        )
+        assert 0.0 <= result.score <= 1.0, f"Score {result.score} is outside [0.0, 1.0]"
 
     def test_feedback_is_non_empty_string(self, tmp_path) -> None:
         """Feedback must be a non-empty string — empty feedback gives GEPA no signal to reflect on."""
@@ -137,6 +136,7 @@ class TestMetricReturnType:
 # ---------------------------------------------------------------------------
 # Threshold band tests
 # ---------------------------------------------------------------------------
+
 
 class TestMetricFeedbackBands:
     """Feedback text must differ across the three similarity threshold bands."""
@@ -221,6 +221,7 @@ class TestMetricFeedbackBands:
 # trace parameter
 # ---------------------------------------------------------------------------
 
+
 class TestMetricTraceParameter:
     """Metric must accept a trace parameter (DSPy passes it during compilation)."""
 
@@ -253,6 +254,7 @@ class TestMetricTraceParameter:
 # ---------------------------------------------------------------------------
 # Import fallback chain
 # ---------------------------------------------------------------------------
+
 
 class TestMetricImportFallbacks:
     """Metric uses BERTScore -> embedding -> exact match fallback chain.
@@ -287,5 +289,7 @@ class TestMetricImportFallbacks:
             with patch("rosettastone.evaluate.exact_match.string_similarity", return_value=0.6):
                 result = metric(gold, pred)
 
-        assert 0.0 <= result.score <= 1.0, f"String similarity fallback score out of range: {result.score}"
+        assert 0.0 <= result.score <= 1.0, (
+            f"String similarity fallback score out of range: {result.score}"
+        )
         assert len(result.feedback) > 0

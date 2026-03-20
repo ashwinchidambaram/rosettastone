@@ -20,7 +20,6 @@ from unittest.mock import patch
 
 from rosettastone.config import MigrationConfig
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -63,19 +62,17 @@ def test_tokens_well_within_budget_produces_no_warnings_or_blockers():
     """This test proves that prompts using a small fraction of the context window are fine."""
     data_path = _make_jsonl_file("Short prompt.", "Another short prompt.")
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", return_value=50):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", return_value=50),
+    ):
         # 50 tokens out of 128000 = 0.04% — well under 75%
         from rosettastone.preflight.token_budget import check_token_budget
 
         warnings, blockers = check_token_budget(_config(data_path))
 
-    assert warnings == [], (
-        f"Expected no warnings for prompts well within budget, got: {warnings}"
-    )
-    assert blockers == [], (
-        f"Expected no blockers for prompts well within budget, got: {blockers}"
-    )
+    assert warnings == [], f"Expected no warnings for prompts well within budget, got: {warnings}"
+    assert blockers == [], f"Expected no blockers for prompts well within budget, got: {blockers}"
 
 
 # ---------------------------------------------------------------------------
@@ -87,8 +84,10 @@ def test_tokens_exceeding_context_window_produces_blocker():
     """This test proves that a prompt exceeding max_input_tokens produces a blocker, not a warning."""
     data_path = _make_jsonl_file("This prompt is way too long.")
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", return_value=200000):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", return_value=200000),
+    ):
         # 200000 tokens out of 128000 — exceeds the context window
         from rosettastone.preflight.token_budget import check_token_budget
 
@@ -110,8 +109,10 @@ def test_tokens_exceeding_context_window_is_blocker_not_warning():
     """This test proves the distinction: context overflow is a blocker, not just a warning."""
     data_path = _make_jsonl_file("Oversized prompt text here.")
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", return_value=200000):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", return_value=200000),
+    ):
         from rosettastone.preflight.token_budget import check_token_budget
 
         warnings, blockers = check_token_budget(_config(data_path))
@@ -138,8 +139,10 @@ def test_blocker_message_references_correct_prompt_index():
             return 200000  # this one exceeds the window
         return 10  # short prompt is fine
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", side_effect=token_counter_side_effect):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", side_effect=token_counter_side_effect),
+    ):
         from rosettastone.preflight.token_budget import check_token_budget
 
         warnings, blockers = check_token_budget(_config(data_path))
@@ -164,8 +167,10 @@ def test_tokens_above_75_percent_threshold_produces_warning():
     max_input = _MODEL_INFO_128K["max_input_tokens"]  # 128000
     token_count = int(max_input * 0.80)  # 80% — above the 75% default threshold
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", return_value=token_count):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", return_value=token_count),
+    ):
         from rosettastone.preflight.token_budget import check_token_budget
 
         warnings, blockers = check_token_budget(_config(data_path))
@@ -173,15 +178,11 @@ def test_tokens_above_75_percent_threshold_produces_warning():
     assert len(warnings) >= 1, (
         f"Expected at least one warning at 80% context usage, got: {warnings}"
     )
-    usage_warning = next(
-        (w for w in warnings if "%" in w or "token" in w.lower()), None
-    )
+    usage_warning = next((w for w in warnings if "%" in w or "token" in w.lower()), None)
     assert usage_warning is not None, (
         f"Expected a warning mentioning token usage percentage, got: {warnings}"
     )
-    assert blockers == [], (
-        f"80% usage should be a warning, not a blocker, got: {blockers}"
-    )
+    assert blockers == [], f"80% usage should be a warning, not a blocker, got: {blockers}"
 
 
 def test_tokens_at_exactly_75_percent_does_not_produce_warning():
@@ -191,8 +192,10 @@ def test_tokens_at_exactly_75_percent_does_not_produce_warning():
     # Exactly 75% → usage_pct == 0.75, which does NOT satisfy > 0.75
     token_count = int(max_input * 0.75)
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", return_value=token_count):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", return_value=token_count),
+    ):
         from rosettastone.preflight.token_budget import check_token_budget
 
         warnings, blockers = check_token_budget(_config(data_path))
@@ -209,15 +212,15 @@ def test_tokens_at_74_percent_produces_no_warning():
     max_input = _MODEL_INFO_128K["max_input_tokens"]
     token_count = int(max_input * 0.74)
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", return_value=token_count):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", return_value=token_count),
+    ):
         from rosettastone.preflight.token_budget import check_token_budget
 
         warnings, blockers = check_token_budget(_config(data_path))
 
-    assert warnings == [], (
-        f"Expected no warning at 74% context usage, got: {warnings}"
-    )
+    assert warnings == [], f"Expected no warning at 74% context usage, got: {warnings}"
     assert blockers == [], f"Expected no blockers at 74% usage, got: {blockers}"
 
 
@@ -229,8 +232,10 @@ def test_custom_max_context_usage_threshold_respected():
     token_count = int(max_input * 0.60)
     config = _config(data_path, max_context_usage=0.50)
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", return_value=token_count):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", return_value=token_count),
+    ):
         from rosettastone.preflight.token_budget import check_token_budget
 
         warnings, blockers = check_token_budget(config)
@@ -258,8 +263,10 @@ def test_multiple_prompts_each_checked_independently():
             return int(max_input * 0.90)  # above 75% → warning
         return 50
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", side_effect=token_counter_side_effect):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", side_effect=token_counter_side_effect),
+    ):
         from rosettastone.preflight.token_budget import check_token_budget
 
         warnings, blockers = check_token_budget(_config(data_path))
@@ -283,8 +290,10 @@ def test_only_first_5_prompts_are_sampled():
             return max_input * 2  # would be a blocker if checked
         return 50
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", side_effect=token_counter_side_effect):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", side_effect=token_counter_side_effect),
+    ):
         from rosettastone.preflight.token_budget import check_token_budget
 
         warnings, blockers = check_token_budget(_config(data_path))
@@ -309,12 +318,8 @@ def test_get_model_info_raises_returns_warning_not_crash():
 
         warnings, blockers = check_token_budget(_config(data_path))
 
-    assert len(warnings) >= 1, (
-        "Expected at least one warning when get_model_info raises, got none"
-    )
-    assert blockers == [], (
-        f"A get_model_info failure should not produce blockers, got: {blockers}"
-    )
+    assert len(warnings) >= 1, "Expected at least one warning when get_model_info raises, got none"
+    assert blockers == [], f"A get_model_info failure should not produce blockers, got: {blockers}"
 
 
 def test_get_model_info_raises_warning_mentions_context_window():
@@ -327,7 +332,11 @@ def test_get_model_info_raises_warning_mentions_context_window():
         warnings, blockers = check_token_budget(_config(data_path))
 
     context_warning = next(
-        (w for w in warnings if "context" in w.lower() or "window" in w.lower() or "determine" in w.lower()),
+        (
+            w
+            for w in warnings
+            if "context" in w.lower() or "window" in w.lower() or "determine" in w.lower()
+        ),
         None,
     )
     assert context_warning is not None, (
@@ -345,12 +354,8 @@ def test_get_model_info_returns_zero_max_input_exits_cleanly():
 
         warnings, blockers = check_token_budget(_config(data_path))
 
-    assert warnings == [], (
-        f"Expected no warnings when max_input_tokens is 0, got: {warnings}"
-    )
-    assert blockers == [], (
-        f"Expected no blockers when max_input_tokens is 0, got: {blockers}"
-    )
+    assert warnings == [], f"Expected no warnings when max_input_tokens is 0, got: {warnings}"
+    assert blockers == [], f"Expected no blockers when max_input_tokens is 0, got: {blockers}"
 
 
 def test_get_model_info_missing_max_input_key_exits_cleanly():
@@ -385,8 +390,10 @@ def test_token_counter_raises_for_one_pair_that_pair_is_skipped():
             raise Exception("Tokenizer failure")
         return 50  # good prompt is fine
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", side_effect=token_counter_side_effect):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", side_effect=token_counter_side_effect),
+    ):
         from rosettastone.preflight.token_budget import check_token_budget
 
         warnings, blockers = check_token_budget(_config(data_path))
@@ -404,8 +411,10 @@ def test_token_counter_raises_for_all_pairs_produces_no_crash():
     """This test proves that token_counter failing for every pair still returns cleanly."""
     data_path = _make_jsonl_file("Prompt A.", "Prompt B.", "Prompt C.")
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", side_effect=Exception("Always fails")):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", side_effect=Exception("Always fails")),
+    ):
         from rosettastone.preflight.token_budget import check_token_budget
 
         warnings, blockers = check_token_budget(_config(data_path))
@@ -436,7 +445,14 @@ def test_nonexistent_data_file_produces_warning_not_crash():
         "Expected at least one warning when data file doesn't exist, got none"
     )
     data_warning = next(
-        (w for w in warnings if "budget" in w.lower() or "check" in w.lower() or "load" in w.lower() or "file" in w.lower()),
+        (
+            w
+            for w in warnings
+            if "budget" in w.lower()
+            or "check" in w.lower()
+            or "load" in w.lower()
+            or "file" in w.lower()
+        ),
         None,
     )
     assert data_warning is not None, (
@@ -453,22 +469,16 @@ def test_check_token_budget_always_returns_two_lists():
     """This test proves that check_token_budget always returns a 2-tuple of lists."""
     data_path = _make_jsonl_file("A prompt.")
 
-    with patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()), \
-         patch("litellm.token_counter", return_value=50):
+    with (
+        patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
+        patch("litellm.token_counter", return_value=50),
+    ):
         from rosettastone.preflight.token_budget import check_token_budget
 
         result = check_token_budget(_config(data_path))
 
-    assert isinstance(result, tuple), (
-        f"Expected tuple return, got: {type(result)}"
-    )
-    assert len(result) == 2, (
-        f"Expected 2-tuple (warnings, blockers), got {len(result)}-tuple"
-    )
+    assert isinstance(result, tuple), f"Expected tuple return, got: {type(result)}"
+    assert len(result) == 2, f"Expected 2-tuple (warnings, blockers), got {len(result)}-tuple"
     warnings, blockers = result
-    assert isinstance(warnings, list), (
-        f"Expected warnings to be a list, got: {type(warnings)}"
-    )
-    assert isinstance(blockers, list), (
-        f"Expected blockers to be a list, got: {type(blockers)}"
-    )
+    assert isinstance(warnings, list), f"Expected warnings to be a list, got: {type(warnings)}"
+    assert isinstance(blockers, list), f"Expected blockers to be a list, got: {type(blockers)}"

@@ -9,7 +9,6 @@ DSPy specifics:
 """
 
 import dspy
-import pytest
 
 from rosettastone.optimize.dspy_program import MigrationProgram, MigrationSignature
 

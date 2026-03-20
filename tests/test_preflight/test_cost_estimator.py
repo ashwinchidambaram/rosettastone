@@ -16,7 +16,6 @@ from unittest.mock import patch
 from rosettastone.config import MigrationConfig
 from rosettastone.preflight.cost_estimator import GEPA_METRIC_CALLS
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -107,9 +106,7 @@ def test_light_mode_cost_matches_formula():
     assert "light" in cost_warning, (
         f"Expected mode 'light' mentioned in warning, got: {cost_warning!r}"
     )
-    assert "560" in cost_warning, (
-        f"Expected call count 560 in warning, got: {cost_warning!r}"
-    )
+    assert "560" in cost_warning, f"Expected call count 560 in warning, got: {cost_warning!r}"
 
 
 def test_medium_mode_cost_matches_formula():
@@ -136,9 +133,7 @@ def test_medium_mode_cost_matches_formula():
     assert "medium" in cost_warning, (
         f"Expected mode 'medium' mentioned in warning, got: {cost_warning!r}"
     )
-    assert "2000" in cost_warning, (
-        f"Expected call count 2000 in warning, got: {cost_warning!r}"
-    )
+    assert "2000" in cost_warning, f"Expected call count 2000 in warning, got: {cost_warning!r}"
 
 
 def test_heavy_mode_cost_matches_formula():
@@ -165,9 +160,7 @@ def test_heavy_mode_cost_matches_formula():
     assert "heavy" in cost_warning, (
         f"Expected mode 'heavy' mentioned in warning, got: {cost_warning!r}"
     )
-    assert "5000" in cost_warning, (
-        f"Expected call count 5000 in warning, got: {cost_warning!r}"
-    )
+    assert "5000" in cost_warning, f"Expected call count 5000 in warning, got: {cost_warning!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +188,11 @@ def test_cost_above_20_dollars_produces_additional_threshold_warning():
         f"Expected at least 2 warnings when cost exceeds $20, got {len(warnings)}: {warnings}"
     )
     threshold_warning = next(
-        (w for w in warnings if "exceeds $20" in w or "light" in w.lower() or "reduce" in w.lower()),
+        (
+            w
+            for w in warnings
+            if "exceeds $20" in w or "light" in w.lower() or "reduce" in w.lower()
+        ),
         None,
     )
     assert threshold_warning is not None, (
@@ -277,9 +274,7 @@ def test_zero_cost_tokens_produce_no_cost_warning():
 
         warnings = estimate_cost(config)
 
-    assert warnings == [], (
-        f"Expected no warnings for zero-cost pricing, got: {warnings}"
-    )
+    assert warnings == [], f"Expected no warnings for zero-cost pricing, got: {warnings}"
 
 
 def test_null_cost_fields_treated_as_zero_no_cost_warning():
@@ -316,11 +311,13 @@ def test_get_model_info_raises_returns_unavailable_warning():
 
         warnings = estimate_cost(config)
 
-    assert len(warnings) >= 1, (
-        "Expected at least one warning when get_model_info raises, got none"
-    )
+    assert len(warnings) >= 1, "Expected at least one warning when get_model_info raises, got none"
     unavailable_warning = next(
-        (w for w in warnings if "pricing" in w.lower() or "cost" in w.lower() or "not available" in w.lower()),
+        (
+            w
+            for w in warnings
+            if "pricing" in w.lower() or "cost" in w.lower() or "not available" in w.lower()
+        ),
         None,
     )
     assert unavailable_warning is not None, (
@@ -356,9 +353,7 @@ def test_estimate_cost_always_returns_list():
 
         result = estimate_cost(config)
 
-    assert isinstance(result, list), (
-        f"Expected list return type, got: {type(result)}"
-    )
+    assert isinstance(result, list), f"Expected list return type, got: {type(result)}"
     for item in result:
         assert isinstance(item, str), (
             f"Expected all warnings to be strings, got: {type(item)} — {item!r}"

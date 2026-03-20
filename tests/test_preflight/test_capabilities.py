@@ -17,7 +17,6 @@ from unittest.mock import patch
 
 from rosettastone.config import MigrationConfig
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -33,7 +32,9 @@ _BASE_MODEL_INFO = {
 }
 
 
-def _config(source: str = "openai/gpt-4o", target: str = "anthropic/claude-sonnet-4") -> MigrationConfig:
+def _config(
+    source: str = "openai/gpt-4o", target: str = "anthropic/claude-sonnet-4"
+) -> MigrationConfig:
     return MigrationConfig(
         source_model=source,
         target_model=target,
@@ -64,12 +65,8 @@ def test_identical_models_produce_no_warnings_or_blockers():
 
         warnings, blockers = check_capabilities(config)
 
-    assert warnings == [], (
-        f"Expected no warnings for identical models, got: {warnings}"
-    )
-    assert blockers == [], (
-        f"Expected no blockers for identical models, got: {blockers}"
-    )
+    assert warnings == [], f"Expected no warnings for identical models, got: {warnings}"
+    assert blockers == [], f"Expected no blockers for identical models, got: {blockers}"
 
 
 # ---------------------------------------------------------------------------
@@ -119,9 +116,7 @@ def test_source_supports_vision_target_does_not_emits_warning():
     assert vision_warning is not None, (
         f"Expected a warning mentioning vision/image input, got warnings: {warnings}"
     )
-    assert blockers == [], (
-        f"Vision gap should produce a warning, not a blocker, got: {blockers}"
-    )
+    assert blockers == [], f"Vision gap should produce a warning, not a blocker, got: {blockers}"
 
 
 def test_source_supports_response_schema_target_does_not_emits_warning():
@@ -136,7 +131,11 @@ def test_source_supports_response_schema_target_does_not_emits_warning():
         warnings, blockers = check_capabilities(config)
 
     schema_warning = next(
-        (w for w in warnings if "structured" in w.lower() or "json" in w.lower() or "schema" in w.lower()),
+        (
+            w
+            for w in warnings
+            if "structured" in w.lower() or "json" in w.lower() or "schema" in w.lower()
+        ),
         None,
     )
     assert schema_warning is not None, (
@@ -217,7 +216,11 @@ def test_target_smaller_context_window_emits_warning():
         warnings, blockers = check_capabilities(config)
 
     context_warning = next(
-        (w for w in warnings if "context" in w.lower() or "window" in w.lower() or "truncat" in w.lower()),
+        (
+            w
+            for w in warnings
+            if "context" in w.lower() or "window" in w.lower() or "truncat" in w.lower()
+        ),
         None,
     )
     assert context_warning is not None, (
@@ -247,7 +250,11 @@ def test_target_larger_context_window_emits_no_context_warning():
         warnings, blockers = check_capabilities(config)
 
     context_warning = next(
-        (w for w in warnings if "context" in w.lower() or "window" in w.lower() or "truncat" in w.lower()),
+        (
+            w
+            for w in warnings
+            if "context" in w.lower() or "window" in w.lower() or "truncat" in w.lower()
+        ),
         None,
     )
     assert context_warning is None, (
@@ -287,19 +294,19 @@ def test_get_model_info_raises_exception_returns_warning_not_crash():
 
         warnings, blockers = check_capabilities(config)
 
-    assert len(warnings) >= 1, (
-        "Expected at least one warning when get_model_info raises, got none"
-    )
+    assert len(warnings) >= 1, "Expected at least one warning when get_model_info raises, got none"
     skip_warning = next(
-        (w for w in warnings if "skip" in w.lower() or "could not" in w.lower() or "fetch" in w.lower()),
+        (
+            w
+            for w in warnings
+            if "skip" in w.lower() or "could not" in w.lower() or "fetch" in w.lower()
+        ),
         None,
     )
     assert skip_warning is not None, (
         f"Expected a warning about skipping capability checks, got warnings: {warnings}"
     )
-    assert blockers == [], (
-        f"A get_model_info failure should not produce blockers, got: {blockers}"
-    )
+    assert blockers == [], f"A get_model_info failure should not produce blockers, got: {blockers}"
 
 
 def test_get_model_info_raises_does_not_produce_capability_warnings():
@@ -331,16 +338,8 @@ def test_check_capabilities_always_returns_two_lists():
 
         result = check_capabilities(config)
 
-    assert isinstance(result, tuple), (
-        f"Expected tuple return, got: {type(result)}"
-    )
-    assert len(result) == 2, (
-        f"Expected 2-tuple (warnings, blockers), got {len(result)}-tuple"
-    )
+    assert isinstance(result, tuple), f"Expected tuple return, got: {type(result)}"
+    assert len(result) == 2, f"Expected 2-tuple (warnings, blockers), got {len(result)}-tuple"
     warnings, blockers = result
-    assert isinstance(warnings, list), (
-        f"Expected warnings to be a list, got: {type(warnings)}"
-    )
-    assert isinstance(blockers, list), (
-        f"Expected blockers to be a list, got: {type(blockers)}"
-    )
+    assert isinstance(warnings, list), f"Expected warnings to be a list, got: {type(warnings)}"
+    assert isinstance(blockers, list), f"Expected blockers to be a list, got: {type(blockers)}"

@@ -9,7 +9,6 @@ import pytest
 from rosettastone.core.types import PromptPair
 from rosettastone.ingest.jsonl import JSONLAdapter
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -85,9 +84,7 @@ def test_empty_lines_are_skipped(tmp_path):
 
     result = JSONLAdapter(jsonl_file).load()
 
-    assert len(result) == 2, (
-        f"Expected 2 pairs (blank lines skipped), got {len(result)}"
-    )
+    assert len(result) == 2, f"Expected 2 pairs (blank lines skipped), got {len(result)}"
 
 
 def test_list_prompt_messages_format_loaded_correctly(tmp_path):
@@ -158,9 +155,7 @@ def test_file_with_only_blank_lines_returns_empty_list(tmp_path):
 
     result = JSONLAdapter(jsonl_file).load()
 
-    assert result == [], (
-        f"Expected empty list from blank-only file, got: {result!r}"
-    )
+    assert result == [], f"Expected empty list from blank-only file, got: {result!r}"
 
 
 def test_truly_empty_file_returns_empty_list(tmp_path):

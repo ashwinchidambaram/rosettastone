@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from rosettastone.cli.main import app
@@ -17,9 +16,12 @@ runner = CliRunner()
 # ---------------------------------------------------------------------------
 
 BASE_ARGS = [
-    "--data", "examples/sample_data.jsonl",
-    "--from", "openai/gpt-4o",
-    "--to", "anthropic/claude-sonnet-4",
+    "--data",
+    "examples/sample_data.jsonl",
+    "--from",
+    "openai/gpt-4o",
+    "--to",
+    "anthropic/claude-sonnet-4",
 ]
 
 
@@ -80,9 +82,7 @@ def test_migrate_with_warnings():
     """migrate prints warnings when the result includes them."""
     warning_msg = "Token budget exceeded for 3 examples"
     with patch("rosettastone.core.migrator.Migrator") as mock_cls:
-        mock_cls.return_value.run.return_value = _make_migration_result(
-            warnings=[warning_msg]
-        )
+        mock_cls.return_value.run.return_value = _make_migration_result(warnings=[warning_msg])
 
         result = runner.invoke(app, ["migrate"] + BASE_ARGS)
 
@@ -178,8 +178,10 @@ def test_preflight_displays_warnings():
 def test_evaluate_command():
     """evaluate calls load_and_split_data + evaluate_baseline and prints win rate."""
     mock_result = MagicMock(is_win=True)
-    with patch("rosettastone.core.pipeline.load_and_split_data") as mock_load, \
-         patch("rosettastone.core.pipeline.evaluate_baseline") as mock_eval:
+    with (
+        patch("rosettastone.core.pipeline.load_and_split_data") as mock_load,
+        patch("rosettastone.core.pipeline.evaluate_baseline") as mock_eval,
+    ):
         mock_load.return_value = ([], [], [mock_result, mock_result])
         mock_eval.return_value = [mock_result, mock_result]
 
@@ -195,8 +197,10 @@ def test_evaluate_win_rate_calculation():
     """evaluate computes win rate correctly (wins / total)."""
     win = MagicMock(is_win=True)
     loss = MagicMock(is_win=False)
-    with patch("rosettastone.core.pipeline.load_and_split_data") as mock_load, \
-         patch("rosettastone.core.pipeline.evaluate_baseline") as mock_eval:
+    with (
+        patch("rosettastone.core.pipeline.load_and_split_data") as mock_load,
+        patch("rosettastone.core.pipeline.evaluate_baseline") as mock_eval,
+    ):
         mock_load.return_value = ([], [], [win, win, loss, loss])
         mock_eval.return_value = [win, win, loss, loss]
 
@@ -210,8 +214,10 @@ def test_evaluate_win_rate_calculation():
 
 def test_evaluate_sets_skip_preflight():
     """evaluate sets skip_preflight=True on the config."""
-    with patch("rosettastone.core.pipeline.load_and_split_data") as mock_load, \
-         patch("rosettastone.core.pipeline.evaluate_baseline") as mock_eval:
+    with (
+        patch("rosettastone.core.pipeline.load_and_split_data") as mock_load,
+        patch("rosettastone.core.pipeline.evaluate_baseline") as mock_eval,
+    ):
         captured_config: list = []
 
         def capture_load(config):
@@ -234,31 +240,46 @@ def test_evaluate_sets_skip_preflight():
 
 def test_missing_data_arg_migrate():
     """migrate exits non-zero when --data is missing."""
-    result = runner.invoke(app, [
-        "migrate",
-        "--from", "openai/gpt-4o",
-        "--to", "anthropic/claude-sonnet-4",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "migrate",
+            "--from",
+            "openai/gpt-4o",
+            "--to",
+            "anthropic/claude-sonnet-4",
+        ],
+    )
     assert result.exit_code != 0
 
 
 def test_missing_from_arg_migrate():
     """migrate exits non-zero when --from is missing."""
-    result = runner.invoke(app, [
-        "migrate",
-        "--data", "examples/sample_data.jsonl",
-        "--to", "anthropic/claude-sonnet-4",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "migrate",
+            "--data",
+            "examples/sample_data.jsonl",
+            "--to",
+            "anthropic/claude-sonnet-4",
+        ],
+    )
     assert result.exit_code != 0
 
 
 def test_missing_to_arg_migrate():
     """migrate exits non-zero when --to is missing."""
-    result = runner.invoke(app, [
-        "migrate",
-        "--data", "examples/sample_data.jsonl",
-        "--from", "openai/gpt-4o",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "migrate",
+            "--data",
+            "examples/sample_data.jsonl",
+            "--from",
+            "openai/gpt-4o",
+        ],
+    )
     assert result.exit_code != 0
 
 

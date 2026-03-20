@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from rosettastone.evaluate.json_validator import JSONEvaluator
 
 

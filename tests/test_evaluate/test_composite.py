@@ -6,12 +6,9 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from rosettastone.config import MigrationConfig
 from rosettastone.core.types import EvalResult, OutputType, PromptPair
 from rosettastone.evaluate.composite import WIN_THRESHOLD, CompositeEvaluator
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -118,9 +115,7 @@ class TestScoreRouting:
         self.evaluator = CompositeEvaluator(make_config())
 
     def test_json_output_type_uses_json_evaluator(self) -> None:
-        scores = self.evaluator._score(
-            '{"name": "Alice"}', '{"name": "Alice"}', OutputType.JSON
-        )
+        scores = self.evaluator._score('{"name": "Alice"}', '{"name": "Alice"}', OutputType.JSON)
         assert "json_valid" in scores
         assert "json_field_match" in scores
 
@@ -137,7 +132,10 @@ class TestScoreRouting:
             patch.dict("sys.modules", {"sentence_transformers": None}),
         ):
             for key in list(sys.modules.keys()):
-                if "rosettastone.evaluate.bertscore" in key or "rosettastone.evaluate.embedding" in key:
+                if (
+                    "rosettastone.evaluate.bertscore" in key
+                    or "rosettastone.evaluate.embedding" in key
+                ):
                     del sys.modules[key]
             scores = self.evaluator._score(
                 "This is a short text.", "This is similar text.", OutputType.SHORT_TEXT
@@ -147,9 +145,7 @@ class TestScoreRouting:
 
     def test_none_output_type_auto_detected(self) -> None:
         # JSON response → auto-detected as JSON → json_valid key present
-        scores = self.evaluator._score(
-            '{"key": "val"}', '{"key": "val"}', None
-        )
+        scores = self.evaluator._score('{"key": "val"}', '{"key": "val"}', None)
         assert "json_valid" in scores
 
     def test_long_text_falls_back_without_optional_deps(self) -> None:
@@ -158,7 +154,10 @@ class TestScoreRouting:
             patch.dict("sys.modules", {"sentence_transformers": None}),
         ):
             for key in list(sys.modules.keys()):
-                if "rosettastone.evaluate.bertscore" in key or "rosettastone.evaluate.embedding" in key:
+                if (
+                    "rosettastone.evaluate.bertscore" in key
+                    or "rosettastone.evaluate.embedding" in key
+                ):
                     del sys.modules[key]
             long_text = " ".join(["word"] * 60)
             scores = self.evaluator._score(long_text, long_text, OutputType.LONG_TEXT)
@@ -212,9 +211,7 @@ class TestCompositeEvaluatorEvaluate:
         assert "string_similarity" in scores
 
     @patch("rosettastone.evaluate.composite.litellm.completion")
-    def test_is_win_true_when_composite_at_threshold(
-        self, mock_completion: MagicMock
-    ) -> None:
+    def test_is_win_true_when_composite_at_threshold(self, mock_completion: MagicMock) -> None:
         """is_win is True when composite score >= WIN_THRESHOLD."""
         # Perfect classification match → composite = 1.0
         mock_completion.return_value = make_litellm_response("positive")
@@ -227,9 +224,7 @@ class TestCompositeEvaluatorEvaluate:
         assert results[0].is_win is True
 
     @patch("rosettastone.evaluate.composite.litellm.completion")
-    def test_is_win_false_when_composite_below_threshold(
-        self, mock_completion: MagicMock
-    ) -> None:
+    def test_is_win_false_when_composite_below_threshold(self, mock_completion: MagicMock) -> None:
         """is_win is False when composite score < WIN_THRESHOLD."""
         # Completely wrong classification → composite = 0.0
         mock_completion.return_value = make_litellm_response("XYZ_VERY_DIFFERENT_RESPONSE")
@@ -262,9 +257,7 @@ class TestCompositeEvaluatorEvaluate:
         assert isinstance(result.scores, dict)
 
     @patch("rosettastone.evaluate.composite.litellm.completion")
-    def test_optimized_prompt_prepended_as_system_message(
-        self, mock_completion: MagicMock
-    ) -> None:
+    def test_optimized_prompt_prepended_as_system_message(self, mock_completion: MagicMock) -> None:
         """optimized_prompt is added as a system message before user messages."""
         mock_completion.return_value = make_litellm_response("positive")
         pair = make_pair(
@@ -316,9 +309,7 @@ class TestCompositeEvaluatorEvaluate:
         assert results[0].new_response == ""
 
     @patch("rosettastone.evaluate.composite.litellm.completion")
-    def test_json_field_match_perfect_when_identical(
-        self, mock_completion: MagicMock
-    ) -> None:
+    def test_json_field_match_perfect_when_identical(self, mock_completion: MagicMock) -> None:
         """Identical JSON → json_field_match == 1.0."""
         mock_completion.return_value = make_litellm_response('{"status": "ok"}')
         pair = make_pair(
@@ -330,9 +321,7 @@ class TestCompositeEvaluatorEvaluate:
         assert results[0].scores["json_field_match"] == 1.0
 
     @patch("rosettastone.evaluate.composite.litellm.completion")
-    def test_composite_score_is_average_of_sub_scores(
-        self, mock_completion: MagicMock
-    ) -> None:
+    def test_composite_score_is_average_of_sub_scores(self, mock_completion: MagicMock) -> None:
         """composite_score == mean of all score values."""
         mock_completion.return_value = make_litellm_response('{"k": "v"}')
         pair = make_pair(
