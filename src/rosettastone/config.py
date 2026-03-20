@@ -38,6 +38,9 @@ class MigrationConfig(BaseModel):
     reflection_model: str = "openai/gpt-4o"
     num_threads: int = 4
 
+    # Evaluation
+    judge_model: str = "openai/gpt-4o"
+
     # Pre-flight
     dry_run: bool = False
     skip_preflight: bool = False
