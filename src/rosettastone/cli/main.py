@@ -72,9 +72,8 @@ def migrate(
     if result.safety_warnings:
         display.show_safety_warnings(result.safety_warnings)
 
-    display.show_cost_summary(
-        result.config.get("costs", {}) if isinstance(result.config, dict) else {}
-    )
+    if result.cost_usd > 0:
+        display.show_cost_summary({"total": result.cost_usd})
 
     if result.warnings:
         console.print("\n[yellow]Warnings:[/yellow]")

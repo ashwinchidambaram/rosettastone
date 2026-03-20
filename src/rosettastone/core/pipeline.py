@@ -220,8 +220,8 @@ def build_result(
     recommendation = None
     recommendation_reasoning = None
     per_type_scores: dict[str, Any] = {}
-    if ctx and hasattr(ctx, "_recommendation"):
-        recommendation, recommendation_reasoning, per_type_scores = ctx._recommendation  # type: ignore[attr-defined]
+    if ctx and ctx.recommendation is not None:
+        recommendation, recommendation_reasoning, per_type_scores = ctx.recommendation
 
     total_cost = sum(ctx.costs.values()) if ctx else 0.0
 

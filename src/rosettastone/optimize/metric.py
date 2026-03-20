@@ -61,7 +61,7 @@ def build_migration_metric(
         if sem_score < 0.7:
             feedback_parts.append(
                 f"Response diverges significantly from expected (similarity: {sem_score:.2f}). "
-                f"Expected style/content: '{expected[:200]}...'"
+                f"Expected ~{len(expected)} chars. Check structure and intent."
             )
         elif sem_score < 0.85:
             feedback_parts.append(

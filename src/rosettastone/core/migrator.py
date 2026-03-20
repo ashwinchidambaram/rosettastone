@@ -80,7 +80,7 @@ class Migrator:
         # Step 4.5: Recommendation
         t0 = time.time()
         rec, reasoning, per_type = make_recommendation(validation, ctx, self.config)
-        ctx._recommendation = (rec, reasoning, per_type)  # type: ignore[attr-defined]
+        ctx.recommendation = (rec, reasoning, per_type)
         ctx.timing["recommendation"] = time.time() - t0
 
         # Step 5: Report

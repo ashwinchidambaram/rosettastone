@@ -64,15 +64,12 @@ _No distribution data available._
 {% for r in sorted_results[:5] %}
 ### Regression {{ loop.index }} (Score: {{ "%.4f" | format(r.composite_score) }})
 
-**Expected:**
-```
-{{ r.prompt_pair.response[:500] }}
-```
+- **Output Type:** {{ r.details.get('output_type', 'unknown') }}
+- **Scores:** {% for k, v in r.scores.items() %}{{ k }}={{ "%.3f" | format(v) }}{% if not loop.last %}, {% endif %}{% endfor %}
 
-**Got:**
-```
-{{ r.new_response[:500] }}
-```
+- **Threshold:** {{ "%.3f" | format(r.details.get('threshold', 0.8)) }}
+
+> _Prompt/response content omitted for PII safety. Use `--output` to inspect individual pairs._
 
 {% endfor %}
 {% else %}

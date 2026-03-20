@@ -1,9 +1,13 @@
 """Abstract base class for optimizers."""
 
-from abc import ABC, abstractmethod
+from __future__ import annotations
 
-from rosettastone.config import MigrationConfig
-from rosettastone.core.types import PromptPair
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from rosettastone.config import MigrationConfig
+    from rosettastone.core.types import PromptPair
 
 
 class Optimizer(ABC):

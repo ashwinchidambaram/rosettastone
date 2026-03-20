@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -46,22 +45,4 @@ class PipelineContext:
     costs: dict[str, float] = field(default_factory=dict)
     timing: dict[str, float] = field(default_factory=dict)
     per_type_stats: dict[OutputType, TypeStats] = field(default_factory=dict)
-    _current_phase: str = ""
-    _cost_lock: threading.Lock = field(default_factory=threading.Lock)
-
-    def register_cost_callback(self, phase: str) -> None:
-        """Register a LiteLLM success callback to accumulate costs for the given phase."""
-        import litellm
-
-        self._current_phase = phase
-
-        def _track_cost(kwargs: dict, completion_response: object, **cb_kwargs: object) -> None:
-            cost = getattr(completion_response, "_hidden_params", {}).get("response_cost", 0)
-            if cost and cost > 0:
-                with self._cost_lock:
-                    self.costs[self._current_phase] = (
-                        self.costs.get(self._current_phase, 0.0) + cost
-                    )
-
-        if _track_cost not in litellm.success_callback:
-            litellm.success_callback.append(_track_cost)  # type: ignore[arg-type]
+    recommendation: tuple[str, str, dict[str, object]] | None = None

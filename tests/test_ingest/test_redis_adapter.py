@@ -106,12 +106,9 @@ def test_scan_multiple_cursor_iterations():
         b"key:3": _litellm_value("Q3", "A3"),
     }
 
-    # Detection pass: (cursor=42, batch1), (cursor=0, batch2)
-    # Collection pass: same sequence again
+    # Single pass: (cursor=42, batch1), (cursor=0, batch2)
     mock_client = MagicMock()
     mock_client.scan.side_effect = [
-        (42, batch1_keys),
-        (0, batch2_keys),
         (42, batch1_keys),
         (0, batch2_keys),
     ]
@@ -122,9 +119,9 @@ def test_scan_multiple_cursor_iterations():
         result = adapter.load()
 
     assert len(result) == 3, f"Expected 3 pairs from 2 SCAN batches, got {len(result)}"
-    # 2 cursor iterations × 2 passes (detection + collection) = 4 total calls
-    assert mock_client.scan.call_count == 4, (
-        f"Expected 4 scan calls (2 cursor iterations × 2 passes), got {mock_client.scan.call_count}"
+    # Single pass: 2 cursor iterations = 2 total scan calls
+    assert mock_client.scan.call_count == 2, (
+        f"Expected 2 scan calls (single pass, 2 cursor iterations), got {mock_client.scan.call_count}"
     )
 
 
