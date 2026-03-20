@@ -11,6 +11,11 @@ def detect_output_type(response: str) -> OutputType:
     """Auto-detect the output type from response content."""
     response = response.strip()
 
+    # Empty or whitespace-only responses default to SHORT_TEXT
+    # (not CLASSIFICATION — empty string is not a label)
+    if not response:
+        return OutputType.SHORT_TEXT
+
     # Try JSON
     try:
         json.loads(response)
