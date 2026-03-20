@@ -10,9 +10,12 @@ from rosettastone.core.types import EvalResult, OutputType, PromptPair
 from rosettastone.evaluate.exact_match import ExactMatchEvaluator
 from rosettastone.evaluate.json_validator import JSONEvaluator
 from rosettastone.evaluate.types import detect_output_type
+from rosettastone.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from rosettastone.config import MigrationConfig
+
+logger = get_logger("evaluate.composite")
 
 
 WIN_THRESHOLD = 0.8
@@ -29,23 +32,34 @@ class CompositeEvaluator:
     ) -> list[EvalResult]:
         results: list[EvalResult] = []
 
-        for pair in test_set:
-            # Generate response from target model
-            prompt_content = pair.prompt if isinstance(pair.prompt, str) else pair.prompt
-            messages = (
-                [{"role": "user", "content": prompt_content}]
-                if isinstance(prompt_content, str)
-                else prompt_content
-            )
+        for i, pair in enumerate(test_set):
+            # Build messages from prompt
+            if isinstance(pair.prompt, str):
+                messages: list[dict[str, str]] = [{"role": "user", "content": pair.prompt}]
+            else:
+                messages = pair.prompt  # type: ignore[assignment]
 
             if optimized_prompt:
                 messages = [{"role": "system", "content": optimized_prompt}] + messages
 
-            response = litellm.completion(
-                model=self.config.target_model,
-                messages=messages,
-            )
-            new_response = response.choices[0].message.content or ""
+            # Generate response from target model
+            try:
+                response = litellm.completion(
+                    model=self.config.target_model,
+                    messages=messages,
+                )
+                if not response.choices:
+                    logger.warning("Pair %d: empty choices in response, skipping", i)
+                    continue
+                new_response = response.choices[0].message.content or ""
+            except Exception as e:
+                logger.warning(
+                    "Pair %d: litellm.completion failed (%s: %s), skipping",
+                    i,
+                    type(e).__name__,
+                    e,
+                )
+                continue
 
             # Score
             scores = self._score(pair.response, new_response, pair.output_type)
@@ -58,6 +72,12 @@ class CompositeEvaluator:
                     scores=scores,
                     composite_score=composite,
                     is_win=composite >= WIN_THRESHOLD,
+                    details={
+                        "output_type": (
+                            pair.output_type or detect_output_type(pair.response)
+                        ).value,
+                        "evaluators_used": list(scores.keys()),
+                    },
                 )
             )
 
