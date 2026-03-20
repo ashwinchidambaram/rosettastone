@@ -23,14 +23,14 @@ class TestDetectOutputType:
         assert detect_output_type("true") == OutputType.JSON
 
     def test_empty_string_is_short_text(self) -> None:
-        # Empty string: json.loads("") raises, words=[], len<=5, but "\n" not in ""
-        # Actually empty string has 0 words so len(words) <= 5 → CLASSIFICATION
-        # But the task says SHORT_TEXT for empty string due to guard clause
-        # Let's check: response.strip() == "" → words = [] → len([]) == 0 <= 5 → CLASSIFICATION
-        # The task spec says SHORT_TEXT but the code returns CLASSIFICATION for 0 words
-        # We test actual code behavior, not spec assumption
+        # Empty string hits the guard clause: `if not response: return SHORT_TEXT`
+        # This was fixed to avoid classifying empty responses as CLASSIFICATION
         result = detect_output_type("")
-        assert result == OutputType.CLASSIFICATION
+        assert result == OutputType.SHORT_TEXT
+
+    def test_whitespace_only_is_short_text(self) -> None:
+        # Whitespace-only is stripped to empty, then hits the guard clause
+        assert detect_output_type("   ") == OutputType.SHORT_TEXT
 
     def test_single_word_is_classification(self) -> None:
         assert detect_output_type("Paris") == OutputType.CLASSIFICATION
