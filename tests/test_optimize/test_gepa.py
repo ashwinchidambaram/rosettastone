@@ -1,4 +1,4 @@
-"""Tests for GEPAOptimizer and _extract_optimized_instructions in optimize/gepa.py.
+"""Tests for GEPAOptimizer and extract_optimized_instructions in optimize/gepa.py.
 
 dspy.GEPA and dspy.LM are mocked entirely — no API calls, no model downloads,
 no money spent. The tests verify the optimizer's wiring and instruction extraction
@@ -13,11 +13,8 @@ import pytest
 
 from rosettastone.config import MigrationConfig
 from rosettastone.core.types import OutputType, PromptPair
-from rosettastone.optimize.gepa import (
-    GEPAOptimizer,
-    InstructionExtractionError,
-    _extract_optimized_instructions,
-)
+from rosettastone.optimize.gepa import GEPAOptimizer, InstructionExtractionError
+from rosettastone.optimize.utils import extract_optimized_instructions
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -47,7 +44,7 @@ def _make_pairs(n: int = 2) -> list[PromptPair]:
 
 
 # ---------------------------------------------------------------------------
-# _extract_optimized_instructions — primary path
+# extract_optimized_instructions — primary path
 # ---------------------------------------------------------------------------
 
 
@@ -59,7 +56,7 @@ class TestExtractOptimizedInstructionsPrimaryPath:
         mock_compiled = MagicMock()
         mock_compiled.predict.signature.instructions = "Optimized: be concise"
 
-        result = _extract_optimized_instructions(mock_compiled)
+        result = extract_optimized_instructions(mock_compiled)
 
         assert result == "Optimized: be concise", (
             f"Expected 'Optimized: be concise', got {result!r}"
@@ -70,7 +67,7 @@ class TestExtractOptimizedInstructionsPrimaryPath:
         mock_compiled = MagicMock()
         mock_compiled.predict.signature.instructions = "Some instructions"
 
-        result = _extract_optimized_instructions(mock_compiled)
+        result = extract_optimized_instructions(mock_compiled)
 
         assert isinstance(result, str), f"Expected str, got {type(result).__name__}"
 
@@ -82,13 +79,13 @@ class TestExtractOptimizedInstructionsPrimaryPath:
         mock_instructions.__str__ = lambda self: "Coerced instructions"
         mock_compiled.predict.signature.instructions = mock_instructions
 
-        result = _extract_optimized_instructions(mock_compiled)
+        result = extract_optimized_instructions(mock_compiled)
 
         assert isinstance(result, str)
 
 
 # ---------------------------------------------------------------------------
-# _extract_optimized_instructions — fallback path
+# extract_optimized_instructions — fallback path
 # ---------------------------------------------------------------------------
 
 
@@ -102,7 +99,7 @@ class TestExtractOptimizedInstructionsFallback:
         predictor.signature.instructions = "Fallback instructions"
         mock_compiled.named_predictors.return_value = [("predict", predictor)]
 
-        result = _extract_optimized_instructions(mock_compiled)
+        result = extract_optimized_instructions(mock_compiled)
 
         assert result == "Fallback instructions", f"Expected fallback instructions, got {result!r}"
 
@@ -118,13 +115,13 @@ class TestExtractOptimizedInstructionsFallback:
             ("second", predictor_b),
         ]
 
-        result = _extract_optimized_instructions(mock_compiled)
+        result = extract_optimized_instructions(mock_compiled)
 
         assert result == "First predictor instructions"
 
 
 # ---------------------------------------------------------------------------
-# _extract_optimized_instructions — error path
+# extract_optimized_instructions — error path
 # ---------------------------------------------------------------------------
 
 
@@ -137,7 +134,7 @@ class TestExtractOptimizedInstructionsError:
         mock_compiled.named_predictors.return_value = []
 
         with pytest.raises(InstructionExtractionError):
-            _extract_optimized_instructions(mock_compiled)
+            extract_optimized_instructions(mock_compiled)
 
     def test_raises_with_descriptive_message(self) -> None:
         """Error message must be non-empty to help diagnose compiled program issues."""
@@ -145,7 +142,7 @@ class TestExtractOptimizedInstructionsError:
         mock_compiled.named_predictors.return_value = []
 
         with pytest.raises(InstructionExtractionError, match=r".+"):
-            _extract_optimized_instructions(mock_compiled)
+            extract_optimized_instructions(mock_compiled)
 
     def test_raises_when_predictors_have_no_instructions(self) -> None:
         """Predictor without .signature.instructions attribute must not satisfy the fallback."""
@@ -155,7 +152,7 @@ class TestExtractOptimizedInstructionsError:
         mock_compiled.named_predictors.return_value = [("predict", predictor)]
 
         with pytest.raises(InstructionExtractionError):
-            _extract_optimized_instructions(mock_compiled)
+            extract_optimized_instructions(mock_compiled)
 
     def test_instruction_extraction_error_is_exception(self) -> None:
         """InstructionExtractionError must be a proper Exception subclass."""
@@ -356,7 +353,7 @@ class TestGEPAOptimizerOptimize:
         )
 
     def test_returns_extracted_instructions_from_compiled(self, tmp_path) -> None:
-        """optimize() must return what _extract_optimized_instructions finds in compiled program."""
+        """optimize() must return what extract_optimized_instructions finds in compiled program."""
         config = _make_config(tmp_path)
         train = _make_pairs(2)
         val = _make_pairs(1)

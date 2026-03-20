@@ -40,3 +40,9 @@ class MigrationResult(BaseModel):
     cost_usd: float
     duration_seconds: float
     warnings: list[str]
+
+    # Phase 2: Safety, decision, per-type breakdown
+    safety_warnings: list[dict[str, Any]] = []
+    recommendation: str = ""
+    recommendation_reasoning: str = ""
+    per_type_scores: dict[str, dict[str, float]] = {}

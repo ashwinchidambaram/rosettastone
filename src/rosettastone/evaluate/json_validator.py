@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from rosettastone.evaluate.base import Evaluator
 
 
 class JSONEvaluator(Evaluator):
-    def score(self, expected: str, actual: str) -> dict[str, float]:
+    def score(self, expected: str, actual: str, **kwargs: Any) -> dict[str, float]:
         try:
             expected_obj = json.loads(expected)
             actual_obj = json.loads(actual)

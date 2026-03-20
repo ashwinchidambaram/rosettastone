@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from rosettastone.evaluate.base import Evaluator
 
 
@@ -22,5 +24,5 @@ def compute_embedding_sim(expected: str, actual: str) -> float:
 
 
 class EmbeddingEvaluator(Evaluator):
-    def score(self, expected: str, actual: str) -> dict[str, float]:
+    def score(self, expected: str, actual: str, **kwargs: Any) -> dict[str, float]:
         return {"embedding_sim": compute_embedding_sim(expected, actual)}

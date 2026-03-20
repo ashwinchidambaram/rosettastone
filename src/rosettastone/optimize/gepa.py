@@ -52,24 +52,6 @@ class GEPAOptimizer(Optimizer):
             )
             compiled = optimizer.compile(program, trainset=trainset)
 
-        return _extract_optimized_instructions(compiled)
+        from rosettastone.optimize.utils import extract_optimized_instructions
 
-
-def _extract_optimized_instructions(compiled: dspy.Module) -> str:
-    """Extract the optimized prompt instructions from a compiled DSPy program."""
-    # GEPA stores optimized instructions in the predict module's signature
-    if hasattr(compiled, "predict") and hasattr(compiled.predict, "signature"):
-        sig = compiled.predict.signature
-        if hasattr(sig, "instructions"):
-            return str(sig.instructions)
-
-    # Fallback: inspect the compiled program's state
-    for name, module in compiled.named_predictors():
-        if hasattr(module, "signature") and hasattr(module.signature, "instructions"):
-            return str(module.signature.instructions)
-
-    raise InstructionExtractionError(
-        "Could not extract optimized instructions from compiled program. "
-        "This may indicate a DSPy version incompatibility. "
-        "Check that dspy>=2.6 is installed."
-    )
+        return extract_optimized_instructions(compiled)

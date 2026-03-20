@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 from rosettastone.config import MigrationConfig
 from rosettastone.core.types import EvalResult, OutputType, PromptPair
-from rosettastone.evaluate.composite import WIN_THRESHOLD, CompositeEvaluator
+from rosettastone.evaluate.composite import DEFAULT_WIN_THRESHOLDS, CompositeEvaluator
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -55,54 +55,61 @@ class TestCompositeScore:
         self.evaluator = CompositeEvaluator(make_config())
 
     def test_empty_scores_returns_zero(self) -> None:
-        assert self.evaluator._composite_score({}) == 0.0
-
-    def test_average_of_two_scores(self) -> None:
-        result = self.evaluator._composite_score({"a": 0.8, "b": 0.9})
-        assert abs(result - 0.85) < 1e-9
+        assert self.evaluator._composite_score({}, OutputType.SHORT_TEXT) == 0.0
 
     def test_single_score_returns_itself(self) -> None:
-        assert self.evaluator._composite_score({"x": 0.75}) == 0.75
+        # A metric with default weight 1.0
+        assert self.evaluator._composite_score({"custom": 0.75}, OutputType.SHORT_TEXT) == 0.75
 
     def test_all_zeros(self) -> None:
-        assert self.evaluator._composite_score({"a": 0.0, "b": 0.0}) == 0.0
+        assert self.evaluator._composite_score({"a": 0.0, "b": 0.0}, OutputType.SHORT_TEXT) == 0.0
 
     def test_all_ones(self) -> None:
-        assert self.evaluator._composite_score({"a": 1.0, "b": 1.0}) == 1.0
+        assert self.evaluator._composite_score({"a": 1.0, "b": 1.0}, OutputType.SHORT_TEXT) == 1.0
 
-    def test_average_of_three_scores(self) -> None:
-        result = self.evaluator._composite_score({"a": 0.6, "b": 0.9, "c": 0.3})
-        assert abs(result - 0.6) < 1e-9
+    def test_json_gating_invalid_json_returns_zero(self) -> None:
+        """json_valid == 0.0 gates the composite score to 0.0 for JSON output."""
+        scores = {"json_valid": 0.0, "json_field_match": 0.8}
+        assert self.evaluator._composite_score(scores, OutputType.JSON) == 0.0
+
+    def test_json_valid_excluded_from_weighted_average(self) -> None:
+        """json_valid is a gating metric — not included in the weighted average."""
+        scores = {"json_valid": 1.0, "json_field_match": 0.6}
+        composite = self.evaluator._composite_score(scores, OutputType.JSON)
+        # json_field_match has weight 0.4, so composite = 0.6 * 0.4 / 0.4 = 0.6
+        assert abs(composite - 0.6) < 1e-9
+
+    def test_weighted_average_with_known_metrics(self) -> None:
+        """exact_match (weight 0.7) and string_similarity (weight 0.3) give weighted composite."""
+        scores = {"exact_match": 1.0, "string_similarity": 0.5}
+        composite = self.evaluator._composite_score(scores, OutputType.CLASSIFICATION)
+        expected = (1.0 * 0.7 + 0.5 * 0.3) / (0.7 + 0.3)
+        assert abs(composite - expected) < 1e-9
 
 
 # ---------------------------------------------------------------------------
-# WIN_THRESHOLD
+# Win thresholds
 # ---------------------------------------------------------------------------
 
 
 class TestWinThreshold:
-    def test_win_threshold_value(self) -> None:
-        assert WIN_THRESHOLD == 0.8
+    def test_default_thresholds_exist(self) -> None:
+        assert "json" in DEFAULT_WIN_THRESHOLDS
+        assert "classification" in DEFAULT_WIN_THRESHOLDS
+        assert "short_text" in DEFAULT_WIN_THRESHOLDS
+        assert "long_text" in DEFAULT_WIN_THRESHOLDS
 
-    def test_composite_above_threshold_is_win(self) -> None:
-        evaluator = CompositeEvaluator(make_config())
-        # composite of 0.81 → True
-        scores = {"a": 0.81}
-        composite = evaluator._composite_score(scores)
-        assert composite >= WIN_THRESHOLD
+    def test_json_threshold_is_strictest(self) -> None:
+        assert DEFAULT_WIN_THRESHOLDS["json"] > DEFAULT_WIN_THRESHOLDS["long_text"]
 
-    def test_composite_below_threshold_is_not_win(self) -> None:
-        evaluator = CompositeEvaluator(make_config())
-        # composite of 0.79 → False
-        scores = {"a": 0.79}
-        composite = evaluator._composite_score(scores)
-        assert composite < WIN_THRESHOLD
-
-    def test_composite_exactly_at_threshold_is_win(self) -> None:
-        evaluator = CompositeEvaluator(make_config())
-        scores = {"a": 0.8}
-        composite = evaluator._composite_score(scores)
-        assert composite >= WIN_THRESHOLD
+    def test_evaluator_uses_config_thresholds(self) -> None:
+        config = make_config()
+        config_dict = config.model_dump()
+        config_dict["win_thresholds"] = {"classification": 0.99}
+        config2 = MigrationConfig(**config_dict)
+        evaluator = CompositeEvaluator(config2)
+        threshold = evaluator._get_threshold(OutputType.CLASSIFICATION)
+        assert threshold == 0.99
 
 
 # ---------------------------------------------------------------------------
@@ -143,11 +150,6 @@ class TestScoreRouting:
         # Should have some metric key
         assert len(scores) > 0
 
-    def test_none_output_type_auto_detected(self) -> None:
-        # JSON response → auto-detected as JSON → json_valid key present
-        scores = self.evaluator._score('{"key": "val"}', '{"key": "val"}', None)
-        assert "json_valid" in scores
-
     def test_long_text_falls_back_without_optional_deps(self) -> None:
         with (
             patch.dict("sys.modules", {"bert_score": None}),
@@ -176,7 +178,7 @@ class TestCompositeEvaluatorEvaluate:
 
     @patch("rosettastone.evaluate.composite.litellm.completion")
     def test_json_input_produces_json_evaluator_scores(self, mock_completion: MagicMock) -> None:
-        """JSON PromptPair → EvalResult scores contain json_valid and json_field_match."""
+        """JSON PromptPair -> EvalResult scores contain json_valid and json_field_match."""
         mock_completion.return_value = make_litellm_response('{"name": "Alice", "age": 30}')
 
         pair = make_pair(
@@ -195,7 +197,7 @@ class TestCompositeEvaluatorEvaluate:
     def test_classification_input_produces_exact_match_scores(
         self, mock_completion: MagicMock
     ) -> None:
-        """CLASSIFICATION PromptPair → EvalResult scores contain exact_match and string_similarity."""
+        """CLASSIFICATION PromptPair -> EvalResult scores contain exact_match and string_similarity."""
         mock_completion.return_value = make_litellm_response("positive")
 
         pair = make_pair(
@@ -212,8 +214,8 @@ class TestCompositeEvaluatorEvaluate:
 
     @patch("rosettastone.evaluate.composite.litellm.completion")
     def test_is_win_true_when_composite_at_threshold(self, mock_completion: MagicMock) -> None:
-        """is_win is True when composite score >= WIN_THRESHOLD."""
-        # Perfect classification match → composite = 1.0
+        """is_win is True when composite score >= threshold for output type."""
+        # Perfect classification match -> composite = 1.0
         mock_completion.return_value = make_litellm_response("positive")
         pair = make_pair(
             prompt="Classify sentiment",
@@ -225,8 +227,8 @@ class TestCompositeEvaluatorEvaluate:
 
     @patch("rosettastone.evaluate.composite.litellm.completion")
     def test_is_win_false_when_composite_below_threshold(self, mock_completion: MagicMock) -> None:
-        """is_win is False when composite score < WIN_THRESHOLD."""
-        # Completely wrong classification → composite = 0.0
+        """is_win is False when composite score < threshold."""
+        # Completely wrong classification -> composite well below 0.9
         mock_completion.return_value = make_litellm_response("XYZ_VERY_DIFFERENT_RESPONSE")
         pair = make_pair(
             prompt="Classify sentiment",
@@ -234,8 +236,8 @@ class TestCompositeEvaluatorEvaluate:
             output_type=OutputType.CLASSIFICATION,
         )
         results = self.evaluator.evaluate([pair])
-        # exact_match=0.0, string_similarity likely very low → composite < 0.8
-        assert results[0].composite_score < WIN_THRESHOLD
+        threshold = DEFAULT_WIN_THRESHOLDS["classification"]
+        assert results[0].composite_score < threshold
         assert results[0].is_win is False
 
     @patch("rosettastone.evaluate.composite.litellm.completion")
@@ -310,7 +312,7 @@ class TestCompositeEvaluatorEvaluate:
 
     @patch("rosettastone.evaluate.composite.litellm.completion")
     def test_json_field_match_perfect_when_identical(self, mock_completion: MagicMock) -> None:
-        """Identical JSON → json_field_match == 1.0."""
+        """Identical JSON -> json_field_match == 1.0."""
         mock_completion.return_value = make_litellm_response('{"status": "ok"}')
         pair = make_pair(
             prompt="Give me JSON",
@@ -321,8 +323,8 @@ class TestCompositeEvaluatorEvaluate:
         assert results[0].scores["json_field_match"] == 1.0
 
     @patch("rosettastone.evaluate.composite.litellm.completion")
-    def test_composite_score_is_average_of_sub_scores(self, mock_completion: MagicMock) -> None:
-        """composite_score == mean of all score values."""
+    def test_details_contain_output_type(self, mock_completion: MagicMock) -> None:
+        """EvalResult details include output_type and threshold."""
         mock_completion.return_value = make_litellm_response('{"k": "v"}')
         pair = make_pair(
             prompt="JSON?",
@@ -331,5 +333,22 @@ class TestCompositeEvaluatorEvaluate:
         )
         results = self.evaluator.evaluate([pair])
         result = results[0]
-        expected_composite = sum(result.scores.values()) / len(result.scores)
-        assert abs(result.composite_score - expected_composite) < 1e-9
+        assert result.details["output_type"] == "json"
+        assert "threshold" in result.details
+
+    @patch("rosettastone.evaluate.composite.litellm.completion")
+    def test_progress_callback_called(self, mock_completion: MagicMock) -> None:
+        """on_progress callback is called for each pair."""
+        mock_completion.return_value = make_litellm_response("positive")
+        progress_calls: list[tuple[int, int]] = []
+
+        def on_progress(current: int, total: int) -> None:
+            progress_calls.append((current, total))
+
+        evaluator = CompositeEvaluator(make_config(), on_progress=on_progress)
+        pairs = [
+            make_pair("Q1", "positive", OutputType.CLASSIFICATION),
+            make_pair("Q2", "negative", OutputType.CLASSIFICATION),
+        ]
+        evaluator.evaluate(pairs)
+        assert progress_calls == [(1, 2), (2, 2)]

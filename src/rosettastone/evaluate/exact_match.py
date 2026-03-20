@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from difflib import SequenceMatcher
+from typing import Any
 
 from rosettastone.evaluate.base import Evaluator
 
@@ -13,7 +14,7 @@ def string_similarity(expected: str, actual: str) -> float:
 
 
 class ExactMatchEvaluator(Evaluator):
-    def score(self, expected: str, actual: str) -> dict[str, float]:
+    def score(self, expected: str, actual: str, **kwargs: Any) -> dict[str, float]:
         is_match = expected.strip().lower() == actual.strip().lower()
         return {
             "exact_match": 1.0 if is_match else 0.0,

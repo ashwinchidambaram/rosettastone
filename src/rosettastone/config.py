@@ -42,3 +42,25 @@ class MigrationConfig(BaseModel):
     dry_run: bool = False
     skip_preflight: bool = False
     max_context_usage: float = 0.75
+
+    # Phase 2: Data sources
+    local_only: bool = False
+    redis_url: str | None = None
+
+    # Phase 2: LLM-as-judge
+    judge_model: str = "openai/gpt-4o"
+
+    # Phase 2: Safety
+    pii_scan: bool = True
+    prompt_audit: bool = True
+
+    # Phase 2: MIPROv2 optimizer
+    mipro_auto: Literal["light", "medium", "heavy"] | None = None
+
+    # Phase 2: Decision thresholds (per output type)
+    win_thresholds: dict[str, float] = {
+        "json": 0.95,
+        "classification": 0.90,
+        "short_text": 0.80,
+        "long_text": 0.75,
+    }
