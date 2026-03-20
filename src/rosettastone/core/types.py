@@ -41,7 +41,6 @@ class MigrationResult(BaseModel):
     duration_seconds: float
     warnings: list[str]
 
-
     # Phase 2: Safety, decision, per-type breakdown
     safety_warnings: list[Any] = []
     recommendation: str | None = None
