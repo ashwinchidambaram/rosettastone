@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from rosettastone.config import MigrationConfig
+    from rosettastone.core.context import PipelineContext
     from rosettastone.core.types import EvalResult, MigrationResult, PromptPair
 
 
@@ -45,18 +46,30 @@ def run_preflight(config: MigrationConfig) -> PreflightReport:
 def load_and_split_data(
     config: MigrationConfig,
 ) -> tuple[list[PromptPair], list[PromptPair], list[PromptPair]]:
-    from rosettastone.ingest.jsonl import JSONLAdapter
+    if config.redis_url:
+        from rosettastone.ingest.redis_adapter import RedisAdapter
+
+        adapter = RedisAdapter(config.redis_url, config.source_model)
+    else:
+        from rosettastone.ingest.jsonl import JSONLAdapter
+
+        adapter = JSONLAdapter(config.data_path)
+
     from rosettastone.ingest.splitter import split_data
 
-    adapter = JSONLAdapter(config.data_path)
     pairs = adapter.load()
     return split_data(pairs, config.train_split, config.val_split)
 
 
 def optimize_prompt(train: list[PromptPair], val: list[PromptPair], config: MigrationConfig) -> str:
-    from rosettastone.optimize.gepa import GEPAOptimizer
+    if config.mipro_auto is not None:
+        from rosettastone.optimize.mipro import MIPROv2Optimizer
 
-    optimizer = GEPAOptimizer()
+        optimizer = MIPROv2Optimizer()
+    else:
+        from rosettastone.optimize.gepa import GEPAOptimizer
+
+        optimizer = GEPAOptimizer()
     return optimizer.optimize(train, val, config)
 
 
@@ -76,12 +89,99 @@ def evaluate_optimized(
     return evaluator.evaluate(test, optimized_prompt=optimized_prompt)
 
 
+def run_pii_scan(pairs: list[PromptPair], ctx: PipelineContext, config: MigrationConfig) -> None:
+    """Scan prompt pairs for PII and add warnings to context."""
+    if not config.pii_scan:
+        return
+
+    from rosettastone.core.context import SafetySeverity, SafetyWarning
+    from rosettastone.safety.pii_scanner import scan_pairs
+
+    pii_warnings = scan_pairs(pairs)
+    for pw in pii_warnings:
+        ctx.safety_warnings.append(
+            SafetyWarning(
+                warning_type="pii",
+                severity=SafetySeverity(pw.severity),
+                message=f"PII detected: {pw.pii_type} (count: {pw.count})",
+                details={"pair_index": pw.pair_index, "pii_type": pw.pii_type},
+            )
+        )
+
+
+def run_prompt_audit(
+    optimized_prompt: str,
+    train: list[PromptPair],
+    ctx: PipelineContext,
+    config: MigrationConfig,
+) -> None:
+    """Audit optimized prompt for training data leakage."""
+    if not config.prompt_audit:
+        return
+
+    from rosettastone.core.context import SafetySeverity, SafetyWarning
+    from rosettastone.safety.prompt_auditor import audit_prompt
+
+    findings = audit_prompt(optimized_prompt, train)
+    for finding in findings:
+        ctx.safety_warnings.append(
+            SafetyWarning(
+                warning_type="prompt_audit",
+                severity=SafetySeverity.MEDIUM,
+                message=(
+                    f"Training data leakage: {len(finding.substring)} chars "
+                    f"from {finding.source_count} source(s)"
+                ),
+                details={"source_count": finding.source_count},
+            )
+        )
+
+
+def run_pii_scan_text(text: str, ctx: PipelineContext) -> None:
+    """Scan optimized prompt text for HIGH-severity PII (blocker)."""
+    from rosettastone.core.context import SafetySeverity, SafetyWarning
+    from rosettastone.safety.pii_scanner import scan_text
+
+    findings = scan_text(text)
+    for pii_type, severity in findings:
+        if severity == "HIGH":
+            ctx.safety_warnings.append(
+                SafetyWarning(
+                    warning_type="pii_in_prompt",
+                    severity=SafetySeverity.HIGH,
+                    message=f"HIGH-severity PII ({pii_type}) found in optimized prompt",
+                    details={"pii_type": pii_type},
+                )
+            )
+
+
+def make_recommendation(
+    validation: list[EvalResult],
+    ctx: PipelineContext,
+    config: MigrationConfig,
+) -> tuple[str, str, dict[str, Any]]:
+    """Run recommendation engine and return (recommendation, reasoning, per_type_scores)."""
+    from rosettastone.decision.recommendation import make_recommendation as _make_rec
+
+    safety_dicts = [
+        {"severity": str(w.severity), "message": w.message} for w in ctx.safety_warnings
+    ]
+    rec_result = _make_rec(validation, safety_dicts, config.win_thresholds)
+
+    import dataclasses
+
+    per_type_scores = {k: dataclasses.asdict(v) for k, v in rec_result.per_type_details.items()}
+
+    return str(rec_result.recommendation), rec_result.reasoning, per_type_scores
+
+
 def build_result(
     config: MigrationConfig,
     optimized_prompt: str,
     baseline: list[EvalResult],
     validation: list[EvalResult],
     duration: float,
+    ctx: PipelineContext | None = None,
 ) -> MigrationResult:
     from rosettastone.core.types import MigrationResult
 
@@ -93,6 +193,8 @@ def build_result(
     confidence_score = validation_wins / total
 
     warnings: list[str] = []
+    if ctx:
+        warnings.extend(ctx.warnings)
     if not validation:
         warnings.append(
             "All validation pairs were skipped — check target model configuration and API keys."
@@ -102,6 +204,27 @@ def build_result(
             "All baseline pairs were skipped — check target model configuration and API keys."
         )
 
+    # Safety warnings as dicts for serialization
+    safety_warnings: list[Any] = []
+    if ctx:
+        safety_warnings = [
+            {
+                "warning_type": w.warning_type,
+                "severity": str(w.severity),
+                "message": w.message,
+            }
+            for w in ctx.safety_warnings
+        ]
+
+    # Recommendation and per-type scores
+    recommendation = None
+    recommendation_reasoning = None
+    per_type_scores: dict[str, Any] = {}
+    if ctx and hasattr(ctx, "_recommendation"):
+        recommendation, recommendation_reasoning, per_type_scores = ctx._recommendation  # type: ignore[attr-defined]
+
+    total_cost = sum(ctx.costs.values()) if ctx else 0.0
+
     return MigrationResult(
         config=config.model_dump(mode="json"),
         optimized_prompt=optimized_prompt,
@@ -110,9 +233,13 @@ def build_result(
         confidence_score=confidence_score,
         baseline_score=baseline_score,
         improvement=confidence_score - baseline_score,
-        cost_usd=0.0,  # TODO: track actual cost via LiteLLM callbacks
+        cost_usd=total_cost,
         duration_seconds=duration,
         warnings=warnings,
+        safety_warnings=safety_warnings,
+        recommendation=recommendation,
+        recommendation_reasoning=recommendation_reasoning,
+        per_type_scores=per_type_scores,
     )
 
 

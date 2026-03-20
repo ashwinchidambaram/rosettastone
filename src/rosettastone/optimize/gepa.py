@@ -33,8 +33,8 @@ class GEPAOptimizer(Optimizer):
         # Build DSPy program
         program = MigrationProgram()
 
-        # Build metric
-        metric = build_migration_metric(config)
+        # Build metric (with feedback map if training data has feedback)
+        metric = build_migration_metric(config, train_set=train_set)
 
         # Convert to DSPy Examples
         trainset = [

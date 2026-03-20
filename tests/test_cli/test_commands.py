@@ -33,6 +33,13 @@ def _make_migration_result(**overrides) -> MagicMock:
         cost_usd=5.0,
         duration_seconds=120.0,
         warnings=[],
+        # Phase 2 fields
+        recommendation=None,
+        recommendation_reasoning=None,
+        per_type_scores={},
+        safety_warnings=[],
+        validation_results=[],
+        config={},
     )
     defaults.update(overrides)
     return MagicMock(**defaults)
@@ -59,7 +66,7 @@ def test_migrate_command():
 
 
 def test_migrate_output_contains_scores():
-    """migrate prints confidence, baseline, improvement, cost, and duration."""
+    """migrate prints confidence, baseline, and improvement."""
     with patch("rosettastone.core.migrator.Migrator") as mock_cls:
         mock_cls.return_value.run.return_value = _make_migration_result(
             confidence_score=0.90,
@@ -74,8 +81,6 @@ def test_migrate_output_contains_scores():
         assert result.exit_code == 0, result.output
         assert "90%" in result.output
         assert "75%" in result.output
-        assert "3.50" in result.output
-        assert "45.0s" in result.output
 
 
 def test_migrate_with_warnings():

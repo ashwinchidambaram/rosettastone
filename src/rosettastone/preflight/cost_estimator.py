@@ -15,6 +15,13 @@ GEPA_METRIC_CALLS = {
     "heavy": 5000,
 }
 
+# MIPROv2 call estimates (zero-shot mode — fewer than GEPA)
+MIPRO_METRIC_CALLS = {
+    "light": 300,
+    "medium": 1200,
+    "heavy": 3000,
+}
+
 
 def estimate_cost(config: MigrationConfig) -> list[str]:
     """Estimate total API cost for a migration run.
@@ -33,7 +40,13 @@ def estimate_cost(config: MigrationConfig) -> list[str]:
         warnings.append("Could not estimate cost — model pricing not available.")
         return warnings
 
-    metric_calls = GEPA_METRIC_CALLS.get(config.gepa_auto, 560)
+    # Optimizer cost
+    if config.mipro_auto is not None:
+        metric_calls = MIPRO_METRIC_CALLS.get(config.mipro_auto, 300)
+        opt_label = f"MIPROv2 {config.mipro_auto}"
+    else:
+        metric_calls = GEPA_METRIC_CALLS.get(config.gepa_auto, 560)
+        opt_label = f"GEPA {config.gepa_auto}"
 
     # Rough estimate: avg 500 input tokens + 500 output tokens per call
     avg_input_tokens = 500
@@ -42,15 +55,41 @@ def estimate_cost(config: MigrationConfig) -> list[str]:
         avg_input_tokens * input_cost + avg_output_tokens * output_cost
     )
 
-    if estimated_cost > 0:
-        warnings.append(
-            f"Estimated API cost: ${estimated_cost:.2f} "
-            f"(~{metric_calls} calls, {config.gepa_auto} mode)"
-        )
+    # Judge cost: 4N calls (2 bidirectional × 2 phases) × avg tokens
+    judge_cost = 0.0
+    if not config.local_only:
+        try:
+            judge_info = litellm.get_model_info(config.judge_model)
+            judge_input = judge_info.get("input_cost_per_token", 0) or 0
+            judge_output = judge_info.get("output_cost_per_token", 0) or 0
+            # Estimate 4 judge calls per pair, 2 phases
+            judge_calls = 4 * config.recommended_pairs
+            judge_cost = judge_calls * (
+                avg_input_tokens * judge_input + avg_output_tokens * judge_output
+            )
+        except Exception:
+            pass
 
-    if estimated_cost > 20:
+    total_cost = estimated_cost + judge_cost
+
+    if total_cost > 0:
+        cost_parts = [f"optimizer: ${estimated_cost:.2f} (~{metric_calls} calls, {opt_label})"]
+        if judge_cost > 0:
+            cost_parts.append(f"LLM judge: ${judge_cost:.2f}")
+        warnings.append(f"Estimated API cost: ${total_cost:.2f} ({', '.join(cost_parts)})")
+
+    if total_cost > 20:
         warnings.append(
             "Estimated cost exceeds $20. Consider using --auto light or reducing dataset size."
         )
+
+    # Redis dependency check
+    if config.redis_url:
+        try:
+            import redis  # noqa: F401
+        except ImportError:
+            warnings.append(
+                "redis-url specified but 'redis' package not installed. Install with: uv add redis"
+            )
 
     return warnings

@@ -231,6 +231,7 @@ def test_cost_just_below_20_does_not_trigger_threshold():
     which is safely below the threshold.
     """
     config = _config(gepa_auto="light")
+    config = config.model_copy(update={"local_only": True})
     calls = GEPA_METRIC_CALLS["light"]  # 560
     # Target ~$19.99: cost = calls * 500 * (in + out) ≈ 19.99
     # → unit_cost = 19.99 / (560 * 1000) ≈ 3.569e-05
