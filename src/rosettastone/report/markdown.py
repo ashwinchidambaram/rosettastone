@@ -33,6 +33,7 @@ def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
         wins=sum(1 for r in result.validation_results if r.is_win),
     )
 
+    output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "migration_report.md"
     output_path.write_text(report_content)
 
