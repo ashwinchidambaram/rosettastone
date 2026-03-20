@@ -37,7 +37,7 @@ class Migrator:
             if preflight_report.has_blockers:
                 raise MigrationBlockedError(preflight_report)
             if self.config.dry_run:
-                return preflight_report.as_dry_run_result()
+                return preflight_report.as_dry_run_result()  # type: ignore[no-any-return]
 
         # Step 1: Ingest
         train, val, test = load_and_split_data(self.config)

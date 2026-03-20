@@ -12,7 +12,7 @@ class OutputType(str, Enum):
 
 
 class PromptPair(BaseModel):
-    prompt: str | list[dict]
+    prompt: str | list[dict[str, Any]]
     response: str
     source_model: str
     metadata: dict[str, Any] = {}
