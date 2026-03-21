@@ -64,6 +64,9 @@ select = ["E", "F", "I", "N", "W", "UP"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "playwright: marks tests as Playwright end-to-end UI tests (deselect with '-m not playwright')",
+]
 
 [tool.mypy]
 python_version = "3.11"
