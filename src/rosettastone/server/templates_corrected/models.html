@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% set active_nav = "models" %}
+
+{% block title %}RosettaStone | Models{% endblock %}
+
+{% block content %}
+<!-- Attention Banner -->
+{% if alerts %}
+<section class="attention-banner mb-12">
+    <div class="flex items-start gap-4">
+        <i data-lucide="alert-triangle" class="w-5 h-5 mt-0.5 flex-shrink-0" style="color: var(--gold-400);"></i>
+        <div class="space-y-2">
+            <h3 class="font-bold text-sm uppercase tracking-wider" style="color: var(--text-primary);">{{ alerts|length }} things need your attention</h3>
+            <ul class="space-y-1">
+                {% for alert in alerts %}
+                <li class="text-sm flex items-center gap-2" style="color: var(--text-on-surface); opacity: 0.8;">
+                    <span class="w-1 h-1 rounded-full inline-block" style="background: var(--gold-400);"></span>
+                    {{ alert.message }}{% if alert.action %} — {{ alert.action }}{% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- Your Models Section -->
+<section class="space-y-8 mb-16">
+    <div class="flex justify-between items-end">
+        <h2 class="text-[28px] font-bold tracking-tight font-headline" style="color: var(--text-primary);">Your models</h2>
+        <span class="text-xs font-mono uppercase tracking-widest" style="color: var(--text-muted);">{{ models|length }} ACTIVE INSTANCES</span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {% for model in models %}
+        <div class="group card-surface-low {% if model.status == 'deprecated' %}card-accent-gold{% endif %} flex flex-col justify-between min-h-[220px] hover:opacity-90 transition-all">
+            <div class="flex justify-between items-start">
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        {% if model.status == 'active' %}
+                        <span class="status-dot status-dot-active"></span>
+                        <span class="font-mono text-[10px] uppercase font-bold tracking-widest" style="color: var(--sage-400);">Active</span>
+                        {% elif model.status == 'deprecated' %}
+                        <span class="status-dot status-dot-deprecated"></span>
+                        <span class="font-mono text-[10px] uppercase font-bold tracking-widest" style="color: var(--gold-400);">Deprecated</span>
+                        {% endif %}
+                    </div>
+                    <h3 class="text-xl font-bold" style="color: var(--text-on-surface);">{{ model.id }}</h3>
+                    {% if model.status == 'deprecated' and model.retirement_date %}
+                    <p class="text-xs" style="color: var(--gold-400); opacity: 0.8;">Retiring {{ model.retirement_date }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if model.status == 'deprecated' and model.replacement %}
+            <div class="p-4 rounded-lg my-6" style="background: var(--gold-bg);">
+                <p class="text-[10px] font-mono uppercase tracking-widest mb-1" style="color: var(--gold-400);">Recommended Upgrade</p>
+                <p class="font-bold" style="color: var(--text-on-surface);">{{ model.replacement }}</p>
+            </div>
+            {% else %}
+            <div class="p-4 rounded-lg my-6 flex justify-between items-center" style="background: var(--bg-surface-high);">
+                <div class="text-center px-4" style="border-right: 1px solid var(--border-subtle);">
+                    <p class="text-[10px] font-mono uppercase tracking-tighter" style="color: var(--text-muted);">Context</p>
+                    <p class="font-bold" style="color: var(--text-on-surface);">{{ model.context }}</p>
+                </div>
+                <div class="text-center px-4" style="border-right: 1px solid var(--border-subtle);">
+                    <p class="text-[10px] font-mono uppercase tracking-tighter" style="color: var(--text-muted);">Cost/1M</p>
+                    <p class="font-bold" style="color: var(--text-on-surface);">{{ model.cost_per_1m }}</p>
+                </div>
+                <div class="text-center px-4">
+                    <p class="text-[10px] font-mono uppercase tracking-tighter" style="color: var(--text-muted);">Provider</p>
+                    <p class="font-bold" style="color: var(--text-on-surface);">{{ model.provider }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <a href="/ui/migrations" class="font-bold text-sm inline-flex items-center gap-2 hover:translate-x-1 transition-transform" style="color: var(--terracotta-400);">
+                {% if model.status == 'deprecated' %}Start migration{% else %}Run migration{% endif %}
+                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </a>
+        </div>
+        {% endfor %}
+
+        <!-- Add Model Card -->
+        <div class="card-dashed min-h-[220px] group">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform" style="background: var(--bg-surface-high);">
+                <i data-lucide="plus" class="w-5 h-5" style="color: var(--terracotta-400);"></i>
+            </div>
+            <span class="font-bold" style="color: var(--text-on-surface);">Add model</span>
+            <span class="text-xs mt-1" style="color: var(--text-muted);">Configure a new model</span>
+        </div>
+    </div>
+</section>
+
+<!-- Explore Models Section -->
+<section class="space-y-8 pb-20">
+    <h2 class="text-[28px] font-bold tracking-tight font-headline" style="color: var(--text-on-surface);">Explore models</h2>
+
+    <!-- Search -->
+    <div class="flex flex-col md:flex-row gap-4 items-center">
+        <div class="relative flex-grow w-full">
+            <i data-lucide="search" class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" style="color: var(--text-muted);"></i>
+            <input type="text" placeholder="Search 2,450+ models..." class="w-full rounded-lg pl-12 pr-4 py-3 text-sm focus:ring-1 focus:outline-none transition-all" style="background: var(--bg-input); border: 1px solid var(--border-input); color: var(--text-on-surface);">
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-hidden rounded-xl" style="background: var(--bg-surface-low);">
+        <table class="explore-table">
+            <thead>
+                <tr style="background: var(--bg-surface-high);">
+                    <th class="px-6 py-4 text-[10px] font-mono uppercase tracking-widest" style="color: var(--text-muted);">Model Name</th>
+                    <th class="px-6 py-4 text-[10px] font-mono uppercase tracking-widest" style="color: var(--text-muted);">Provider</th>
+                    <th class="px-6 py-4 text-[10px] font-mono uppercase tracking-widest" style="color: var(--text-muted);">Cost/1M</th>
+                    <th class="px-6 py-4 text-[10px] font-mono uppercase tracking-widest" style="color: var(--text-muted);">Context</th>
+                    <th class="px-6 py-4 text-[10px] font-mono uppercase tracking-widest" style="color: var(--text-muted);">Match %</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="transition-colors" style="border-bottom: 1px solid var(--border-subtle);">
+                    <td class="px-6 py-5 font-bold" style="color: var(--text-on-surface);">gemini-2.5-flash</td>
+                    <td class="px-6 py-5 text-sm" style="color: var(--text-secondary);">Google</td>
+                    <td class="px-6 py-5 font-mono text-xs" style="color: var(--terracotta-400);">$0.10</td>
+                    <td class="px-6 py-5 text-sm" style="color: var(--text-secondary);">1M+</td>
+                    <td class="px-6 py-5 w-48">
+                        <div class="metric-bar-track"><div class="metric-bar-fill metric-bar-terracotta" style="width: 98%;"></div></div>
+                    </td>
+                </tr>
+                <tr class="transition-colors" style="border-bottom: 1px solid var(--border-subtle);">
+                    <td class="px-6 py-5 font-bold" style="color: var(--text-on-surface);">llama-4-maverick</td>
+                    <td class="px-6 py-5 text-sm" style="color: var(--text-secondary);">Meta</td>
+                    <td class="px-6 py-5 font-mono text-xs" style="color: var(--terracotta-400);">$0.00</td>
+                    <td class="px-6 py-5 text-sm" style="color: var(--text-secondary);">64K</td>
+                    <td class="px-6 py-5 w-48">
+                        <div class="metric-bar-track"><div class="metric-bar-fill metric-bar-terracotta" style="width: 85%;"></div></div>
+                    </td>
+                </tr>
+                <tr class="transition-colors" style="border-bottom: 1px solid var(--border-subtle);">
+                    <td class="px-6 py-5 font-bold" style="color: var(--text-on-surface);">claude-opus-4.6</td>
+                    <td class="px-6 py-5 text-sm" style="color: var(--text-secondary);">Anthropic</td>
+                    <td class="px-6 py-5 font-mono text-xs" style="color: var(--terracotta-400);">$15.00</td>
+                    <td class="px-6 py-5 text-sm" style="color: var(--text-secondary);">200K</td>
+                    <td class="px-6 py-5 w-48">
+                        <div class="metric-bar-track"><div class="metric-bar-fill metric-bar-terracotta" style="width: 92%;"></div></div>
+                    </td>
+                </tr>
+                <tr class="transition-colors" style="border-bottom: 1px solid var(--border-subtle);">
+                    <td class="px-6 py-5 font-bold" style="color: var(--text-on-surface);">mistral-large</td>
+                    <td class="px-6 py-5 text-sm" style="color: var(--text-secondary);">Mistral</td>
+                    <td class="px-6 py-5 font-mono text-xs" style="color: var(--terracotta-400);">$4.00</td>
+                    <td class="px-6 py-5 text-sm" style="color: var(--text-secondary);">32K</td>
+                    <td class="px-6 py-5 w-48">
+                        <div class="metric-bar-track"><div class="metric-bar-fill metric-bar-terracotta" style="width: 76%;"></div></div>
+                    </td>
+                </tr>
+                <tr class="transition-colors">
+                    <td class="px-6 py-5 font-bold" style="color: var(--text-on-surface);">deepseek-v3</td>
+                    <td class="px-6 py-5 text-sm" style="color: var(--text-secondary);">DeepSeek</td>
+                    <td class="px-6 py-5 font-mono text-xs" style="color: var(--terracotta-400);">$0.25</td>
+                    <td class="px-6 py-5 text-sm" style="color: var(--text-secondary);">128K</td>
+                    <td class="px-6 py-5 w-48">
+                        <div class="metric-bar-track"><div class="metric-bar-fill metric-bar-terracotta" style="width: 81%;"></div></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

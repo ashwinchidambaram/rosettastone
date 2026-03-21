@@ -59,7 +59,8 @@ The core insight: your production data already defines how your model should beh
 pip install rosettastone
 
 pip install "rosettastone[eval]"   # adds BERTScore & sentence-transformers
-pip install "rosettastone[all]"    # includes everything (redis, eval, etc.)
+pip install "rosettastone[web]"    # adds FastAPI web dashboard
+pip install "rosettastone[all]"    # includes everything (redis, eval, web, etc.)
 ```
 
 ### Configuration
@@ -309,6 +310,8 @@ src/rosettastone/
 ├── safety/               PII scanner (regex), prompt auditor (leakage detection)
 ├── decision/             Recommendation engine, Wilson CI statistics
 ├── report/               Jinja2 markdown report generation (10-section template)
+├── server/               Web UI — FastAPI + Jinja2 + HTMX + Tailwind
+│                         SQLite persistence, JSON API, template rendering
 └── utils/                Logging (never logs prompt content), LiteLLM helpers
 ```
 
@@ -320,6 +323,37 @@ src/rosettastone/
 - **Lazy optional deps** — `bert-score`, `sentence-transformers`, and `redis` only load when called, with graceful fallbacks.
 - **PII-safe by default** — prompt content is never logged at any level. Reports show structural metrics only. PII scanning runs automatically.
 - **Additive phases** — each phase adds new files without rewriting existing ones. Phase 1 code stays stable through Phase 5.
+
+---
+
+## Web Dashboard
+
+RosettaStone includes a web UI for exploring migration results visually.
+
+```bash
+# install web dependencies
+pip install "rosettastone[web]"
+
+# start the dashboard
+uvicorn rosettastone.server.app:create_app --factory --port 8000
+
+# open http://localhost:8000/ui/
+```
+
+**Pages:**
+
+| Page | URL | Description |
+|:---|:---|:---|
+| Models | `/ui/` | Active models, deprecation warnings, model explorer |
+| Migrations | `/ui/migrations` | Migration history with go/no-go recommendations |
+| Migration Detail | `/ui/migrations/{id}` | Answer-first layout: recommendation, KPIs, per-type breakdown, regressions with diff view |
+| Costs | `/ui/costs` | Spend breakdown by model, optimization opportunities |
+| Alerts | `/ui/alerts` | Deprecation warnings, price changes, new model availability |
+| Executive Report | `/ui/migrations/{id}/executive` | Print-ready one-page summary for stakeholders |
+
+**Design philosophy:** "Designing for decisions, not data." The UI answers questions first ("Should we ship this?") with evidence behind a click. Human language ("Safe to ship" / "Needs review" / "Do not ship") instead of jargon.
+
+**Tech stack:** FastAPI + Jinja2 + HTMX + Tailwind CSS + Material Symbols. Dark mode default with light mode toggle. All migrations data is live from the SQLite database; models, costs, and alerts use placeholder data pending backend integration.
 
 ---
 
@@ -349,7 +383,7 @@ src/rosettastone/
 |:---:|:---|:---:|
 | **1** | CLI + Python library, JSONL ingestion, GEPA optimization, multi-strategy evaluation, markdown reports | ✅ Complete |
 | **2** | Redis ingestion, LLM-as-judge evaluation, MIPROv2 optimizer, PII detection, prompt auditing, decision engine (GO/NO_GO), Rich CLI, per-output-type statistics | ✅ Complete |
-| **3** | Web UI (FastAPI + React), side-by-side diffs, PDF/HTML reports, executive dashboard | ⏳ Planned |
+| **3** | Web UI (FastAPI + HTMX + Tailwind), side-by-side diffs, executive reports, decision-first dashboard | 🚧 In Progress |
 | **4** | LangSmith / Braintrust / OpenTelemetry adapters, CI/CD integration | ⏳ Planned |
 | **5** | Multi-step pipeline migration, A/B testing, versioning, enterprise features | ⏳ Planned |
 

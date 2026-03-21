@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Alerts{% endblock %}
+
+{% block head_extra %}
+<style>
+    .ghost-border { border: 1px solid rgba(163, 140, 134, 0.15); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen pt-8">
+
+<!-- Hero: Critical Status Section -->
+<section class="relative px-8 pt-16 pb-24 overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-br from-error-container/20 to-transparent pointer-events-none"></div>
+    <div class="max-w-7xl mx-auto relative z-10">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+            <div class="space-y-4">
+                <div class="flex items-center gap-4 text-[#D85650]">
+                    <span class="material-symbols-outlined text-5xl" style="font-variation-settings: 'FILL' 1;">warning</span>
+                    <span class="font-['JetBrains_Mono'] text-sm tracking-widest uppercase opacity-80">System Priority: Omega</span>
+                </div>
+                <h1 class="text-5xl md:text-7xl font-black tracking-tighter leading-none text-on-surface">
+                    {{ alerts|length }} Critical Alerts.<br/>
+                    <span class="text-[#D85650]">ACTION REQUIRED.</span>
+                </h1>
+                <p class="text-on-surface-variant max-w-xl text-lg">
+                    RosettaStone migration protocols have detected model deprecations, price changes, and new model availability. Review and take action.
+                </p>
+            </div>
+            <div class="flex flex-col gap-4">
+                <button class="bg-gradient-to-br from-[#D4745E] to-[#D67660] text-on-primary px-10 py-5 rounded-lg font-bold text-lg hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-primary/20">
+                    Start Batch Migration
+                </button>
+                <button class="ghost-border px-10 py-5 rounded-lg font-bold text-on-surface hover:bg-surface-container-high transition-colors">
+                    View Drift Logs
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Active Intelligence Reports -->
+<section class="px-8 pb-32">
+    <div class="max-w-7xl mx-auto">
+        <div class="flex justify-between items-end mb-12">
+            <div>
+                <h2 class="text-3xl font-black tracking-tight text-on-surface">Active Intelligence Reports</h2>
+                <p class="text-on-surface-variant mt-2 font-['JetBrains_Mono'] text-xs">Real-time heuristic monitoring for RosettaStone core</p>
+            </div>
+            <button class="text-[#D4745E] font-bold text-sm hover:underline">Export Report Data</button>
+        </div>
+        <div class="grid grid-cols-1 gap-4">
+            {% for alert in alerts %}
+            <div class="bg-surface-container-low p-6 rounded-xl border-l-4
+                {% if alert.type == 'deprecation' %}border-[#D85650]{% elif alert.type == 'price_change' %}border-[#D4A574]{% else %}border-[#8B9D83]{% endif %}
+                flex items-center justify-between group hover:bg-surface-container-high transition-all">
+                <div class="flex items-center gap-6">
+                    <div class="w-12 h-12 rounded-lg
+                        {% if alert.type == 'deprecation' %}bg-error-container/10{% elif alert.type == 'price_change' %}bg-tertiary-container/10{% else %}bg-secondary-container/10{% endif %}
+                        flex items-center justify-center">
+                        <span class="material-symbols-outlined
+                            {% if alert.type == 'deprecation' %}text-[#D85650]{% elif alert.type == 'price_change' %}text-[#D4A574]{% else %}text-[#8B9D83]{% endif %}">
+                            {% if alert.type == 'deprecation' %}history_toggle_off{% elif alert.type == 'price_change' %}payments{% else %}model_training{% endif %}
+                        </span>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-on-surface">
+                            {% if alert.type == 'deprecation' %}Deprecation Warning: {{ alert.model }}{% elif alert.type == 'price_change' %}Price Change: {{ alert.model }}{% else %}New Model Available: {{ alert.model }}{% endif %}
+                        </h3>
+                        <p class="text-sm text-on-surface-variant">{{ alert.message }}. {{ alert.action }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-8">
+                    <div class="text-right">
+                        <div class="text-xs font-['JetBrains_Mono'] text-on-surface-variant">
+                            {% if alert.type == 'deprecation' %}TIMELINE{% elif alert.type == 'price_change' %}IMPACT{% else %}STATUS{% endif %}
+                        </div>
+                        <div class="font-bold
+                            {% if alert.type == 'deprecation' %}text-[#D85650]{% elif alert.type == 'price_change' %}text-[#D4A574]{% else %}text-[#8B9D83]{% endif %}">
+                            {% if alert.type == 'deprecation' %}{{ alert.days_left }} days remaining{% elif alert.type == 'price_change' %}{{ alert.old_price }} &rarr; {{ alert.new_price }}{% else %}Available{% endif %}
+                        </div>
+                    </div>
+                    <span class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- Notification Settings Section -->
+<section class="px-8 py-24 bg-surface-container-lowest">
+    <div class="max-w-3xl mx-auto">
+        <h3 class="text-2xl font-bold mb-8 text-on-surface">Notification Settings</h3>
+        <div class="space-y-6">
+            <label class="flex items-start gap-4 p-4 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group">
+                <div class="pt-1">
+                    <input checked class="w-5 h-5 rounded border-outline bg-surface-container-high text-[#D4745E] focus:ring-[#D4745E]" type="checkbox"/>
+                </div>
+                <div>
+                    <span class="block font-bold text-on-surface">Email: Critical System Alerts</span>
+                    <span class="text-sm text-on-surface-variant">Immediate dispatch for priority Omega incidents.</span>
+                </div>
+            </label>
+            <label class="flex items-start gap-4 p-4 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group">
+                <div class="pt-1">
+                    <input class="w-5 h-5 rounded border-outline bg-surface-container-high text-[#D4745E] focus:ring-[#D4745E]" type="checkbox"/>
+                </div>
+                <div>
+                    <span class="block font-bold text-on-surface">Email: Cost &amp; Efficiency Reports</span>
+                    <span class="text-sm text-on-surface-variant">Weekly summaries of compute utilization and spending.</span>
+                </div>
+            </label>
+            <label class="flex items-start gap-4 p-4 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group">
+                <div class="pt-1">
+                    <input checked class="w-5 h-5 rounded border-outline bg-surface-container-high text-[#D4745E] focus:ring-[#D4745E]" type="checkbox"/>
+                </div>
+                <div>
+                    <span class="block font-bold text-on-surface">Push: Model Performance Drift</span>
+                    <span class="text-sm text-on-surface-variant">Alerts when heuristic accuracy drops below threshold.</span>
+                </div>
+            </label>
+        </div>
+        <div class="mt-12 flex justify-end">
+            <button class="bg-surface-container-highest px-8 py-3 rounded-lg font-bold text-on-surface hover:bg-surface-bright transition-colors">
+                Save Preferences
+            </button>
+        </div>
+    </div>
+</section>
+
+</div>
+{% endblock %}

@@ -1,0 +1,115 @@
+{# HTMX fragment — no base.html. Loaded into #diff-content inside the slide-over panel. #}
+
+<!-- Panel Header -->
+<div class="px-8 pt-8 pb-4 flex justify-between items-start">
+    <div class="space-y-3">
+        <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded bg-[#7A9FB5]/20 text-[#7A9FB5] text-[10px] font-bold tracking-wider uppercase">{{ diff.output_type }}</span>
+        </div>
+        <div class="flex items-end gap-3">
+            <h2 class="text-5xl font-semibold text-[#D4A574] font-headline leading-none">{{ diff.composite_score }}</h2>
+            <span class="px-1.5 py-0.5 rounded {% if diff.is_win %}bg-[#8B9D83] text-white{% else %}bg-[#D85650] text-white{% endif %} text-[10px] font-black mb-1">{% if diff.is_win %}WIN{% else %}LOSS{% endif %}</span>
+        </div>
+    </div>
+    <button data-action="close-slideout" class="p-2 hover:bg-white/5 rounded-full transition-colors">
+        <span class="material-symbols-outlined text-[#BDBDBD] text-3xl">close</span>
+    </button>
+</div>
+
+<!-- Metric Bars -->
+<div class="px-8 py-6 space-y-5">
+    <div class="space-y-2">
+        <div class="flex justify-between text-[11px] font-mono text-on-surface/60 uppercase tracking-widest">
+            <span>BERTScore</span>
+            <span class="text-on-surface">{{ diff.scores.bertscore }}</span>
+        </div>
+        <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+            <div class="h-full bg-[#8B9D83]/40 rounded-full" style="width: {{ (diff.scores.bertscore * 100)|int }}%"></div>
+        </div>
+    </div>
+    <div class="space-y-2">
+        <div class="flex justify-between text-[11px] font-mono text-on-surface/60 uppercase tracking-widest">
+            <span>Embedding similarity</span>
+            <span class="text-on-surface">{{ diff.scores.embedding }}</span>
+        </div>
+        <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+            <div class="h-full bg-[#8B9D83] rounded-full" style="width: {{ (diff.scores.embedding * 100)|int }}%"></div>
+        </div>
+    </div>
+    <div class="space-y-2">
+        <div class="flex justify-between text-[11px] font-mono text-on-surface/60 uppercase tracking-widest">
+            <span>Composite</span>
+            <span class="text-[#D4A574] font-bold">{{ diff.scores.composite }}</span>
+        </div>
+        <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+            <div class="h-full bg-[#D4A574] rounded-full" style="width: {{ (diff.scores.composite * 100)|int }}%"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab Toggle -->
+<div class="px-8 border-b border-white/5 flex gap-8">
+    <button class="pb-3 text-sm font-bold text-on-surface border-b-2 border-[#D4745E] tracking-tight">Side-by-side</button>
+    <button class="pb-3 text-sm font-bold text-on-surface/40 hover:text-on-surface/70 transition-colors tracking-tight">Unified</button>
+</div>
+
+<!-- Scrollable Content Area -->
+<div class="flex-1 overflow-y-auto custom-scrollbar">
+    {% if diff.expected and diff.expected != 'Content not stored (run with --store-prompt-content)' %}
+    <!-- PII Warning Banner -->
+    <div class="m-6 p-4 bg-[#D4A574]/10 border-l-4 border-[#D4A574] flex items-center gap-3">
+        <span class="material-symbols-outlined text-[#D4A574] text-sm" style="font-variation-settings: 'FILL' 1;">warning</span>
+        <p class="text-[14px] text-[#D4A574] font-medium">Content may contain sensitive data from production prompts</p>
+    </div>
+
+    <!-- Diff View -->
+    <div class="mx-6 mb-8 rounded-xl bg-[#1A1A1A] overflow-hidden border border-white/5">
+        <div class="grid grid-cols-2 border-b border-white/5">
+            <div class="px-5 py-3 border-r border-white/5">
+                <span class="text-[12px] font-mono text-[#9E9E9E] uppercase tracking-tighter">Expected ({{ diff.source_model|default('') }})</span>
+            </div>
+            <div class="px-5 py-3">
+                <span class="text-[12px] font-mono text-[#9E9E9E] uppercase tracking-tighter">Actual ({{ diff.target_model|default('') }})</span>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 font-mono text-[14px] leading-relaxed">
+            <!-- Left Column (Expected) -->
+            <div class="p-5 border-r border-white/5 text-[#E8DCC4] whitespace-pre-wrap">{{ diff.expected }}</div>
+            <!-- Right Column (Actual) -->
+            <div class="p-5 text-[#E8DCC4] whitespace-pre-wrap">{{ diff.actual|default('') }}</div>
+        </div>
+    </div>
+    {% else %}
+    <!-- Content not available info message -->
+    <div class="m-6 p-6 bg-surface-container-low border border-outline-variant/20 rounded-xl flex flex-col items-center gap-3 text-center">
+        <span class="material-symbols-outlined text-3xl text-on-surface-variant/40">visibility_off</span>
+        <p class="text-[14px] text-on-surface-variant font-medium">Content not stored</p>
+        <p class="text-[12px] text-on-surface-variant/60 max-w-xs">Run the migration with <code class="font-mono bg-surface-container-high px-1 rounded">--store-prompt-content</code> to enable diff view.</p>
+    </div>
+    {% endif %}
+
+    <!-- Additional Metadata Section -->
+    <div class="mx-6 p-8 rounded-xl bg-surface-container-low border border-white/5 mb-10">
+        <h3 class="text-[#D4A574] text-[12px] font-bold uppercase tracking-[0.2em] mb-6">Test Case Evidence</h3>
+        <div class="grid grid-cols-3 gap-8">
+            <div>
+                <p class="text-[10px] text-on-surface/40 uppercase mb-1">Test Case ID</p>
+                <p class="font-mono text-sm">#{{ diff.tc_id }}</p>
+            </div>
+            <div>
+                <p class="text-[10px] text-on-surface/40 uppercase mb-1">Output Type</p>
+                <p class="font-mono text-sm">{{ diff.output_type }}</p>
+            </div>
+            <div>
+                <p class="text-[10px] text-on-surface/40 uppercase mb-1">Composite Score</p>
+                <p class="font-mono text-sm">{{ diff.composite_score }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Footer CTA -->
+<div class="p-6 bg-surface-container-high border-t border-white/5 flex justify-end gap-3">
+    <button data-action="close-slideout" class="px-6 py-2 text-xs font-bold text-on-surface/60 hover:text-on-surface transition-colors">CLOSE</button>
+    <button class="px-6 py-2 bg-[#D4A574] text-surface-container-lowest text-xs font-black rounded-md hover:brightness-110 transition-all">APPROVE VARIANCE</button>
+</div>

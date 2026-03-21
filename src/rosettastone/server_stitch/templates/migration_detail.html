@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+{% block title %}Migration Detail{% endblock %}
+
+{% block head_extra %}
+<style>
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pb-24 px-8 max-w-[1440px] mx-auto min-h-screen pt-8">
+
+<!-- Breadcrumb & Header -->
+<div class="mb-12">
+    <a class="flex items-center gap-2 text-[#D4745E] font-medium mb-4 hover:opacity-80 transition-opacity" href="/ui/migrations">
+        <span class="material-symbols-outlined text-sm">arrow_back</span>
+        <span>Migrations</span>
+    </a>
+    <div class="flex flex-wrap items-center justify-between gap-6">
+        <div class="flex items-center gap-4">
+            {% if migration.recommendation == "Do not ship" %}
+            <h1 class="text-[28px] font-bold text-[#E8DCC4] tracking-tight flex items-center gap-3">
+                <span class="font-mono text-xl opacity-60">{{ migration.source }}</span>
+                <span class="material-symbols-outlined text-outline">trending_flat</span>
+                <span class="font-mono text-xl">{{ migration.target }}</span>
+            </h1>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-error/20 text-error border border-error/30 tracking-widest uppercase">FAILED</span>
+            {% else %}
+            <h1 class="text-[28px] font-semibold text-[#E8DCC4] font-headline tracking-tight">
+                {{ migration.source }} <span class="text-on-surface-variant/30 mx-2">&rarr;</span> {{ migration.target }}
+            </h1>
+            {% if migration.recommendation == "Safe to ship" %}
+            <span class="px-3 py-1 bg-success/10 text-success border border-success/30 text-[11px] font-bold uppercase tracking-widest rounded-full">Complete</span>
+            {% else %}
+            <span class="px-3 py-1 bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/30 text-[11px] font-bold uppercase tracking-widest rounded-full">Review</span>
+            {% endif %}
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-3">
+            {% if migration.recommendation == "Safe to ship" %}
+            <button class="flex items-center gap-2 px-4 py-2 bg-surface-container-high hover:bg-surface-bright text-on-surface text-sm font-medium rounded-lg transition-all">
+                <span class="material-symbols-outlined text-[18px]">history</span>
+                Version History
+            </button>
+            <button class="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-primary-container to-primary text-on-primary-container text-sm font-bold rounded-lg transition-all active:scale-95 shadow-lg shadow-primary/10">
+                <span class="material-symbols-outlined text-[18px]">rocket_launch</span>
+                Deploy to Prod
+            </button>
+            {% elif migration.recommendation == "Do not ship" %}
+            <div class="text-right">
+                <p class="text-[10px] font-mono uppercase tracking-[0.2em] text-on-surface-variant">Last Evaluated</p>
+                <p class="text-sm font-medium">Oct 24, 2024 &mdash; 14:02 UTC</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if migration.recommendation == "Safe to ship" %}
+{# ─── SAFE TO SHIP LAYOUT ─── #}
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <!-- Left Column: Recommendation & Analysis -->
+    <div class="lg:col-span-8 space-y-8">
+        <!-- Recommendation Card -->
+        <section class="bg-surface-container-low border-l-4 border-success p-8 rounded-xl shadow-xl shadow-black/20">
+            <div class="flex flex-col md:flex-row gap-8 items-start">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 text-success mb-4">
+                        <span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        <h2 class="text-2xl font-bold font-headline">Safe to ship</h2>
+                    </div>
+                    <p class="text-on-surface/80 leading-relaxed mb-8 max-w-2xl">
+                        {{ migration.reasoning }}
+                    </p>
+                    <div class="flex flex-wrap gap-4">
+                        <a href="/ui/migrations/{{ migration.id }}/executive" class="px-6 py-2.5 bg-[#D4745E] text-white font-bold rounded-lg hover:brightness-110 transition-all active:scale-95 shadow-md shadow-[#D4745E]/20">
+                            Export report
+                        </a>
+                        <button class="px-6 py-2.5 bg-transparent border border-outline/30 text-on-surface font-medium rounded-lg hover:bg-surface-container-high transition-all">
+                            View optimized prompt
+                        </button>
+                    </div>
+                </div>
+                <div class="w-full md:w-auto flex flex-col items-center justify-center p-6 bg-surface-container-high rounded-xl min-w-[180px]">
+                    <div class="text-4xl font-black text-success font-headline mb-1">{{ migration.confidence }}%</div>
+                    <div class="text-[10px] font-label text-on-surface-variant uppercase tracking-widest">Confidence Score</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- KPI Grid -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div class="bg-surface-container-low p-6 rounded-xl">
+                <div class="text-3xl font-bold text-success font-headline mb-1">{{ migration.confidence }}%</div>
+                <div class="text-xs text-on-surface-variant/70 font-medium">Parity Score</div>
+            </div>
+            <div class="bg-surface-container-low p-6 rounded-xl">
+                <div class="text-3xl font-bold text-on-surface/60 font-headline mb-1">{{ migration.baseline }}%</div>
+                <div class="text-xs text-on-surface-variant/70 font-medium">Baseline</div>
+            </div>
+            <div class="bg-surface-container-low p-6 rounded-xl">
+                <div class="text-3xl font-bold text-success font-headline mb-1">+{{ migration.improvement }}%</div>
+                <div class="text-xs text-on-surface-variant/70 font-medium">Improvement from GEPA</div>
+            </div>
+        </section>
+
+        <!-- Results by Output Type -->
+        {% if migration.per_type %}
+        <section>
+            <h3 class="text-xl font-bold font-headline mb-6 text-on-surface/90">Results by output type</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% for pt in migration.per_type %}
+                <div class="bg-surface-container-low {% if pt.badge == 'WARN' %}border-l-4 border-warn{% elif pt.badge == 'FAIL' %}border-l-4 border-[#D85650]{% endif %} p-6 rounded-xl flex items-center justify-between group hover:bg-surface-container-high transition-colors">
+                    <div>
+                        <div class="text-sm font-semibold text-on-surface-variant mb-1">{{ pt.type }}</div>
+                        <div class="text-2xl font-bold font-headline">{{ pt.wins }}/{{ pt.total }} <span class="text-sm text-on-surface-variant font-normal">({{ (pt.wins / pt.total * 100)|int }}%)</span></div>
+                    </div>
+                    <span class="px-3 py-1 text-[10px] font-bold rounded
+                        {% if pt.badge == 'PASS' %}bg-success/10 text-success border border-success/30{% elif pt.badge == 'WARN' %}bg-warn/10 text-warn border border-warn/30{% else %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% endif %}">{{ pt.badge }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+    </div>
+
+    <!-- Right Column: Regressions & Config -->
+    <div class="lg:col-span-4 space-y-8">
+        <!-- Needs Attention Section -->
+        {% if migration.regressions %}
+        <section class="bg-surface-container-low rounded-xl overflow-hidden">
+            <div class="px-6 py-5 bg-surface-container-high border-b border-outline-variant/10 flex justify-between items-center">
+                <h3 class="font-bold text-sm uppercase tracking-wider text-on-surface/70">Needs Attention</h3>
+                <span class="px-2 py-0.5 bg-error/10 text-error text-[10px] font-bold rounded-full">{{ migration.regressions|length }} CRITICAL</span>
+            </div>
+            <div class="p-6 space-y-6">
+                {% for reg in migration.regressions %}
+                <div class="space-y-3">
+                    <div class="flex justify-between items-start">
+                        {% if loop.first %}
+                        <span class="text-[10px] font-label text-error/80 bg-error/5 px-2 py-0.5 rounded border border-error/20">Worst regression</span>
+                        {% endif %}
+                        <span class="text-[10px] font-label text-on-surface-variant">Score: {{ reg.score }}</span>
+                    </div>
+                    <div class="text-sm font-bold text-on-surface">{{ reg.title }}</div>
+                    <div class="p-3 bg-surface-container-lowest rounded text-xs font-label leading-relaxed">
+                        <div class="text-on-surface-variant/50 mb-1">Expected: <span class="text-success/70">{{ reg.expected }}</span></div>
+                        <div class="text-on-surface">Got: <span class="text-error/70">{{ reg.got }}</span></div>
+                    </div>
+                    <button class="text-primary text-[11px] font-bold flex items-center gap-1 hover:underline"
+                            hx-get="/ui/fragments/diff/{{ migration.id }}/{{ reg.tc_id }}"
+                            hx-target="#diff-content"
+                            hx-swap="innerHTML">
+                        View diff <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                    </button>
+                </div>
+                {% if not loop.last %}
+                <div class="h-px bg-outline-variant/10"></div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Configuration Section -->
+        <section>
+            <button class="w-full flex items-center justify-between p-4 bg-surface-container-low hover:bg-surface-container-high rounded-xl transition-all group"
+                    data-action="toggle-collapse" data-target="config-details" aria-expanded="false">
+                <span class="font-bold text-sm text-on-surface/80">Configuration and details</span>
+                <span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform collapse-chevron">chevron_right</span>
+            </button>
+            <div id="config-details" class="collapsible-content">
+                <div class="p-4 bg-surface-container-low rounded-b-xl mt-1 space-y-3 text-xs">
+                    <div class="flex justify-between"><span class="text-on-surface-variant">Source</span><span class="font-label">{{ migration.source }}</span></div>
+                    <div class="flex justify-between"><span class="text-on-surface-variant">Target</span><span class="font-label">{{ migration.target }}</span></div>
+                    <div class="flex justify-between"><span class="text-on-surface-variant">Test Cases</span><span class="font-label">{{ migration.test_cases }}</span></div>
+                    <div class="flex justify-between"><span class="text-on-surface-variant">Cost</span><span class="font-label">{{ migration.cost }}</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quick Stats -->
+        <section class="bg-gradient-to-br from-surface-container-low to-surface-container-lowest p-6 rounded-xl border border-outline-variant/5">
+            <h4 class="text-[10px] font-label uppercase tracking-[0.2em] text-on-surface-variant mb-6">Model Metadata</h4>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center text-xs">
+                    <span class="text-on-surface-variant">Context Window</span>
+                    <span class="font-label text-on-surface">200k tokens</span>
+                </div>
+                <div class="flex justify-between items-center text-xs">
+                    <span class="text-on-surface-variant">Tokenizer</span>
+                    <span class="font-label text-on-surface">Claude v4 Native</span>
+                </div>
+                <div class="flex justify-between items-center text-xs">
+                    <span class="text-on-surface-variant">Provider</span>
+                    <span class="font-label text-on-surface">Anthropic</span>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+
+{% elif migration.recommendation == "Do not ship" %}
+{# ─── DO NOT SHIP LAYOUT ─── #}
+
+<!-- Recommendation Card (Answer First) -->
+<div class="mb-16 bg-[#3D3D3D] rounded-xl p-8 border-l-4 border-[#D85650] shadow-2xl relative overflow-hidden">
+    <!-- Background Texture for depth -->
+    <div class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-error/5 to-transparent pointer-events-none"></div>
+    <div class="relative z-10">
+        <div class="flex items-center gap-3 mb-4">
+            <span class="material-symbols-outlined text-[#D85650] text-3xl font-bold">cancel</span>
+            <h2 class="text-[28px] font-extrabold text-[#D85650] tracking-tight">Do not ship</h2>
+        </div>
+        <p class="text-on-surface-variant max-w-2xl leading-relaxed mb-8">
+            {{ migration.reasoning }}
+        </p>
+        <div class="flex gap-4">
+            <a href="/ui/migrations/{{ migration.id }}/executive" class="px-6 py-2.5 bg-[#D4745E] text-on-primary-container font-semibold rounded-md hover:brightness-110 active:scale-95 transition-all shadow-lg">
+                View full report
+            </a>
+            <button class="px-6 py-2.5 border border-outline/30 text-on-surface font-semibold rounded-md hover:bg-surface-bright active:scale-95 transition-all">
+                Adjust optimization settings
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards Row -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+    <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+        <span class="text-[32px] font-bold text-[#D85650] mb-2">{{ migration.confidence }}%</span>
+        <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Confidence (after optimization)</span>
+    </div>
+    <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+        <span class="text-[32px] font-bold text-[#BDBDBD] mb-2">{{ migration.baseline }}%</span>
+        <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Baseline (before optimization)</span>
+    </div>
+    <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+        <span class="text-[32px] font-bold text-[#BDBDBD] mb-2">+{{ migration.improvement }}%</span>
+        <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Improvement from GEPA</span>
+    </div>
+</div>
+
+<!-- Results Grid -->
+{% if migration.per_type %}
+<div class="mb-16">
+    <h3 class="headline-md font-bold mb-8 text-[#E8DCC4]">Results by output type</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for pt in migration.per_type %}
+        <div class="bg-surface-container-low p-6 rounded-xl border-l-4
+            {% if pt.badge == 'FAIL' %}border-[#D85650]{% elif pt.badge == 'WARN' %}border-tertiary-container{% else %}border-secondary{% endif %}
+            flex justify-between items-start">
+            <div>
+                <p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant mb-2">{{ pt.type }}</p>
+                <p class="text-2xl font-bold mb-1">{{ pt.wins }}/{{ pt.total }} ({{ (pt.wins / pt.total * 100)|int }}%)</p>
+                <p class="text-sm {% if pt.badge == 'FAIL' %}text-[#D85650]{% elif pt.badge == 'WARN' %}text-tertiary-container{% else %}text-secondary{% endif %}">{{ pt.desc }}</p>
+            </div>
+            <span class="px-2 py-1 rounded text-[10px] font-bold tracking-tighter
+                {% if pt.badge == 'FAIL' %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% elif pt.badge == 'WARN' %}bg-tertiary-container/10 text-tertiary-container border border-tertiary-container/20{% else %}bg-secondary/10 text-secondary border border-secondary/20{% endif %}">{{ pt.badge }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Critical Regressions List -->
+{% if migration.regressions %}
+<div>
+    <div class="flex items-center justify-between mb-8">
+        <h3 class="headline-md font-bold text-[#E8DCC4]">Critical regressions</h3>
+        <span class="text-xs font-mono text-on-surface-variant">Showing {{ migration.regressions|length }} of {{ migration.regressions|length }}</span>
+    </div>
+    <div class="space-y-4">
+        {% for reg in migration.regressions %}
+        <div class="bg-surface-container-lowest p-5 rounded-lg flex items-center justify-between group hover:bg-surface-container-low transition-all">
+            <div class="flex items-center gap-4">
+                <span class="material-symbols-outlined text-[#D85650]">warning</span>
+                <div>
+                    <p class="font-mono text-sm">{{ reg.title }}</p>
+                    <p class="text-xs text-on-surface-variant mt-1">Expected: {{ reg.expected }} / Got: {{ reg.got }}</p>
+                </div>
+            </div>
+            <a class="text-primary text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+               hx-get="/ui/fragments/diff/{{ migration.id }}/{{ reg.tc_id }}"
+               hx-target="#diff-content"
+               hx-swap="innerHTML">View diff &rarr;</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+{# ─── NEEDS REVIEW / DEFAULT LAYOUT (warning/gold) ─── #}
+
+<!-- Recommendation Card -->
+<div class="mb-16 bg-[#3D3D3D] rounded-xl p-8 border-l-4 border-[#D4A574] shadow-2xl relative overflow-hidden">
+    <div class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-[#D4A574]/5 to-transparent pointer-events-none"></div>
+    <div class="relative z-10">
+        <div class="flex items-center gap-3 mb-4">
+            <span class="material-symbols-outlined text-[#D4A574] text-3xl">warning</span>
+            <h2 class="text-[28px] font-extrabold text-[#D4A574] tracking-tight">Needs review</h2>
+        </div>
+        <p class="text-on-surface-variant max-w-2xl leading-relaxed mb-8">
+            {{ migration.reasoning }}
+        </p>
+        <div class="flex gap-4">
+            <a href="/ui/migrations/{{ migration.id }}/executive" class="px-6 py-2.5 bg-[#D4745E] text-on-primary-container font-semibold rounded-md hover:brightness-110 active:scale-95 transition-all shadow-lg">
+                View full report
+            </a>
+            <button class="px-6 py-2.5 border border-outline/30 text-on-surface font-semibold rounded-md hover:bg-surface-bright active:scale-95 transition-all">
+                Review edge cases
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards Row -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+    <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+        <span class="text-[32px] font-bold text-[#D4A574] mb-2">{{ migration.confidence }}%</span>
+        <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Confidence (after optimization)</span>
+    </div>
+    <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+        <span class="text-[32px] font-bold text-[#BDBDBD] mb-2">{{ migration.baseline }}%</span>
+        <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Baseline (before optimization)</span>
+    </div>
+    <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+        <span class="text-[32px] font-bold text-[#BDBDBD] mb-2">+{{ migration.improvement }}%</span>
+        <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Improvement from GEPA</span>
+    </div>
+</div>
+
+<!-- Results Grid (if available) -->
+{% if migration.per_type %}
+<div class="mb-16">
+    <h3 class="headline-md font-bold mb-8 text-[#E8DCC4]">Results by output type</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for pt in migration.per_type %}
+        <div class="bg-surface-container-low p-6 rounded-xl border-l-4
+            {% if pt.badge == 'FAIL' %}border-[#D85650]{% elif pt.badge == 'WARN' %}border-[#D4A574]{% else %}border-secondary{% endif %}
+            flex justify-between items-start">
+            <div>
+                <p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant mb-2">{{ pt.type }}</p>
+                <p class="text-2xl font-bold mb-1">{{ pt.wins }}/{{ pt.total }} ({{ (pt.wins / pt.total * 100)|int }}%)</p>
+                <p class="text-sm {% if pt.badge == 'FAIL' %}text-[#D85650]{% elif pt.badge == 'WARN' %}text-[#D4A574]{% else %}text-secondary{% endif %}">{{ pt.desc }}</p>
+            </div>
+            <span class="px-2 py-1 rounded text-[10px] font-bold tracking-tighter
+                {% if pt.badge == 'FAIL' %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% elif pt.badge == 'WARN' %}bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/20{% else %}bg-secondary/10 text-secondary border border-secondary/20{% endif %}">{{ pt.badge }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+
+</div>
+{% endblock %}

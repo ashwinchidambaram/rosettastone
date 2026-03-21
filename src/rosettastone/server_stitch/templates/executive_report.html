@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Executive Migration Report</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    "on-secondary-fixed-variant": "#3b4b36",
+                    "tertiary-fixed": "#ffdcbc",
+                    "tertiary-container": "#b4885a",
+                    "secondary-fixed-dim": "#b9ccb0",
+                    "on-secondary": "#253421",
+                    "surface": "#131313",
+                    "primary": "#ffb4a3",
+                    "error": "#ffb4ab",
+                    "tertiary": "#efbd8a",
+                    "on-secondary-fixed": "#101f0d",
+                    "on-tertiary-fixed": "#2c1700",
+                    "surface-tint": "#ffb4a3",
+                    "secondary-fixed": "#d5e8cb",
+                    "primary-fixed": "#ffdad2",
+                    "inverse-surface": "#e5e2e1",
+                    "background": "#131313",
+                    "surface-container-highest": "#353535",
+                    "inverse-on-surface": "#313030",
+                    "surface-bright": "#393939",
+                    "on-primary": "#5c190a",
+                    "outline": "#a38c86",
+                    "on-error-container": "#ffdad6",
+                    "on-error": "#690005",
+                    "on-secondary-container": "#abbea2",
+                    "outline-variant": "#55433e",
+                    "surface-dim": "#131313",
+                    "on-tertiary-container": "#3f2300",
+                    "surface-container-low": "#1c1b1b",
+                    "on-primary-fixed": "#3d0600",
+                    "surface-container-lowest": "#0e0e0e",
+                    "secondary": "#b9ccb0",
+                    "on-surface": "#e5e2e1",
+                    "surface-container": "#20201f",
+                    "on-surface-variant": "#dbc1bb",
+                    "primary-container": "#d67660",
+                    "on-background": "#e5e2e1",
+                    "secondary-container": "#3d4d38",
+                    "on-tertiary-fixed-variant": "#614018",
+                    "primary-fixed-dim": "#ffb4a3",
+                    "on-primary-container": "#531205",
+                    "inverse-primary": "#984633",
+                    "surface-variant": "#353535",
+                    "tertiary-fixed-dim": "#efbd8a",
+                    "on-tertiary": "#472a03",
+                    "error-container": "#93000a",
+                    "on-primary-fixed-variant": "#7a2f1e",
+                    "surface-container-high": "#2a2a2a"
+                },
+                fontFamily: {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+                },
+                borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+        },
+    }
+</script>
+<style>
+    body {
+        background-color: #F9F7F4;
+        color: #2C2C2C;
+        font-family: 'Inter', sans-serif;
+        -webkit-print-color-adjust: exact;
+    }
+    .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .report-canvas {
+        max-width: 8.5in;
+        min-height: 11in;
+        margin: 0 auto;
+        background: white;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+    }
+    .sage-dot { background-color: #8B9D83; }
+    .gold-dot { background-color: #D4AF37; }
+    .text-sage { color: #8B9D83; }
+    .border-divider { border-color: #E0E0E0; }
+    .text-muted { color: #616161; }
+    .text-footer { color: #9E9E9E; }
+    @media print {
+        body { background: white; padding: 0; margin: 0; }
+        .report-canvas { box-shadow: none; }
+    }
+</style>
+</head>
+<body class="antialiased p-4 md:p-12">
+
+<!-- Main Report Container -->
+<div class="report-canvas flex flex-col">
+
+<!-- Header -->
+<header class="w-full pt-12 pb-8 px-16 border-b-[0.5px] border-[#D4745E]/15">
+    <div class="flex justify-between items-end max-w-full">
+        <div class="flex flex-col gap-1">
+            <span class="text-[12px] font-bold tracking-[0.1em] uppercase text-muted">ROSETTASTONE MIGRATION REPORT</span>
+            <h1 class="text-[28px] font-bold tracking-tight text-[#2C2C2C]">{{ migration.source }} &rarr; {{ migration.target }}</h1>
+        </div>
+        <div class="text-right">
+            <span class="text-[14px] text-muted">{{ report_date }}</span>
+        </div>
+    </div>
+</header>
+
+<!-- Main Content Body -->
+<main class="flex-grow px-16 py-12">
+
+<!-- Recommendation Section (Answer First) -->
+<section class="mb-12">
+    <div class="flex items-center gap-3 mb-4">
+        {% if migration.recommendation == "Safe to ship" %}
+        <span class="material-symbols-outlined text-sage" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+        <h2 class="text-[22px] font-semibold text-sage">Recommendation: Safe to switch</h2>
+        {% elif migration.recommendation == "Do not ship" %}
+        <span class="material-symbols-outlined text-[#D85650]" style="font-variation-settings: 'FILL' 1;">cancel</span>
+        <h2 class="text-[22px] font-semibold text-[#D85650]">Recommendation: Do not switch</h2>
+        {% else %}
+        <span class="material-symbols-outlined text-[#D4A574]" style="font-variation-settings: 'FILL' 1;">warning</span>
+        <h2 class="text-[22px] font-semibold text-[#D4A574]">Recommendation: Needs review</h2>
+        {% endif %}
+    </div>
+    <p class="text-[16px] leading-[1.6] text-[#2C2C2C] max-w-2xl">
+        {{ migration.reasoning }}
+    </p>
+</section>
+
+<!-- Metric Boxes Grid -->
+<section class="grid grid-cols-4 gap-4 mb-16">
+    <div class="border border-divider p-6 flex flex-col items-center justify-center text-center rounded-lg">
+        <span class="text-[24px] font-bold text-[#2C2C2C]">{{ migration.confidence }}%</span>
+        <span class="text-[11px] uppercase tracking-wider text-muted font-medium">Quality match</span>
+    </div>
+    <div class="border border-divider p-6 flex flex-col items-center justify-center text-center rounded-lg">
+        <span class="text-[24px] font-bold text-sage">{{ migration.cost }}</span>
+        <span class="text-[11px] uppercase tracking-wider text-muted font-medium">Cost</span>
+    </div>
+    <div class="border border-divider p-6 flex flex-col items-center justify-center text-center rounded-lg">
+        <span class="text-[24px] font-bold {% if migration.recommendation == 'Safe to ship' %}text-sage{% elif migration.recommendation == 'Do not ship' %}text-[#D85650]{% else %}text-[#D4A574]{% endif %}">
+            {% if migration.confidence >= 85 %}Low{% elif migration.confidence >= 70 %}Medium{% else %}High{% endif %}
+        </span>
+        <span class="text-[11px] uppercase tracking-wider text-muted font-medium">Risk level</span>
+    </div>
+    <div class="border border-divider p-6 flex flex-col items-center justify-center text-center rounded-lg">
+        <span class="text-[24px] font-bold {% if migration.recommendation == 'Safe to ship' %}text-sage{% else %}text-[#D85650]{% endif %}">
+            {% if migration.recommendation == 'Safe to ship' %}Ready{% elif migration.recommendation == 'Do not ship' %}Blocked{% else %}Pending{% endif %}
+        </span>
+        <span class="text-[11px] uppercase tracking-wider text-muted font-medium">Deployment status</span>
+    </div>
+</section>
+
+<!-- Columns Section -->
+<section class="grid grid-cols-2 gap-16">
+    <!-- Left Column -->
+    <div>
+        <div class="flex items-center gap-2 mb-6">
+            <div class="w-2 h-2 rounded-full sage-dot"></div>
+            <h3 class="text-[16px] font-medium text-[#2C2C2C]">What improves</h3>
+        </div>
+        <ul class="space-y-4">
+            <li class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-[18px] mt-0.5 text-sage">bolt</span>
+                <span class="text-[14px] text-[#2C2C2C]">{{ migration.confidence }}% parity across {{ migration.test_cases }} test cases</span>
+            </li>
+            <li class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-[18px] mt-0.5 text-sage">code</span>
+                <span class="text-[14px] text-[#2C2C2C]">+{{ migration.improvement }}% improvement from GEPA optimization</span>
+            </li>
+            <li class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-[18px] mt-0.5 text-sage">layers</span>
+                <span class="text-[14px] text-[#2C2C2C]">Baseline score: {{ migration.baseline }}%</span>
+            </li>
+        </ul>
+    </div>
+    <!-- Right Column -->
+    <div>
+        <div class="flex items-center gap-2 mb-6">
+            <div class="w-2 h-2 rounded-full gold-dot"></div>
+            <h3 class="text-[16px] font-medium text-[#2C2C2C]">What to watch</h3>
+        </div>
+        <ul class="space-y-4">
+            {% if migration.regressions %}
+            {% for reg in migration.regressions[:3] %}
+            <li class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-[18px] mt-0.5 text-muted">warning</span>
+                <span class="text-[14px] text-[#2C2C2C]">{{ reg.title }} (score: {{ reg.score }})</span>
+            </li>
+            {% endfor %}
+            {% else %}
+            <li class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-[18px] mt-0.5 text-muted">check</span>
+                <span class="text-[14px] text-[#2C2C2C]">No critical regressions detected</span>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+</section>
+
+<!-- Visual Evidence (Design System: Evidence Area) -->
+{% if migration.per_type %}
+<section class="mt-20">
+    <div class="bg-surface-container-lowest border border-divider rounded-xl p-8">
+        <div class="flex justify-between items-center mb-6">
+            <h4 class="font-['JetBrains_Mono'] text-[12px] uppercase tracking-tighter text-muted">Results by Output Type</h4>
+            <span class="text-[10px] font-['JetBrains_Mono'] text-muted">V.04.2-STABLE</span>
+        </div>
+        <div class="space-y-3 font-['JetBrains_Mono'] text-[13px]">
+            {% for pt in migration.per_type %}
+            <div class="flex justify-between items-center py-2 {% if not loop.last %}border-b border-divider/50{% endif %}">
+                <span class="text-muted">{{ pt.type }}</span>
+                <span class="text-[#2C2C2C]">{{ pt.wins }}/{{ pt.total }}
+                    <span class="{% if pt.badge == 'PASS' %}text-sage{% elif pt.badge == 'WARN' %}text-[#D4A574]{% else %}text-[#D85650]{% endif %}">({{ pt.badge }})</span>
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+</main>
+
+<!-- Footer -->
+<footer class="w-full py-8 mt-auto px-16 border-t-[0.5px] border-divider">
+    <div class="flex justify-between items-center max-w-full">
+        <div class="text-[12px] font-['JetBrains_Mono'] text-footer uppercase tracking-tighter">
+            Prepared by RosettaStone v0.1.0
+        </div>
+        <div class="flex gap-4">
+            <span class="text-[10px] font-['JetBrains_Mono'] text-footer uppercase">CONFIDENTIAL</span>
+        </div>
+    </div>
+</footer>
+
+</div>
+
+<!-- Background Decorative Elements -->
+<div class="fixed top-0 left-0 w-full h-1 bg-gradient-to-r from-[#8B9D83]/20 via-[#D4745E]/20 to-[#8B9D83]/20 opacity-30 pointer-events-none"></div>
+
+</body>
+</html>

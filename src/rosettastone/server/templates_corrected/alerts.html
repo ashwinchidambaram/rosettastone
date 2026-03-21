@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% set active_nav = "alerts" %}
+
+{% block title %}RosettaStone | Alerts{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<header class="mb-12">
+    <h1 class="font-headline font-semibold text-[28px] tracking-tight" style="color: var(--text-primary);">Alerts</h1>
+    <p class="text-sm mt-2" style="color: var(--text-secondary); opacity: 0.7;">Stay informed about model changes and opportunities.</p>
+</header>
+
+<!-- Calm Attention Banner -->
+<section class="attention-banner mb-12">
+    <div class="flex items-start gap-4">
+        <i data-lucide="bell" class="w-5 h-5 mt-0.5 flex-shrink-0" style="color: var(--gold-400);"></i>
+        <div>
+            <h3 class="font-bold text-sm uppercase tracking-wider" style="color: var(--text-primary);">{{ alerts|length }} things need your attention</h3>
+            <p class="text-sm mt-1" style="color: var(--text-secondary);">Review the items below at your convenience.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Alert Cards -->
+<div class="grid grid-cols-1 gap-4">
+    {% for alert in alerts %}
+    <div class="card-surface-low rounded-xl flex items-center justify-between group transition-all card-hover p-6
+        {% if alert.type == 'deprecation' %}card-accent-error
+        {% elif alert.type == 'price_change' %}card-accent-gold
+        {% elif alert.type == 'new_model' %}card-accent-sage
+        {% endif %}">
+        <div class="flex items-center gap-6">
+            <div class="w-12 h-12 rounded-lg flex items-center justify-center
+                {% if alert.type == 'deprecation' %}" style="background: var(--error-bg);">
+                <i data-lucide="clock" class="w-6 h-6" style="color: var(--error-400);"></i>
+                {% elif alert.type == 'price_change' %}" style="background: var(--gold-bg);">
+                <i data-lucide="dollar-sign" class="w-6 h-6" style="color: var(--gold-400);"></i>
+                {% elif alert.type == 'new_model' %}" style="background: var(--sage-bg);">
+                <i data-lucide="cpu" class="w-6 h-6" style="color: var(--sage-400);"></i>
+                {% endif %}
+            </div>
+            <div>
+                <h3 class="font-bold text-lg" style="color: var(--text-on-surface);">
+                    {% if alert.type == 'deprecation' %}Deprecation Warning: {{ alert.model }}
+                    {% elif alert.type == 'price_change' %}Price Change: {{ alert.model }}
+                    {% elif alert.type == 'new_model' %}New Model Available: {{ alert.model }}
+                    {% endif %}
+                </h3>
+                <p class="text-sm" style="color: var(--text-secondary);">{{ alert.message }}{% if alert.action %}. {{ alert.action }}{% endif %}</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-8">
+            <div class="text-right">
+                {% if alert.type == 'deprecation' %}
+                <div class="text-xs font-mono uppercase" style="color: var(--text-muted);">TIMELINE</div>
+                <div class="font-bold" style="color: var(--error-400);">{{ alert.days_left }}d remaining</div>
+                {% elif alert.type == 'price_change' %}
+                <div class="text-xs font-mono uppercase" style="color: var(--text-muted);">CHANGE</div>
+                <div class="font-bold" style="color: var(--gold-400);">{{ alert.old_price }} &rarr; {{ alert.new_price }}</div>
+                {% elif alert.type == 'new_model' %}
+                <div class="text-xs font-mono uppercase" style="color: var(--text-muted);">STATUS</div>
+                <div class="font-bold" style="color: var(--sage-400);">Available</div>
+                {% endif %}
+            </div>
+            <i data-lucide="arrow-right" class="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--text-muted);"></i>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Notification Settings -->
+<section class="mt-20 p-12 rounded-2xl" style="background: var(--bg-surface-low);">
+    <h3 class="text-2xl font-bold mb-8" style="color: var(--text-on-surface);">Notification Settings</h3>
+    <div class="space-y-6">
+        <label class="flex items-start gap-4 p-4 rounded-lg transition-colors cursor-pointer card-hover">
+            <div class="pt-1">
+                <input type="checkbox" checked class="w-5 h-5 rounded" style="accent-color: var(--terracotta-400);">
+            </div>
+            <div>
+                <span class="block font-bold" style="color: var(--text-on-surface);">Email: Critical System Alerts</span>
+                <span class="text-sm" style="color: var(--text-secondary);">Immediate dispatch for deprecation and breaking changes.</span>
+            </div>
+        </label>
+        <label class="flex items-start gap-4 p-4 rounded-lg transition-colors cursor-pointer card-hover">
+            <div class="pt-1">
+                <input type="checkbox" class="w-5 h-5 rounded" style="accent-color: var(--terracotta-400);">
+            </div>
+            <div>
+                <span class="block font-bold" style="color: var(--text-on-surface);">Email: Cost & Efficiency Reports</span>
+                <span class="text-sm" style="color: var(--text-secondary);">Weekly summaries of compute utilization and spending.</span>
+            </div>
+        </label>
+        <label class="flex items-start gap-4 p-4 rounded-lg transition-colors cursor-pointer card-hover">
+            <div class="pt-1">
+                <input type="checkbox" checked class="w-5 h-5 rounded" style="accent-color: var(--terracotta-400);">
+            </div>
+            <div>
+                <span class="block font-bold" style="color: var(--text-on-surface);">Push: New Model Availability</span>
+                <span class="text-sm" style="color: var(--text-secondary);">Alerts when new models are available for migration.</span>
+            </div>
+        </label>
+    </div>
+</section>
+{% endblock %}

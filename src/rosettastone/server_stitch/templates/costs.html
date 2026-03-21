@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Costs{% endblock %}
+
+{% block content %}
+<div class="pb-16 px-8 max-w-7xl mx-auto pt-8">
+
+<!-- Header Section -->
+<header class="flex items-center justify-between py-12">
+    <h1 class="text-[28px] font-semibold text-[#E8DCC4] tracking-tight">Cost overview</h1>
+    <div class="relative group">
+        <button class="bg-[#2a2a2a] hover:bg-[#393939] text-[#E5E2E1] px-5 py-2.5 rounded-lg flex items-center gap-3 transition-all">
+            <span class="text-sm font-medium">This month</span>
+            <span class="material-symbols-outlined text-sm">expand_more</span>
+        </button>
+    </div>
+</header>
+
+<!-- KPI Section -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+    <!-- Estimated Card -->
+    <div class="bg-[#2a2a2a] p-8 rounded-2xl shadow-[0_64px_64px_-12px_rgba(229,226,225,0.06)] flex flex-col justify-between">
+        <div>
+            <span class="text-[32px] font-bold text-[#E8DCC4] block mb-1">{{ costs.total_month }}</span>
+            <span class="text-[#BDBDBD] text-sm font-medium">Estimated this month</span>
+        </div>
+        <div class="mt-4 pt-4 border-t border-[#393939] flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-sm">trending_up</span>
+            <span class="text-xs text-[#BDBDBD] font-['JetBrains_Mono']">+12.4% vs last month</span>
+        </div>
+    </div>
+    <!-- Savings Card -->
+    <div class="bg-[#2a2a2a] p-8 rounded-2xl shadow-[0_64px_64px_-12px_rgba(229,226,225,0.06)] flex flex-col justify-between">
+        <div>
+            <span class="text-[32px] font-bold text-[#8B9D83] block mb-1">{{ costs.potential_savings }}</span>
+            <span class="text-[#BDBDBD] text-sm font-medium">Potential savings</span>
+        </div>
+        <div class="mt-4 pt-4 border-t border-[#393939] flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#8B9D83] text-sm">auto_awesome</span>
+            <span class="text-xs text-[#BDBDBD] font-['JetBrains_Mono']">{{ costs.opportunities|length }} actionable optimizations</span>
+        </div>
+    </div>
+    <!-- Optimization Card -->
+    <div class="bg-[#2a2a2a] p-8 rounded-2xl shadow-[0_64px_64px_-12px_rgba(229,226,225,0.06)] flex flex-col justify-between">
+        <div>
+            <span class="text-[32px] font-bold text-[#E8DCC4] block mb-1">{{ costs.after_optimization }}</span>
+            <span class="text-[#BDBDBD] text-sm font-medium">After optimization</span>
+        </div>
+        <div class="mt-4 pt-4 border-t border-[#393939] flex items-center gap-2">
+            <span class="material-symbols-outlined text-secondary text-sm">check_circle</span>
+            <span class="text-xs text-[#BDBDBD] font-['JetBrains_Mono']">Target budget reached</span>
+        </div>
+    </div>
+</section>
+
+<!-- Cost by Model Section -->
+<section class="mb-20">
+    <h2 class="text-[22px] font-semibold text-[#E8DCC4] mb-8">Cost by model</h2>
+    <div class="bg-surface-container-low p-10 rounded-2xl space-y-8">
+        {% set bar_colors = ["#D4745E", "#8B9D83", "#D4A574"] %}
+        {% for item in costs.by_model %}
+        <div class="space-y-3">
+            <div class="flex justify-between items-end">
+                <span class="font-['JetBrains_Mono'] text-sm text-on-surface">{{ item.model }}</span>
+                <span class="font-['JetBrains_Mono'] text-sm text-[#E8DCC4] font-bold">{{ item.cost }} ({{ item.pct }}%)</span>
+            </div>
+            <div class="h-10 w-full bg-[#2a2a2a] rounded-full overflow-hidden">
+                <div class="h-full rounded-r-lg" style="width: {{ item.pct }}%; background-color: {{ bar_colors[loop.index0 % 3] }}; opacity: 0.4;"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Optimization Opportunities -->
+<section>
+    <h2 class="text-[22px] font-semibold text-[#E8DCC4] mb-8">Optimization opportunities</h2>
+    <div class="grid grid-cols-1 gap-6">
+        {% for opp in costs.opportunities %}
+        <div class="bg-[#8B9D83]/5 border-l-4 border-[#8B9D83] p-8 flex gap-6 items-start">
+            <div class="bg-[#D4A574]/10 p-3 rounded-lg">
+                <span class="material-symbols-outlined text-[#D4A574] text-3xl">{% if loop.index0 == 0 %}lightbulb{% else %}bolt{% endif %}</span>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-[#E5E2E1] font-bold text-lg mb-2">{{ opp.title }}</h3>
+                <p class="text-[#BDBDBD] text-sm mb-4 leading-relaxed">Estimated savings: {{ opp.savings }}. {{ opp.confidence }}.</p>
+                <a class="text-[#D4745E] font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all" href="#">
+                    Evaluate this &rarr;
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Background Detail (Visual Interest) -->
+<div class="fixed top-0 right-0 -z-10 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none"></div>
+<div class="fixed bottom-0 left-0 -z-10 w-[400px] h-[400px] bg-secondary/5 blur-[100px] rounded-full pointer-events-none"></div>
+
+</div>
+{% endblock %}

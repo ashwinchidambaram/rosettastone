@@ -1,0 +1,108 @@
+<!-- Diff Slide-over Fragment (injected via HTMX into #diff-panel) -->
+
+<!-- Panel Header -->
+<div class="px-8 pt-8 pb-4 flex justify-between items-start">
+    <div class="space-y-3">
+        <div class="flex items-center gap-2">
+            <span class="badge badge-info text-[10px]">{{ diff.output_type }}</span>
+        </div>
+        <div class="flex items-end gap-3">
+            <h2 class="text-5xl font-semibold font-headline leading-none" style="color: var(--gold-400);">{{ diff.composite_score }}</h2>
+            {% if diff.is_win %}
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-black mb-1" style="background: var(--sage-400); color: white;">WIN</span>
+            {% else %}
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-black mb-1" style="background: var(--error-400); color: white;">LOSS</span>
+            {% endif %}
+        </div>
+    </div>
+    <button id="slideout-close" class="p-2 rounded-full transition-colors" style="background: transparent;" onclick="rsCloseSlideout()">
+        <i data-lucide="x" class="w-8 h-8" style="color: var(--text-secondary);"></i>
+    </button>
+</div>
+
+<!-- Metric Bars -->
+<div class="px-8 py-6 space-y-5">
+    {% for metric_name, metric_key in [('BERTScore', 'bertscore'), ('Embedding similarity', 'embedding'), ('Composite', 'composite')] %}
+    <div class="space-y-2">
+        <div class="flex justify-between text-[11px] font-mono uppercase tracking-widest" style="color: var(--text-on-surface); opacity: 0.6;">
+            <span>{{ metric_name }}</span>
+            <span style="color: var(--text-on-surface);
+                {% if metric_key == 'composite' %}font-weight: bold; color: var(--gold-400);{% endif %}
+            ">{{ diff.scores[metric_key] }}</span>
+        </div>
+        <div class="metric-bar-track">
+            <div class="metric-bar-fill {% if metric_key == 'composite' %}metric-bar-gold{% else %}metric-bar-sage{% endif %}"
+                 style="width: {{ (diff.scores[metric_key] * 100)|round|int }}%;
+                 {% if diff.scores[metric_key] < 0.5 %}background: var(--error-400);{% endif %}
+            "></div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Tab Toggle -->
+<div class="px-8 flex gap-8" style="border-bottom: 1px solid var(--border-subtle);">
+    <button class="pb-3 text-sm font-bold tracking-tight" style="color: var(--text-on-surface); border-bottom: 2px solid var(--terracotta-400);">Side-by-side</button>
+    <button class="pb-3 text-sm font-bold tracking-tight" style="color: var(--text-on-surface); opacity: 0.4;">Unified</button>
+</div>
+
+<!-- Scrollable Content Area -->
+<div class="flex-1 overflow-y-auto custom-scrollbar">
+    <!-- PII Warning Banner -->
+    <div class="pii-warning flex items-center gap-3">
+        <i data-lucide="alert-triangle" class="w-4 h-4 flex-shrink-0" style="color: var(--gold-400);"></i>
+        <p class="text-[14px] font-medium" style="color: var(--gold-400);">Content may contain sensitive data from production prompts</p>
+    </div>
+
+    <!-- Diff View -->
+    <div class="mx-6 mb-8 rounded-xl overflow-hidden" style="background: var(--bg-primary); border: 1px solid var(--border-subtle);">
+        <div class="grid grid-cols-2" style="border-bottom: 1px solid var(--border-subtle);">
+            <div class="px-5 py-3" style="border-right: 1px solid var(--border-subtle);">
+                <span class="text-[12px] font-mono uppercase tracking-tighter" style="color: var(--text-muted);">Expected ({{ diff.source_model }})</span>
+            </div>
+            <div class="px-5 py-3">
+                <span class="text-[12px] font-mono uppercase tracking-tighter" style="color: var(--text-muted);">Actual ({{ diff.target_model }})</span>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 font-mono text-[14px] leading-relaxed">
+            <!-- Left Column (Expected) -->
+            <div class="p-5 whitespace-pre-wrap" style="border-right: 1px solid var(--border-subtle); color: var(--text-primary);">
+                {%- set expected_lines = diff.expected.split('\n') -%}
+                {%- for line in expected_lines -%}
+                <span class="block mb-1" style="opacity: 0.6;">{{ loop.index }} | {{ line }}</span>
+                {%- endfor -%}
+            </div>
+            <!-- Right Column (Actual) -->
+            <div class="p-5 whitespace-pre-wrap" style="color: var(--text-primary);">
+                {%- set actual_lines = diff.actual.split('\n') -%}
+                {%- for line in actual_lines -%}
+                <span class="block mb-1" style="opacity: 0.6;">{{ loop.index }} | {{ line }}</span>
+                {%- endfor -%}
+            </div>
+        </div>
+    </div>
+
+    <!-- Metadata Section -->
+    <div class="mx-6 p-8 rounded-xl mb-10" style="background: var(--bg-surface-low); border: 1px solid var(--border-subtle);">
+        <h3 class="text-[12px] font-bold uppercase tracking-[0.2em] mb-6" style="color: var(--gold-400);">Test Case Details</h3>
+        <div class="grid grid-cols-3 gap-8">
+            <div>
+                <p class="text-[10px] uppercase mb-1" style="color: var(--text-on-surface); opacity: 0.4;">Test Case ID</p>
+                <p class="font-mono text-sm" style="color: var(--text-on-surface);">#{{ diff.tc_id }}</p>
+            </div>
+            <div>
+                <p class="text-[10px] uppercase mb-1" style="color: var(--text-on-surface); opacity: 0.4;">Output Type</p>
+                <p class="font-mono text-sm" style="color: var(--text-on-surface);">{{ diff.output_type }}</p>
+            </div>
+            <div>
+                <p class="text-[10px] uppercase mb-1" style="color: var(--text-on-surface); opacity: 0.4;">Composite Score</p>
+                <p class="font-mono text-sm" style="color: var(--text-on-surface);">{{ diff.composite_score }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Re-initialize Lucide icons for this fragment
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+</script>

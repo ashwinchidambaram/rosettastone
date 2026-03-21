@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% set active_nav = "costs" %}
+
+{% block title %}RosettaStone | Costs{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<header class="flex items-center justify-between py-12">
+    <h1 class="text-[28px] font-semibold tracking-tight font-headline" style="color: var(--text-primary);">Cost overview</h1>
+    <div class="relative">
+        <button class="px-5 py-2.5 rounded-lg flex items-center gap-3 transition-all" style="background: var(--bg-surface-high); color: var(--text-on-surface);">
+            <span class="text-sm font-medium">This month</span>
+            <i data-lucide="chevron-down" class="w-4 h-4"></i>
+        </button>
+    </div>
+</header>
+
+<!-- KPI Section -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+    <!-- Estimated Card -->
+    <div class="p-8 rounded-2xl flex flex-col justify-between" style="background: var(--bg-surface-high);">
+        <div>
+            <span class="text-[32px] font-bold block mb-1" style="color: var(--text-primary);">{{ costs.total_month }}</span>
+            <span class="text-sm font-medium" style="color: var(--text-secondary);">Estimated this month</span>
+        </div>
+        <div class="mt-4 pt-4 flex items-center gap-2" style="border-top: 1px solid var(--border-subtle);">
+            <i data-lucide="trending-up" class="w-4 h-4" style="color: var(--terracotta-400);"></i>
+            <span class="text-xs font-mono" style="color: var(--text-secondary);">+12.4% vs last month</span>
+        </div>
+    </div>
+    <!-- Savings Card -->
+    <div class="p-8 rounded-2xl flex flex-col justify-between" style="background: var(--bg-surface-high);">
+        <div>
+            <span class="text-[32px] font-bold block mb-1" style="color: var(--sage-400);">{{ costs.potential_savings }}</span>
+            <span class="text-sm font-medium" style="color: var(--text-secondary);">Potential savings</span>
+        </div>
+        <div class="mt-4 pt-4 flex items-center gap-2" style="border-top: 1px solid var(--border-subtle);">
+            <i data-lucide="sparkles" class="w-4 h-4" style="color: var(--sage-400);"></i>
+            <span class="text-xs font-mono" style="color: var(--text-secondary);">{{ costs.opportunities|length }} actionable optimizations</span>
+        </div>
+    </div>
+    <!-- Optimization Card -->
+    <div class="p-8 rounded-2xl flex flex-col justify-between" style="background: var(--bg-surface-high);">
+        <div>
+            <span class="text-[32px] font-bold block mb-1" style="color: var(--text-primary);">{{ costs.after_optimization }}</span>
+            <span class="text-sm font-medium" style="color: var(--text-secondary);">After optimization</span>
+        </div>
+        <div class="mt-4 pt-4 flex items-center gap-2" style="border-top: 1px solid var(--border-subtle);">
+            <i data-lucide="check-circle-2" class="w-4 h-4" style="color: var(--sage-400);"></i>
+            <span class="text-xs font-mono" style="color: var(--text-secondary);">Target budget reached</span>
+        </div>
+    </div>
+</section>
+
+<!-- Cost by Model Section -->
+<section class="mb-20">
+    <h2 class="text-[28px] font-semibold tracking-tight font-headline mb-8" style="color: var(--text-primary);">Cost by model</h2>
+    <div class="p-10 rounded-2xl space-y-8" style="background: var(--bg-surface-low);">
+        {% for item in costs.by_model %}
+        <div class="space-y-3">
+            <div class="flex justify-between items-end">
+                <span class="font-mono text-sm" style="color: var(--text-on-surface);">{{ item.model }}</span>
+                <span class="font-mono text-sm font-bold" style="color: var(--text-primary);">{{ item.cost }} ({{ item.pct }}%)</span>
+            </div>
+            <div class="cost-bar-track">
+                <div class="cost-bar-fill" style="width: {{ item.pct }}%;
+                    {% if loop.index == 1 %}background: rgba(212, 116, 94, 0.4);
+                    {% elif loop.index == 2 %}background: rgba(139, 157, 131, 0.4);
+                    {% else %}background: rgba(212, 165, 116, 0.4);{% endif %}
+                "></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Optimization Opportunities -->
+<section>
+    <h2 class="text-[28px] font-semibold tracking-tight font-headline mb-8" style="color: var(--text-primary);">Optimization opportunities</h2>
+    <div class="grid grid-cols-1 gap-6">
+        {% for opp in costs.opportunities %}
+        <div class="p-8 flex gap-6 items-start card-accent-sage" style="background: var(--sage-bg);">
+            <div class="p-3 rounded-lg" style="background: var(--gold-bg);">
+                <i data-lucide="{% if loop.index == 1 %}lightbulb{% else %}zap{% endif %}" class="w-8 h-8" style="color: var(--gold-400);"></i>
+            </div>
+            <div class="flex-1">
+                <h3 class="font-bold text-lg mb-2" style="color: var(--text-on-surface);">{{ opp.title }}</h3>
+                <p class="text-sm mb-4 leading-relaxed" style="color: var(--text-secondary);">
+                    Estimated savings: {{ opp.savings }}. {{ opp.confidence }} on current benchmark tests.
+                </p>
+                <a href="#" class="font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all" style="color: var(--terracotta-400);">
+                    Evaluate this
+                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

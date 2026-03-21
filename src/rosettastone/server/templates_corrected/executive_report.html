@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive Migration Report | {{ migration.source }} &rarr; {{ migration.target }}</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            background-color: #F9F7F4;
+            color: #2C2C2C;
+            font-family: 'Inter', sans-serif;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .report-canvas {
+            max-width: 8.5in;
+            min-height: 11in;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+        }
+        .text-sage { color: #8B9D83; }
+        .text-gold { color: #D4A574; }
+        .text-error { color: #D85650; }
+        .text-muted { color: #616161; }
+        .text-footer { color: #9E9E9E; }
+        .sage-dot { background-color: #8B9D83; }
+        .gold-dot { background-color: #D4A574; }
+        .border-divider { border-color: #E0E0E0; }
+
+        @media print {
+            body { background: white; }
+            .report-canvas { box-shadow: none; }
+        }
+    </style>
+</head>
+<body class="antialiased p-4 md:p-12">
+<!-- Main Report Container -->
+<div class="report-canvas flex flex-col">
+    <!-- Header -->
+    <header class="w-full pt-12 pb-8 px-16" style="border-bottom: 0.5px solid rgba(212, 116, 94, 0.15);">
+        <div class="flex justify-between items-end max-w-full">
+            <div class="flex flex-col gap-1">
+                <span class="text-[12px] font-bold tracking-[0.1em] uppercase text-muted">ROSETTASTONE MIGRATION REPORT</span>
+                <h1 class="text-[28px] font-bold tracking-tight text-[#2C2C2C]">{{ migration.source }} &rarr; {{ migration.target }}</h1>
+            </div>
+            <div class="text-right">
+                <span class="text-[14px] text-muted">{{ report_date }}</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Body -->
+    <main class="flex-grow px-16 py-12">
+        <!-- Recommendation Section -->
+        <section class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                {% if migration.recommendation == 'Safe to ship' %}
+                <i data-lucide="check-circle-2" class="w-6 h-6 text-sage"></i>
+                <h2 class="text-[22px] font-semibold text-sage">Recommendation: Safe to switch</h2>
+                {% elif migration.recommendation == 'Needs review' %}
+                <i data-lucide="alert-triangle" class="w-6 h-6 text-gold"></i>
+                <h2 class="text-[22px] font-semibold text-gold">Recommendation: Needs review</h2>
+                {% else %}
+                <i data-lucide="x-circle" class="w-6 h-6 text-error"></i>
+                <h2 class="text-[22px] font-semibold text-error">Recommendation: Do not switch</h2>
+                {% endif %}
+            </div>
+            <p class="text-[16px] leading-[1.6] text-[#2C2C2C] max-w-2xl">
+                {{ migration.reasoning }}
+            </p>
+        </section>
+
+        <!-- Metric Boxes Grid -->
+        <section class="grid grid-cols-4 gap-4 mb-16">
+            <div class="border border-divider p-6 flex flex-col items-center justify-center text-center rounded-lg">
+                <span class="text-[24px] font-bold text-[#2C2C2C]">{{ migration.confidence }}%</span>
+                <span class="text-[11px] uppercase tracking-wider text-muted font-medium">Quality match</span>
+            </div>
+            <div class="border border-divider p-6 flex flex-col items-center justify-center text-center rounded-lg">
+                <span class="text-[24px] font-bold text-sage">{{ migration.cost }}</span>
+                <span class="text-[11px] uppercase tracking-wider text-muted font-medium">Cost impact</span>
+            </div>
+            <div class="border border-divider p-6 flex flex-col items-center justify-center text-center rounded-lg">
+                {% if migration.recommendation == 'Safe to ship' %}
+                <span class="text-[24px] font-bold text-sage">Low</span>
+                {% elif migration.recommendation == 'Needs review' %}
+                <span class="text-[24px] font-bold text-gold">Medium</span>
+                {% else %}
+                <span class="text-[24px] font-bold text-error">High</span>
+                {% endif %}
+                <span class="text-[11px] uppercase tracking-wider text-muted font-medium">Risk level</span>
+            </div>
+            <div class="border border-divider p-6 flex flex-col items-center justify-center text-center rounded-lg">
+                {% if migration.recommendation == 'Safe to ship' %}
+                <span class="text-[24px] font-bold text-sage">Ready</span>
+                {% elif migration.recommendation == 'Needs review' %}
+                <span class="text-[24px] font-bold text-gold">Pending</span>
+                {% else %}
+                <span class="text-[24px] font-bold text-error">Blocked</span>
+                {% endif %}
+                <span class="text-[11px] uppercase tracking-wider text-muted font-medium">Deployment status</span>
+            </div>
+        </section>
+
+        <!-- Columns Section -->
+        <section class="grid grid-cols-2 gap-16">
+            <!-- Left Column: What improves -->
+            <div>
+                <div class="flex items-center gap-2 mb-6">
+                    <div class="w-2 h-2 rounded-full sage-dot"></div>
+                    <h3 class="text-[16px] font-medium text-[#2C2C2C]">What improves</h3>
+                </div>
+                <ul class="space-y-4">
+                    {% if migration.per_type %}
+                    {% for pt in migration.per_type if pt.badge == 'PASS' %}
+                    <li class="flex items-start gap-3">
+                        <i data-lucide="check" class="w-4 h-4 mt-0.5 text-sage"></i>
+                        <span class="text-[14px] text-[#2C2C2C]">{{ pt.type }}: {{ pt.wins }}/{{ pt.total }} passing ({{ pt.desc }})</span>
+                    </li>
+                    {% endfor %}
+                    {% else %}
+                    <li class="flex items-start gap-3">
+                        <i data-lucide="zap" class="w-4 h-4 mt-0.5 text-sage"></i>
+                        <span class="text-[14px] text-[#2C2C2C]">{{ migration.confidence }}% parity across {{ migration.test_cases }} test cases</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <i data-lucide="trending-up" class="w-4 h-4 mt-0.5 text-sage"></i>
+                        <span class="text-[14px] text-[#2C2C2C]">+{{ migration.improvement }}% improvement over baseline</span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+            <!-- Right Column: What to watch -->
+            <div>
+                <div class="flex items-center gap-2 mb-6">
+                    <div class="w-2 h-2 rounded-full gold-dot"></div>
+                    <h3 class="text-[16px] font-medium text-[#2C2C2C]">What to watch</h3>
+                </div>
+                <ul class="space-y-4">
+                    {% if migration.regressions %}
+                    {% for reg in migration.regressions[:3] %}
+                    <li class="flex items-start gap-3">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 text-muted"></i>
+                        <span class="text-[14px] text-[#2C2C2C]">{{ reg.title }} (score: {{ reg.score }})</span>
+                    </li>
+                    {% endfor %}
+                    {% elif migration.per_type %}
+                    {% for pt in migration.per_type if pt.badge != 'PASS' %}
+                    <li class="flex items-start gap-3">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 text-muted"></i>
+                        <span class="text-[14px] text-[#2C2C2C]">{{ pt.type }}: {{ pt.desc }}</span>
+                    </li>
+                    {% endfor %}
+                    {% else %}
+                    <li class="flex items-start gap-3">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 text-muted"></i>
+                        <span class="text-[14px] text-[#2C2C2C]">Review edge cases before deployment</span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </section>
+
+        <!-- Comparison Matrix -->
+        <section class="mt-20">
+            <div class="border border-divider rounded-xl p-8" style="background: #FAFAFA;">
+                <div class="flex justify-between items-center mb-6">
+                    <h4 class="font-mono text-[12px] uppercase tracking-tighter text-muted">System Comparison Matrix</h4>
+                    <span class="text-[10px] font-mono text-muted">V.{{ migration.id }}-STABLE</span>
+                </div>
+                <div class="space-y-3 font-mono text-[13px]">
+                    <div class="flex justify-between items-center py-2" style="border-bottom: 0.5px solid #E0E0E0;">
+                        <span class="text-muted">Confidence Score</span>
+                        <span class="text-[#2C2C2C]">{{ migration.confidence }}%</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2" style="border-bottom: 0.5px solid #E0E0E0;">
+                        <span class="text-muted">Baseline Score</span>
+                        <span class="text-[#2C2C2C]">{{ migration.baseline }}%</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2">
+                        <span class="text-muted">Improvement</span>
+                        <span class="text-[#2C2C2C]">+{{ migration.improvement }}%</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full py-8 mt-auto px-16" style="border-top: 0.5px solid #E0E0E0;">
+        <div class="flex justify-between items-center max-w-full">
+            <div class="text-[12px] font-mono text-footer uppercase tracking-tighter">
+                Prepared by RosettaStone v0.1.0
+            </div>
+            <div class="flex gap-4">
+                <span class="text-[10px] font-mono text-footer uppercase">CONFIDENTIAL</span>
+            </div>
+        </div>
+    </footer>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    });
+</script>
+</body>
+</html>

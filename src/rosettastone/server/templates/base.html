@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html class="dark" data-theme="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RosettaStone | {% block title %}Dashboard{% endblock %}</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    "on-error": "#690005",
+                    "on-secondary-fixed-variant": "#3b4b36",
+                    "error-container": "#93000a",
+                    "on-secondary-fixed": "#101f0d",
+                    "on-tertiary-fixed-variant": "#614018",
+                    "on-primary-fixed-variant": "#7a2f1e",
+                    "secondary-container": "#3d4d38",
+                    "surface-variant": "#353535",
+                    "surface-container-low": "#1c1b1b",
+                    "error": "#ffb4ab",
+                    "on-primary-container": "#531205",
+                    "tertiary-container": "#b4885a",
+                    "surface-bright": "#393939",
+                    "on-primary-fixed": "#3d0600",
+                    "tertiary-fixed-dim": "#efbd8a",
+                    "inverse-on-surface": "#313030",
+                    "on-surface-variant": "#dbc1bb",
+                    "on-primary": "#5c190a",
+                    "surface": "#131313",
+                    "secondary-fixed": "#d5e8cb",
+                    "primary-fixed-dim": "#ffb4a3",
+                    "primary-fixed": "#ffdad2",
+                    "on-tertiary-fixed": "#2c1700",
+                    "surface-tint": "#ffb4a3",
+                    "on-error-container": "#ffdad6",
+                    "on-secondary": "#253421",
+                    "surface-container-lowest": "#0e0e0e",
+                    "on-surface": "#e5e2e1",
+                    "tertiary-fixed": "#ffdcbc",
+                    "background": "#131313",
+                    "secondary-fixed-dim": "#b9ccb0",
+                    "surface-container-highest": "#353535",
+                    "on-secondary-container": "#abbea2",
+                    "secondary": "#b9ccb0",
+                    "surface-dim": "#131313",
+                    "tertiary": "#efbd8a",
+                    "on-tertiary": "#472a03",
+                    "primary": "#ffb4a3",
+                    "outline": "#a38c86",
+                    "inverse-surface": "#e5e2e1",
+                    "surface-container": "#20201f",
+                    "on-background": "#e5e2e1",
+                    "on-tertiary-container": "#3f2300",
+                    "inverse-primary": "#984633",
+                    "primary-container": "#d67660",
+                    "outline-variant": "#55433e",
+                    "surface-container-high": "#2a2a2a",
+                    "success": "#8B9D83",
+                    "warn": "#D4A373",
+                    "terracotta": "#D4745E",
+                    "sage": "#8B9D83",
+                    "gold": "#D4A574",
+                    "critical": "#D85650"
+                },
+                fontFamily: {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["JetBrains Mono"],
+                    "mono": ["JetBrains Mono"]
+                },
+                borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+        },
+    }
+</script>
+<link rel="stylesheet" href="/static/css/components.css"/>
+{% block head_extra %}{% endblock %}
+</head>
+<body class="min-h-screen flex flex-col bg-surface text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container">
+
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full h-[72px] z-50 bg-[#131313]/80 backdrop-blur-md shadow-2xl shadow-[#E5E2E1]/5 flex items-center justify-between px-8">
+    <div class="flex items-center gap-8">
+        <span class="text-xl font-black text-[#E5E2E1] tracking-tighter">RosettaStone</span>
+        <div class="hidden md:flex items-center gap-6 font-['Inter'] font-bold tracking-tight">
+            <a class="{% if active_nav == 'models' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/">Models</a>
+            <a class="{% if active_nav == 'migrations' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/migrations">Migrations</a>
+            <a class="{% if active_nav == 'costs' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/costs">Costs</a>
+            <div class="relative">
+                <a class="{% if active_nav == 'alerts' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/alerts">Alerts</a>
+                <span class="absolute -top-1 -right-2 w-1.5 h-1.5 bg-[#D85650] rounded-full"></span>
+            </div>
+        </div>
+    </div>
+    <div class="flex items-center gap-4">
+        <button data-action="toggle-theme" class="p-2 text-[#BDBDBD] hover:bg-stone-800/50 rounded-lg transition-all active:scale-95">
+            <span class="material-symbols-outlined">dark_mode</span>
+        </button>
+        <button class="p-2 text-[#BDBDBD] hover:bg-stone-800/50 rounded-lg transition-all active:scale-95">
+            <span class="material-symbols-outlined">settings</span>
+        </button>
+        <div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant/30 flex items-center justify-center">
+            <span class="material-symbols-outlined text-on-surface-variant text-sm">account_circle</span>
+        </div>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<main class="flex-grow pt-[72px]">
+{% block content %}{% endblock %}
+</main>
+
+<!-- Footer -->
+<footer class="w-full py-12 px-8 bg-[#0e0e0e] border-t border-[#E5E2E1]/10 flex flex-col md:flex-row justify-between items-center gap-4">
+    <div class="font-['JetBrains_Mono'] text-[10px] uppercase tracking-widest text-[#E5E2E1]/40">
+        &copy; 2024 RosettaStone Intelligence
+    </div>
+    <div class="flex gap-8">
+        <a class="font-['JetBrains_Mono'] text-[10px] uppercase tracking-widest text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors" href="#">Documentation</a>
+        <a class="font-['JetBrains_Mono'] text-[10px] uppercase tracking-widest text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors" href="#">API Reference</a>
+        <a class="font-['JetBrains_Mono'] text-[10px] uppercase tracking-widest text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors" href="#">Status</a>
+        <a class="font-['JetBrains_Mono'] text-[10px] uppercase tracking-widest text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors" href="#">Privacy</a>
+    </div>
+</footer>
+
+<!-- Slide-over Panel Container (shared across pages that need it) -->
+<div id="diff-backdrop" class="fixed inset-0 z-[100] slideout-backdrop hidden"></div>
+<div id="diff-panel" class="fixed right-0 top-0 h-full w-[55%] bg-[#2C2C2C] z-[110] shadow-2xl slideout-panel closed hidden border-l border-white/5 flex flex-col">
+    <div id="diff-content" class="flex-1 overflow-y-auto"></div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

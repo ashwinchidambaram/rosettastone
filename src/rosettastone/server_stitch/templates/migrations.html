@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Migrations{% endblock %}
+
+{% block head_extra %}
+<style>
+    .card-glow-sage:hover {
+        box-shadow: 0 0 15px -3px rgba(185, 204, 176, 0.2);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen pb-20 px-8 max-w-6xl mx-auto pt-16">
+
+<!-- Header Section -->
+<header class="flex justify-between items-end mb-12">
+    <div>
+        <h1 class="font-headline font-semibold text-[28px] text-[#E8DCC4] tracking-tight">Migrations</h1>
+        <p class="text-on-surface-variant text-sm mt-2 opacity-70">Evaluate and deploy model schema updates across your infrastructure.</p>
+    </div>
+    <button class="bg-[#D4745E] text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-[#D4745E]/20">
+        <span class="material-symbols-outlined text-sm">add</span>
+        + New migration
+    </button>
+</header>
+
+<!-- Migration List -->
+<div class="flex flex-col gap-4">
+    {% for migration in migrations %}
+    <a href="/ui/migrations/{{ migration.id }}" class="block">
+    <div class="group relative bg-[#3D3D3D] rounded-xl overflow-hidden cursor-pointer transition-all duration-300
+        {% if migration.recommendation == 'Safe to ship' %}card-glow-sage{% elif migration.recommendation == 'Do not ship' %}hover:shadow-xl hover:shadow-[#D85650]/5{% else %}hover:shadow-xl hover:shadow-[#D4A574]/5{% endif %}
+        active:scale-[0.99]">
+        <div class="absolute left-0 top-0 bottom-0 w-1
+            {% if migration.recommendation == 'Safe to ship' %}bg-[#8B9D83]{% elif migration.recommendation == 'Do not ship' %}bg-[#D85650]{% else %}bg-[#D4A574]{% endif %}"></div>
+        <div class="p-6 pl-8">
+            <div class="flex justify-between items-start mb-6">
+                <div class="flex items-center gap-3">
+                    <h3 class="font-headline font-medium text-[18px] text-on-surface">{{ migration.source }} <span class="text-on-surface-variant/40 mx-2">&rarr;</span> {{ migration.target }}</h3>
+                </div>
+                <span class="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider
+                    {% if migration.recommendation == 'Safe to ship' %}bg-[#8B9D83] text-[#131313]{% elif migration.recommendation == 'Do not ship' %}bg-[#D85650] text-white{% else %}bg-[#D4A574] text-[#131313]{% endif %}">{{ migration.recommendation }}</span>
+            </div>
+            <div class="flex items-center gap-4 text-[#BDBDBD] font-label text-[13px]">
+                <div class="flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[16px]
+                        {% if migration.recommendation == 'Safe to ship' %}text-[#8B9D83]{% elif migration.recommendation == 'Do not ship' %}text-[#D85650]{% else %}text-[#D4A574]{% endif %}">
+                        {% if migration.recommendation == 'Safe to ship' %}verified{% elif migration.recommendation == 'Do not ship' %}cancel{% else %}warning{% endif %}
+                    </span>
+                    {{ migration.confidence }}% confidence
+                </div>
+                <span class="text-white/10">&bull;</span>
+                <span>{{ migration.test_cases }} test cases</span>
+                <span class="text-white/10">&bull;</span>
+                <div class="flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">payments</span>
+                    {{ migration.cost }}
+                </div>
+                <span class="text-white/10">&bull;</span>
+                <div class="flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">schedule</span>
+                    {{ migration.time_ago }}
+                </div>
+            </div>
+        </div>
+    </div>
+    </a>
+    {% endfor %}
+</div>
+
+<!-- Pagination/Count Footer -->
+<div class="mt-12 flex justify-between items-center px-4">
+    <span class="font-['JetBrains_Mono'] text-[12px] uppercase tracking-widest text-[#BDBDBD]">Showing {{ migrations|length }} migrations</span>
+    <div class="flex gap-2">
+        <button class="p-2 bg-surface-container-high rounded-lg text-on-surface-variant hover:text-on-surface disabled:opacity-30" disabled>
+            <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <button class="p-2 bg-surface-container-high rounded-lg text-on-surface-variant hover:text-on-surface">
+            <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+    </div>
+</div>
+
+</div>
+{% endblock %}

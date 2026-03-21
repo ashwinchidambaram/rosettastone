@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% set active_nav = "models" %}
+
+{% block title %}RosettaStone | Welcome{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[60vh] relative">
+    <!-- Background glow -->
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full blur-[120px] pointer-events-none" style="background: rgba(212, 116, 94, 0.05);"></div>
+
+    <!-- Welcome Hero -->
+    <div class="text-center max-w-2xl mb-12 relative z-10">
+        <h1 class="text-[36px] font-semibold tracking-tight mb-3 leading-tight" style="color: var(--text-primary);">Welcome to RosettaStone</h1>
+        <p class="text-[18px] font-normal" style="color: var(--text-secondary);">Let's set up your model landscape.</p>
+    </div>
+
+    <!-- Onboarding Card -->
+    <div class="w-full max-w-[540px] rounded-xl p-8 shadow-2xl relative z-10" style="background: var(--bg-card); border: 1px solid var(--border-subtle);">
+        <h2 class="text-[18px] font-medium mb-8" style="color: var(--text-on-surface);">Which models are you currently using?</h2>
+        <div class="space-y-4 mb-6">
+            <div class="relative">
+                <input type="text" placeholder="openai/gpt-4o" class="w-full rounded-md px-4 py-3.5 font-mono text-sm focus:outline-none transition-all" style="background: var(--bg-input); border: 2px solid var(--border-input); color: var(--text-on-surface);">
+            </div>
+            <div class="relative">
+                <input type="text" placeholder="anthropic/claude-sonnet-4" class="w-full rounded-md px-4 py-3.5 font-mono text-sm focus:outline-none transition-all" style="background: var(--bg-input); border: 2px solid var(--border-input); color: var(--text-on-surface);">
+            </div>
+        </div>
+        <div class="flex items-center justify-between mb-8">
+            <button class="text-sm font-medium flex items-center gap-1.5 transition-all active:scale-95 hover:underline" style="color: var(--terracotta-400);">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                + Add another model
+            </button>
+            <span class="text-[12px] font-mono" style="color: var(--text-muted);">
+                We use LiteLLM model identifiers
+            </span>
+        </div>
+        <button class="w-full font-semibold py-4 rounded-lg shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 group" style="background: var(--terracotta-400); color: #F9F7F4;">
+            Set up models
+            <i data-lucide="arrow-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+        </button>
+    </div>
+
+    <!-- Secondary Actions -->
+    <div class="mt-12 flex flex-col items-center gap-8 relative z-10">
+        <a href="#" class="text-[15px] font-medium flex items-center gap-2 hover:brightness-125 transition-all" style="color: var(--terracotta-400);">
+            Or import from migration results
+            <i data-lucide="external-link" class="w-4 h-4"></i>
+        </a>
+        <div class="flex flex-col items-center gap-4">
+            <span class="text-sm font-medium" style="color: var(--text-secondary); opacity: 0.6;">Or connect your infrastructure:</span>
+            <div class="flex flex-wrap justify-center gap-3">
+                <button class="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm transition-all active:scale-95" style="border: 1px solid var(--border-input); color: var(--text-secondary);">
+                    <i data-lucide="database" class="w-4 h-4"></i>
+                    Connect Redis cache
+                </button>
+                <button class="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm transition-all active:scale-95" style="border: 1px solid var(--border-input); color: var(--text-secondary);">
+                    <i data-lucide="git-branch" class="w-4 h-4"></i>
+                    Connect LangSmith
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

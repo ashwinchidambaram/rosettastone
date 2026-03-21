@@ -1,15 +1,12 @@
 """SQLModel table definitions for persisting migration results."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime
+from typing import Optional
 
 try:
     from sqlmodel import Field, Relationship, SQLModel
 except ImportError:
-    raise ImportError(
-        "Web dependencies required. Install with: uv pip install 'rosettastone[web]'"
-    )
+    raise ImportError("Web dependencies required. Install with: uv pip install 'rosettastone[web]'")
 
 
 class MigrationRecord(SQLModel, table=True):
@@ -37,8 +34,8 @@ class MigrationRecord(SQLModel, table=True):
     warnings_json: str = "[]"  # serialized warnings list
     safety_warnings_json: str = "[]"  # serialized SafetyWarning list
 
-    test_cases: list[TestCaseRecord] = Relationship(back_populates="migration")
-    warning_records: list[WarningRecord] = Relationship(back_populates="migration")
+    test_cases: list["TestCaseRecord"] = Relationship(back_populates="migration")
+    warning_records: list["WarningRecord"] = Relationship(back_populates="migration")
 
 
 class TestCaseRecord(SQLModel, table=True):
@@ -67,7 +64,7 @@ class TestCaseRecord(SQLModel, table=True):
     response_text: str | None = None
     new_response_text: str | None = None
 
-    migration: MigrationRecord = Relationship(back_populates="test_cases")
+    migration: Optional["MigrationRecord"] = Relationship(back_populates="test_cases")
 
 
 class WarningRecord(SQLModel, table=True):
@@ -79,4 +76,4 @@ class WarningRecord(SQLModel, table=True):
     severity: str | None = None  # HIGH / MEDIUM / LOW
     message: str
 
-    migration: MigrationRecord = Relationship(back_populates="warning_records")
+    migration: Optional["MigrationRecord"] = Relationship(back_populates="warning_records")

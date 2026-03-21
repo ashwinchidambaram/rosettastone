@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RosettaStone{% endblock %}</title>
+
+    <!-- Google Fonts: Inter + JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'sage': { 400: '#8B9D83' },
+                        'gold': { 400: '#D4A574' },
+                        'error': { 400: '#D85650' },
+                        'terracotta': { 400: '#D4745E' },
+                        'info': { 400: '#7A9FB5' },
+                    },
+                    fontFamily: {
+                        'headline': ['Inter', 'sans-serif'],
+                        'body': ['Inter', 'sans-serif'],
+                        'mono': ['JetBrains Mono', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Component Styles -->
+    <link rel="stylesheet" href="/static/css/components.css">
+</head>
+<body class="min-h-screen flex flex-col font-body antialiased">
+    {% set active_nav = active_nav|default('models') %}
+
+    <!-- Glass Navigation -->
+    <nav class="glass-nav">
+        <div class="glass-nav-inner">
+            <!-- Brand -->
+            <div class="flex items-center gap-8">
+                <a href="/ui/" class="text-xl font-extrabold tracking-tighter" style="color: var(--text-primary);">
+                    RosettaStone
+                </a>
+                <div class="hidden md:flex items-center gap-8 h-[72px]">
+                    <a href="/ui/" class="nav-link {% if active_nav == 'models' %}active{% endif %}">Models</a>
+                    <a href="/ui/migrations" class="nav-link {% if active_nav == 'migrations' %}active{% endif %}">Migrations</a>
+                    <a href="/ui/costs" class="nav-link {% if active_nav == 'costs' %}active{% endif %}">Costs</a>
+                    <a href="/ui/alerts" class="nav-link {% if active_nav == 'alerts' %}active{% endif %}">Alerts</a>
+                </div>
+            </div>
+
+            <!-- Right side -->
+            <div class="flex items-center gap-4">
+                <button id="theme-toggle" class="p-2 rounded-lg transition-all active:scale-95 duration-200" style="color: var(--text-secondary);" title="Toggle theme">
+                    <i data-lucide="sun" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow pt-[104px] pb-24 px-8 max-w-[1440px] mx-auto w-full min-h-screen">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer mt-auto">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4 max-w-[1440px] mx-auto">
+            <div class="font-mono text-[11px] uppercase tracking-widest" style="color: var(--footer-text);">
+                &copy; 2026 RosettaStone
+            </div>
+            <div class="flex gap-8">
+                <a href="#" class="font-mono text-[11px] uppercase tracking-widest hover:text-terracotta-400 transition-colors" style="color: var(--footer-text);">Documentation</a>
+                <a href="#" class="font-mono text-[11px] uppercase tracking-widest hover:text-terracotta-400 transition-colors" style="color: var(--footer-text);">API Reference</a>
+                <a href="#" class="font-mono text-[11px] uppercase tracking-widest hover:text-terracotta-400 transition-colors" style="color: var(--footer-text);">Status</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- App JS -->
+    <script src="/static/js/app.js"></script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
