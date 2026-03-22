@@ -205,16 +205,21 @@ class TestGetTestCase:
 class TestUIEndpoints:
     """UI endpoint tests verifying templates render with dummy data."""
 
-    def test_dashboard_returns_models(self, ui_client: TestClient) -> None:
-        resp = ui_client.get("/ui/")
+    def test_dashboard_returns_models(self, client: TestClient) -> None:
+        # With an empty DB, /ui/ now shows the empty state (no dummy fallback for models).
+        # Register a model so the models page renders with real data.
+        client.post("/api/v1/models", json={"model_id": "openai/gpt-4o"})
+        client.post("/api/v1/models", json={"model_id": "anthropic/claude-sonnet-4"})
+        resp = client.get("/ui/")
         assert resp.status_code == 200
         body = resp.text
         assert "Your models" in body
         assert "openai/gpt-4o" in body
         assert "anthropic/claude-sonnet-4" in body
 
-    def test_dashboard_empty_state(self, ui_client: TestClient) -> None:
-        resp = ui_client.get("/ui/?empty=true")
+    def test_dashboard_empty_state(self, client: TestClient) -> None:
+        # With no registered models, /ui/ automatically shows the empty state.
+        resp = client.get("/ui/")
         assert resp.status_code == 200
         body = resp.text
         assert "Welcome to RosettaStone" in body
@@ -282,8 +287,9 @@ class TestUIEndpoints:
         assert "0.72" in body
         assert "BERTScore" in body
 
-    def test_nav_links_present(self, ui_client: TestClient) -> None:
-        resp = ui_client.get("/ui/")
+    def test_nav_links_present(self, client: TestClient) -> None:
+        # Nav links are in base.html, present on both empty state and models page.
+        resp = client.get("/ui/")
         assert resp.status_code == 200
         body = resp.text
         assert 'href="/ui/"' in body
@@ -291,8 +297,10 @@ class TestUIEndpoints:
         assert 'href="/ui/costs"' in body
         assert 'href="/ui/alerts"' in body
 
-    def test_models_page_contains_alerts_banner(self, ui_client: TestClient) -> None:
-        resp = ui_client.get("/ui/")
+    def test_models_page_contains_alerts_banner(self, client: TestClient) -> None:
+        # Register a model so we get the full models.html with the alerts banner.
+        client.post("/api/v1/models", json={"model_id": "openai/gpt-4o"})
+        resp = client.get("/ui/")
         assert resp.status_code == 200
         body = resp.text
         assert "things need your attention" in body

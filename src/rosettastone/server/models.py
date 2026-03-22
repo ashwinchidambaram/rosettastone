@@ -9,6 +9,15 @@ except ImportError:
     raise ImportError("Web dependencies required. Install with: uv pip install 'rosettastone[web]'")
 
 
+class RegisteredModel(SQLModel, table=True):
+    __tablename__ = "registered_models"
+
+    id: int | None = Field(default=None, primary_key=True)
+    model_id: str = Field(unique=True, index=True)  # LiteLLM identifier e.g. "openai/gpt-4o"
+    added_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    is_active: bool = Field(default=True)
+
+
 class MigrationRecord(SQLModel, table=True):
     __tablename__ = "migrations"
 

@@ -743,16 +743,30 @@ async def get_test_case(
 
 
 @router.get("/ui/", response_class=HTMLResponse)
-async def dashboard(request: Request, empty: str | None = Query(None)) -> HTMLResponse:
+async def dashboard(
+    request: Request,
+    empty: str | None = Query(None),
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
     """Models dashboard page."""
-    if empty == "true":
+    from rosettastone.server.api.models import _model_to_template_dict
+    from rosettastone.server.models import RegisteredModel
+
+    # Query registered models ordered by most recent first
+    stmt = select(RegisteredModel).order_by(RegisteredModel.added_at.desc())  # type: ignore[union-attr]
+    records = list(session.exec(stmt).all())
+
+    if not records and empty != "false":
+        # No models registered — show empty state
         return templates.TemplateResponse(
             "models_empty.html",
             {"request": request, "active_nav": "models"},
         )
+
+    models = [_model_to_template_dict(r) for r in records] if records else DUMMY_MODELS
     return templates.TemplateResponse(
         "models.html",
-        {"request": request, "models": DUMMY_MODELS, "alerts": DUMMY_ALERTS, "active_nav": "models"},
+        {"request": request, "models": models, "alerts": DUMMY_ALERTS, "active_nav": "models"},
     )
 
 
