@@ -837,11 +837,17 @@ async def executive_report_page(
 
 
 @router.get("/ui/costs", response_class=HTMLResponse)
-async def costs_page(request: Request) -> HTMLResponse:
+async def costs_page(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
     """Costs overview page."""
+    from rosettastone.server.api.costs import _compute_costs
+
+    costs = _compute_costs(session)
+    if costs is None:
+        costs = DUMMY_COSTS  # fallback when no data
+
     return templates.TemplateResponse(
         "costs.html",
-        {"request": request, "costs": DUMMY_COSTS, "active_nav": "costs"},
+        {"request": request, "costs": costs, "active_nav": "costs"},
     )
 
 
