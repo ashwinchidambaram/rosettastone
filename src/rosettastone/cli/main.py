@@ -128,5 +128,23 @@ def evaluate(
     console.print(f"Win rate: {wins}/{len(results)} ({wins / max(len(results), 1):.0%})")
 
 
+@app.command()
+def batch(
+    manifest: Path = typer.Option(..., "--manifest", "-m", help="Path to batch YAML manifest"),
+    output: Path = typer.Option("./batch_output", "--output", "-o", help="Base output directory"),
+) -> None:
+    """Run multiple migrations from a YAML manifest."""
+    from rosettastone.batch import format_batch_summary, load_manifest, run_batch
+
+    console.print(f"[bold]Loading manifest:[/bold] {manifest}")
+    batch_manifest = load_manifest(manifest)
+    console.print(f"Found {len(batch_manifest.migrations)} migration(s)\n")
+
+    results = run_batch(batch_manifest, output)
+
+    summary = format_batch_summary(results)
+    console.print(summary)
+
+
 if __name__ == "__main__":
     app()

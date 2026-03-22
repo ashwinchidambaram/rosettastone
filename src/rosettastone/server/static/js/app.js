@@ -107,6 +107,86 @@
     window.openSlideout = openSlideout;
     window.closeSlideout = closeSlideout;
 
+    /* ─── Mobile Navigation Drawer ────────────────────────────── */
+    function openMobileNav() {
+        var drawer = document.getElementById("mobile-nav-drawer");
+        var backdrop = document.getElementById("mobile-nav-backdrop");
+        var btn = document.getElementById("mobile-menu-btn");
+        if (!drawer || !backdrop) return;
+        drawer.classList.remove("hidden");
+        backdrop.classList.remove("hidden");
+        // Force reflow then animate in
+        void drawer.offsetWidth;
+        drawer.style.transform = "translateX(0)";
+        if (btn) btn.setAttribute("aria-expanded", "true");
+        document.body.style.overflow = "hidden";
+    }
+
+    function closeMobileNav() {
+        var drawer = document.getElementById("mobile-nav-drawer");
+        var backdrop = document.getElementById("mobile-nav-backdrop");
+        var btn = document.getElementById("mobile-menu-btn");
+        if (!drawer || !backdrop) return;
+        drawer.style.transform = "translateX(100%)";
+        if (btn) btn.setAttribute("aria-expanded", "false");
+        setTimeout(function () {
+            drawer.classList.add("hidden");
+            backdrop.classList.add("hidden");
+        }, 300);
+        document.body.style.overflow = "";
+    }
+
+    // Toggle button
+    document.addEventListener("click", function (e) {
+        if (e.target.closest("[data-action='toggle-mobile-nav']")) {
+            var drawer = document.getElementById("mobile-nav-drawer");
+            if (drawer && drawer.classList.contains("hidden")) {
+                openMobileNav();
+            } else {
+                closeMobileNav();
+            }
+        }
+    });
+
+    // Close button
+    document.addEventListener("click", function (e) {
+        if (e.target.closest("[data-action='close-mobile-nav']")) {
+            closeMobileNav();
+        }
+    });
+
+    // Close on backdrop click
+    document.addEventListener("click", function (e) {
+        if (e.target && e.target.id === "mobile-nav-backdrop") {
+            closeMobileNav();
+        }
+    });
+
+    // Close on link click
+    document.addEventListener("click", function (e) {
+        if (e.target.closest(".mobile-nav-link")) {
+            closeMobileNav();
+        }
+    });
+
+    // Escape key closes mobile nav too
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+            var drawer = document.getElementById("mobile-nav-drawer");
+            if (drawer && !drawer.classList.contains("hidden")) {
+                closeMobileNav();
+            }
+        }
+    });
+
+    /* ─── CSRF Token for HTMX ────────────────────────────────── */
+    document.addEventListener("htmx:configRequest", function (e) {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) {
+            e.detail.headers["X-CSRF-Token"] = meta.getAttribute("content");
+        }
+    });
+
     /* ─── Collapsible Sections ────────────────────────────────── */
     document.addEventListener("click", function (e) {
         var trigger = e.target.closest("[data-action='toggle-collapse']");

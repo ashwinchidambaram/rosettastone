@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RosettaStone | Model Intelligence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-error": "#690005",
+              "on-secondary-fixed-variant": "#3b4b36",
+              "error-container": "#93000a",
+              "on-secondary-fixed": "#101f0d",
+              "on-tertiary-fixed-variant": "#614018",
+              "on-primary-fixed-variant": "#7a2f1e",
+              "secondary-container": "#3d4d38",
+              "surface-variant": "#353535",
+              "surface-container-low": "#1c1b1b",
+              "error": "#ffb4ab",
+              "on-primary-container": "#531205",
+              "tertiary-container": "#b4885a",
+              "surface-bright": "#393939",
+              "on-primary-fixed": "#3d0600",
+              "tertiary-fixed-dim": "#efbd8a",
+              "inverse-on-surface": "#313030",
+              "on-surface-variant": "#dbc1bb",
+              "on-primary": "#5c190a",
+              "surface": "#131313",
+              "secondary-fixed": "#d5e8cb",
+              "primary-fixed-dim": "#ffb4a3",
+              "primary-fixed": "#ffdad2",
+              "on-tertiary-fixed": "#2c1700",
+              "surface-tint": "#ffb4a3",
+              "on-error-container": "#ffdad6",
+              "on-secondary": "#253421",
+              "surface-container-lowest": "#0e0e0e",
+              "on-surface": "#e5e2e1",
+              "tertiary-fixed": "#ffdcbc",
+              "background": "#131313",
+              "secondary-fixed-dim": "#b9ccb0",
+              "surface-container-highest": "#353535",
+              "on-secondary-container": "#abbea2",
+              "secondary": "#b9ccb0",
+              "surface-dim": "#131313",
+              "tertiary": "#efbd8a",
+              "on-tertiary": "#472a03",
+              "primary": "#ffb4a3",
+              "outline": "#a38c86",
+              "inverse-surface": "#e5e2e1",
+              "surface-container": "#20201f",
+              "on-background": "#e5e2e1",
+              "on-tertiary-container": "#3f2300",
+              "inverse-primary": "#984633",
+              "primary-container": "#d67660",
+              "outline-variant": "#55433e",
+              "surface-container-high": "#2a2a2a"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"],
+              "mono": ["JetBrains Mono"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #131313;
+            color: #e5e2e1;
+            font-family: 'Inter', sans-serif;
+        }
+        .glass-header {
+            background-color: rgba(44, 44, 44, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid #4a4a4a;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<nav class="h-[72px] w-full sticky top-0 z-50 glass-header shadow-2xl shadow-black/50">
+<div class="flex items-center justify-between px-8 w-full max-w-screen-2xl mx-auto h-full">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-orange-400" style="font-variation-settings: 'FILL' 1;">view_in_ar</span>
+<span class="text-xl font-bold tracking-tighter text-[#E8DCC4] uppercase">MONOLITH</span>
+</div>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-orange-400 font-bold border-b-2 border-orange-400 pb-1 text-sm font-medium tracking-tight transition-all" href="#">Models</a>
+<a class="text-stone-400 hover:text-stone-100 transition-colors text-sm font-medium tracking-tight" href="#">Migrations</a>
+<a class="text-stone-400 hover:text-stone-100 transition-colors text-sm font-medium tracking-tight" href="#">Costs</a>
+<div class="relative">
+<a class="text-stone-400 hover:text-stone-100 transition-colors text-sm font-medium tracking-tight" href="#">Alerts</a>
+<span class="absolute -top-1 -right-2 w-1.5 h-1.5 bg-[#D85650] rounded-full"></span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-[#BDBDBD] hover:bg-stone-800/50 rounded-lg transition-all active:scale-95">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<button class="p-2 text-[#BDBDBD] hover:bg-stone-800/50 rounded-lg transition-all active:scale-95">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant/30">
+<img alt="User profile" data-alt="Close up of a professional user profile photo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfz126uLT_LL4Kdg20csidzFNBlVhsauW8v1tmHUJdxDksTlHx-9gPtoAbMA7Cae_pDAUxJVukOm5o4NH3TCLgfB6MF8WqfTB-DWha2AkvJl-YvwIEGnBCjkOPj2M4VqC6QQBiAtHiHak76dEi55S7TjR8mv69pQopdn1dVqx9AwlCY9wJy81hJl12p6olJqI6bUKul6etjG1G8xwfseAC8ZRDJG65SseudQeK2Q4IZBYLhHyxnQpphdaVXFVTSsF7sNKW9U1tVWSq"/>
+</div>
+</div>
+</div>
+</nav>
+<main class="flex-grow w-full max-w-screen-2xl mx-auto px-8 py-12 space-y-16">
+<!-- Attention Banner -->
+<section class="rounded-xl bg-[#D4A574]/10 border-l-4 border-[#D4A574] p-6">
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-[#D4A574] mt-0.5">warning</span>
+<div class="space-y-2">
+<h3 class="font-bold text-[#E8DCC4] text-sm uppercase tracking-wider">2 things need your attention</h3>
+<ul class="space-y-1">
+<li class="text-on-surface/80 text-sm flex items-center gap-2">
+<span class="w-1 h-1 bg-[#D4A574] rounded-full"></span>
+                            gpt-4o-0613 is deprecated — retiring Apr 15
+                        </li>
+<li class="text-on-surface/80 text-sm flex items-center gap-2">
+<span class="w-1 h-1 bg-[#D4A574] rounded-full"></span>
+                            Claude Haiku 4.5 costs 40 percent less than your current Haiku
+                        </li>
+</ul>
+</div>
+</div>
+</section>
+<!-- Your Models Section -->
+<section class="space-y-8">
+<div class="flex justify-between items-end">
+<h2 class="text-[22px] font-bold text-[#E8DCC4] tracking-tight">Your models</h2>
+<span class="text-xs font-mono text-outline uppercase tracking-widest">4 ACTIVE INSTANCES</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Card 1 -->
+<div class="group bg-surface-container-low p-8 rounded-xl border border-transparent hover:border-outline-variant/30 transition-all flex flex-col justify-between min-h-[220px]">
+<div class="flex justify-between items-start">
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+<span class="font-mono text-[10px] text-emerald-500 uppercase font-bold tracking-widest">Active</span>
+</div>
+<h3 class="text-xl font-bold text-on-surface">openai/gpt-4o</h3>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">more_vert</span>
+</div>
+<div class="bg-surface-container-lowest p-4 rounded-lg my-6 flex justify-between items-center">
+<div class="text-center px-4 border-r border-outline-variant/20">
+<p class="text-[10px] font-mono text-outline uppercase tracking-tighter">Context</p>
+<p class="font-bold text-on-surface">128K</p>
+</div>
+<div class="text-center px-4 border-r border-outline-variant/20">
+<p class="text-[10px] font-mono text-outline uppercase tracking-tighter">Cost/1M</p>
+<p class="font-bold text-on-surface">$2.50</p>
+</div>
+<div class="text-center px-4">
+<p class="text-[10px] font-mono text-outline uppercase tracking-tighter">Provider</p>
+<p class="font-bold text-on-surface">OpenAI</p>
+</div>
+</div>
+<a class="text-[#D4745E] font-bold text-sm inline-flex items-center gap-2 hover:translate-x-1 transition-transform" href="#">Run migration <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
+</div>
+<!-- Card 2 -->
+<div class="group bg-surface-container-low p-8 rounded-xl border border-transparent hover:border-outline-variant/30 transition-all flex flex-col justify-between min-h-[220px]">
+<div class="flex justify-between items-start">
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+<span class="font-mono text-[10px] text-emerald-500 uppercase font-bold tracking-widest">Active</span>
+</div>
+<h3 class="text-xl font-bold text-on-surface">anthropic/claude-sonnet-4</h3>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">more_vert</span>
+</div>
+<div class="bg-surface-container-lowest p-4 rounded-lg my-6 flex justify-between items-center">
+<div class="text-center px-4 border-r border-outline-variant/20">
+<p class="text-[10px] font-mono text-outline uppercase tracking-tighter">Context</p>
+<p class="font-bold text-on-surface">200K</p>
+</div>
+<div class="text-center px-4 border-r border-outline-variant/20">
+<p class="text-[10px] font-mono text-outline uppercase tracking-tighter">Cost/1M</p>
+<p class="font-bold text-on-surface">$3.00</p>
+</div>
+<div class="text-center px-4">
+<p class="text-[10px] font-mono text-outline uppercase tracking-tighter">Provider</p>
+<p class="font-bold text-on-surface">Anthropic</p>
+</div>
+</div>
+<a class="text-outline/60 font-bold text-sm inline-flex items-center gap-2" href="#">Healthy status</a>
+</div>
+<!-- Card 3 -->
+<div class="group bg-surface-container-low p-8 rounded-xl border border-transparent hover:border-outline-variant/30 transition-all flex flex-col justify-between min-h-[220px]">
+<div class="flex justify-between items-start">
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+<span class="font-mono text-[10px] text-emerald-500 uppercase font-bold tracking-widest">Active</span>
+</div>
+<h3 class="text-xl font-bold text-on-surface">openai/gpt-4o-mini</h3>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">more_vert</span>
+</div>
+<div class="bg-surface-container-lowest p-4 rounded-lg my-6 flex justify-between items-center">
+<div class="text-center px-4 border-r border-outline-variant/20">
+<p class="text-[10px] font-mono text-outline uppercase tracking-tighter">Context</p>
+<p class="font-bold text-on-surface">128K</p>
+</div>
+<div class="text-center px-4 border-r border-outline-variant/20">
+<p class="text-[10px] font-mono text-outline uppercase tracking-tighter">Cost/1M</p>
+<p class="font-bold text-on-surface">$0.15</p>
+</div>
+<div class="text-center px-4">
+<p class="text-[10px] font-mono text-outline uppercase tracking-tighter">Provider</p>
+<p class="font-bold text-on-surface">OpenAI</p>
+</div>
+</div>
+<a class="text-outline/60 font-bold text-sm inline-flex items-center gap-2" href="#">Healthy status</a>
+</div>
+<!-- Card 4 (Deprecated) -->
+<div class="group bg-surface-container-low p-8 rounded-xl border-l-4 border-[#D4A574] transition-all flex flex-col justify-between min-h-[220px]">
+<div class="flex justify-between items-start">
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 bg-[#D4A574] rounded-full shadow-[0_0_8px_rgba(212,165,116,0.5)]"></span>
+<span class="font-mono text-[10px] text-[#D4A574] uppercase font-bold tracking-widest">Deprecated</span>
+</div>
+<h3 class="text-xl font-bold text-on-surface">openai/gpt-4o-0613</h3>
+<p class="text-xs text-[#D4A574]/80">Retiring Apr 15, 2024</p>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-[#D4A574] transition-colors">warning</span>
+</div>
+<div class="bg-[#D4A574]/5 p-4 rounded-lg my-6">
+<p class="text-[10px] font-mono text-[#D4A574] uppercase tracking-widest mb-1">Recommended Upgrade</p>
+<p class="font-bold text-on-surface">openai/gpt-4o (latest)</p>
+</div>
+<a class="text-[#D4745E] font-bold text-sm inline-flex items-center gap-2 hover:translate-x-1 transition-transform" href="#">Start migration <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
+</div>
+<!-- Add Model Card -->
+<button class="bg-transparent border-2 border-dashed border-outline-variant/30 rounded-xl flex flex-col items-center justify-center p-8 hover:bg-surface-container-low hover:border-primary/40 transition-all min-h-[220px] group">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-primary">add</span>
+</div>
+<span class="text-on-surface font-bold">Add model</span>
+<span class="text-outline text-xs mt-1">Deploy new intelligence</span>
+</button>
+</div>
+</section>
+<!-- Explore Models Section -->
+<section class="space-y-8 pb-20">
+<h2 class="text-[22px] font-bold text-on-surface tracking-tight">Explore models</h2>
+<!-- Filters -->
+<div class="flex flex-col md:flex-row gap-4 items-center">
+<div class="relative flex-grow w-full">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full bg-[#2C2C2C] border-none rounded-lg pl-12 pr-4 py-3 text-sm focus:ring-1 focus:ring-primary/50 text-on-surface placeholder-outline/50" placeholder="Search 2,450+ models..." type="text"/>
+</div>
+<div class="flex gap-4 w-full md:w-auto">
+<button class="flex items-center justify-between gap-4 px-4 py-3 bg-[#2C2C2C] rounded-lg text-sm text-on-surface min-w-[140px] hover:bg-surface-container-highest transition-colors">
+                        Provider <span class="material-symbols-outlined text-xs">expand_more</span>
+</button>
+<button class="flex items-center justify-between gap-4 px-4 py-3 bg-[#2C2C2C] rounded-lg text-sm text-on-surface min-w-[140px] hover:bg-surface-container-highest transition-colors">
+                        Capability <span class="material-symbols-outlined text-xs">expand_more</span>
+</button>
+</div>
+</div>
+<!-- Table -->
+<div class="overflow-hidden rounded-xl bg-surface-container-low">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-[#2C2C2C] border-b border-outline-variant/10">
+<th class="px-6 py-4 text-[10px] font-mono text-outline uppercase tracking-widest">Model Name</th>
+<th class="px-6 py-4 text-[10px] font-mono text-outline uppercase tracking-widest">Provider</th>
+<th class="px-6 py-4 text-[10px] font-mono text-outline uppercase tracking-widest">Cost/1M</th>
+<th class="px-6 py-4 text-[10px] font-mono text-outline uppercase tracking-widest">Context</th>
+<th class="px-6 py-4 text-[10px] font-mono text-outline uppercase tracking-widest">Match %</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<!-- Row 1 -->
+<tr class="hover:bg-[#3D3D3D] transition-colors group">
+<td class="px-6 py-5 font-bold text-on-surface">gemini-2.5-flash</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">Google</td>
+<td class="px-6 py-5 font-mono text-xs text-primary-container">$0.10</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">1M+</td>
+<td class="px-6 py-5 w-48">
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full opacity-80" style="width: 98%;"></div>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-[#3D3D3D] transition-colors group">
+<td class="px-6 py-5 font-bold text-on-surface">llama-4-maverick</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">Meta</td>
+<td class="px-6 py-5 font-mono text-xs text-primary-container">$0.00</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">64K</td>
+<td class="px-6 py-5 w-48">
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full opacity-80" style="width: 85%;"></div>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-[#3D3D3D] transition-colors group">
+<td class="px-6 py-5 font-bold text-on-surface">claude-opus-4.6</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">Anthropic</td>
+<td class="px-6 py-5 font-mono text-xs text-primary-container">$15.00</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">200K</td>
+<td class="px-6 py-5 w-48">
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full opacity-80" style="width: 92%;"></div>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-[#3D3D3D] transition-colors group">
+<td class="px-6 py-5 font-bold text-on-surface">mistral-large</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">Mistral</td>
+<td class="px-6 py-5 font-mono text-xs text-primary-container">$4.00</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">32K</td>
+<td class="px-6 py-5 w-48">
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full opacity-80" style="width: 76%;"></div>
+</div>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-[#3D3D3D] transition-colors group">
+<td class="px-6 py-5 font-bold text-on-surface">deepseek-v3</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">DeepSeek</td>
+<td class="px-6 py-5 font-mono text-xs text-primary-container">$0.25</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">128K</td>
+<td class="px-6 py-5 w-48">
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full opacity-80" style="width: 81%;"></div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-stone-950 w-full py-12 px-8 border-t border-stone-800/30">
+<div class="flex flex-col md:flex-row justify-between items-center gap-6 w-full max-w-screen-2xl mx-auto">
+<div class="flex items-center gap-4">
+<span class="text-stone-500 font-mono text-[10px] uppercase tracking-widest">© 2024 Celestial Monolith Intelligence</span>
+</div>
+<div class="flex gap-8">
+<a class="text-stone-500 hover:text-stone-200 transition-colors font-mono text-[10px] uppercase tracking-widest" href="#">Documentation</a>
+<a class="text-stone-500 hover:text-stone-200 transition-colors font-mono text-[10px] uppercase tracking-widest" href="#">Support</a>
+<a class="text-stone-500 hover:text-stone-200 transition-colors font-mono text-[10px] uppercase tracking-widest" href="#">API Reference</a>
+<a class="text-stone-500 hover:text-stone-200 transition-colors font-mono text-[10px] uppercase tracking-widest" href="#">Terms</a>
+</div>
+</div>
+</footer>
+</body></html>

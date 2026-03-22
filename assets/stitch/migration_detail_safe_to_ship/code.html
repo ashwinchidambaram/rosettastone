@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RosettaStone | Migration Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-primary-fixed-variant": "#7a2f1e",
+                        "on-secondary-container": "#abbea2",
+                        "inverse-primary": "#984633",
+                        "secondary-fixed": "#d5e8cb",
+                        "tertiary": "#efbd8a",
+                        "on-primary-fixed": "#3d0600",
+                        "primary": "#ffb4a3",
+                        "primary-container": "#d67660",
+                        "surface-container-lowest": "#0e0e0e",
+                        "surface-container-low": "#1c1b1b",
+                        "surface-container-high": "#2a2a2a",
+                        "surface-container-highest": "#353535",
+                        "surface-bright": "#393939",
+                        "surface": "#131313",
+                        "on-surface": "#e5e2e1",
+                        "on-surface-variant": "#dbc1bb",
+                        "outline": "#a38c86",
+                        "outline-variant": "#55433e",
+                        "error": "#ffb4ab",
+                        "success": "#8B9D83",
+                        "warn": "#D4A373"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["JetBrains Mono", "monospace"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-header {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/30 selection:text-primary">
+<!-- TopNavBar Execution -->
+<nav class="fixed top-0 w-full h-[72px] z-50 bg-[#131313]/80 backdrop-blur-md shadow-2xl shadow-[#E5E2E1]/5 flex items-center justify-center">
+<div class="flex justify-between items-center px-8 w-full max-w-[1440px] mx-auto">
+<div class="text-xl font-black text-[#D4745E] uppercase tracking-widest font-headline">
+                RosettaStone
+            </div>
+<div class="hidden md:flex items-center gap-8">
+<a class="text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-all duration-300 font-bold tracking-tight font-headline" href="#">Models</a>
+<a class="text-[#D4745E] border-b-2 border-[#D4745E] pb-1 transition-all duration-300 font-bold tracking-tight font-headline" href="#">Migrations</a>
+<a class="text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-all duration-300 font-bold tracking-tight font-headline" href="#">Costs</a>
+<a class="text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-all duration-300 font-bold tracking-tight font-headline" href="#">Alerts</a>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-sm">search</span>
+<input class="bg-surface-container-highest border-none rounded-lg pl-10 pr-4 py-1.5 text-sm w-48 focus:ring-1 focus:ring-primary/50 transition-all" placeholder="Search migrations..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-[#2a2a2a] p-2 rounded-lg transition-all active:scale-95">dark_mode</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-[#2a2a2a] p-2 rounded-lg transition-all active:scale-95">settings</button>
+<div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary-container overflow-hidden border border-outline-variant/20">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="Close up professional male headshot portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSY7Vr4AQMppyg79eqGretGSdZ_3VXn58KSRp_H248Ucs7uL3ZbYZJnMetX_ybUv3qaI6ey6cj-5-n0hSDcaTE_0rvjfu9iokp4gMebzesz56FvAV-3mOSGUVyJc3GV3RvNG9sIzDsH13WHl1q4zyGw4UKnMwLVNdsYDGXF3UcKGkL3xnO2J4isU5bK7_nAzgvxbCDHocbUSGjAQDQbRMrPuGVdMp8k31_Bm98_V0iCA1aAmcZgsLTOiDswsDXaHwTpLkQgptGlQEg"/>
+</div>
+</div>
+</div>
+</nav>
+<main class="pt-[104px] pb-24 px-8 max-w-[1440px] mx-auto min-h-screen">
+<!-- Breadcrumb & Header -->
+<div class="mb-12">
+<a class="flex items-center gap-2 text-[#D4745E] font-medium mb-4 hover:opacity-80 transition-opacity" href="#">
+<span class="material-symbols-outlined text-sm">arrow_back</span>
+<span>Migrations</span>
+</a>
+<div class="flex flex-wrap items-center justify-between gap-6">
+<div class="flex items-center gap-4">
+<h1 class="text-[28px] font-semibold text-[#E8DCC4] font-headline tracking-tight">
+                        gpt-4o <span class="text-on-surface-variant/30 mx-2">→</span> claude-sonnet-4
+                    </h1>
+<span class="px-3 py-1 bg-success/10 text-success border border-success/30 text-[11px] font-bold uppercase tracking-widest rounded-full">Complete</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-4 py-2 bg-surface-container-high hover:bg-surface-bright text-on-surface text-sm font-medium rounded-lg transition-all">
+<span class="material-symbols-outlined text-[18px]">history</span>
+                        Version History
+                    </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-primary-container to-primary text-on-primary-container text-sm font-bold rounded-lg transition-all active:scale-95 shadow-lg shadow-primary/10">
+<span class="material-symbols-outlined text-[18px]">rocket_launch</span>
+                        Deploy to Prod
+                    </button>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Left Column: Recommendation & Analysis -->
+<div class="lg:col-span-8 space-y-8">
+<!-- Recommendation Card -->
+<section class="bg-surface-container-low border-l-4 border-success p-8 rounded-xl shadow-xl shadow-black/20">
+<div class="flex flex-col md:flex-row gap-8 items-start">
+<div class="flex-1">
+<div class="flex items-center gap-3 text-success mb-4">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<h2 class="text-2xl font-bold font-headline">Safe to ship</h2>
+</div>
+<p class="text-on-surface/80 leading-relaxed mb-8 max-w-2xl">
+                                The target model matches or exceeds the source in <span class="text-success font-bold">92 percent</span> of test cases. JSON outputs pass at 100 percent. Free-text responses show minor tone differences but maintain semantic equivalence.
+                            </p>
+<div class="flex flex-wrap gap-4">
+<button class="px-6 py-2.5 bg-[#D4745E] text-white font-bold rounded-lg hover:brightness-110 transition-all active:scale-95 shadow-md shadow-[#D4745E]/20">
+                                    Export report
+                                </button>
+<button class="px-6 py-2.5 bg-transparent border border-outline/30 text-on-surface font-medium rounded-lg hover:bg-surface-container-high transition-all">
+                                    View optimized prompt
+                                </button>
+</div>
+</div>
+<div class="w-full md:w-auto flex flex-col items-center justify-center p-6 bg-surface-container-high rounded-xl min-w-[180px]">
+<div class="text-4xl font-black text-success font-headline mb-1">92%</div>
+<div class="text-[10px] font-label text-on-surface-variant uppercase tracking-widest">Confidence Score</div>
+</div>
+</div>
+</section>
+<!-- KPI Grid -->
+<section class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+<div class="bg-surface-container-low p-6 rounded-xl">
+<div class="text-3xl font-bold text-success font-headline mb-1">92%</div>
+<div class="text-xs text-on-surface-variant/70 font-medium">Parity Score</div>
+</div>
+<div class="bg-surface-container-low p-6 rounded-xl">
+<div class="text-3xl font-bold text-on-surface/60 font-headline mb-1">85%</div>
+<div class="text-xs text-on-surface-variant/70 font-medium">Latency (Avg)</div>
+</div>
+<div class="bg-surface-container-low p-6 rounded-xl">
+<div class="text-3xl font-bold text-success font-headline mb-1">+7%</div>
+<div class="text-xs text-on-surface-variant/70 font-medium">Cost Efficiency</div>
+</div>
+</section>
+<!-- Results by Output Type -->
+<section>
+<h3 class="text-xl font-bold font-headline mb-6 text-on-surface/90">Results by output type</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Card 1 -->
+<div class="bg-surface-container-low p-6 rounded-xl flex items-center justify-between group hover:bg-surface-container-high transition-colors">
+<div>
+<div class="text-sm font-semibold text-on-surface-variant mb-1">JSON outputs</div>
+<div class="text-2xl font-bold font-headline">48/48 <span class="text-sm text-on-surface-variant font-normal">(100%)</span></div>
+</div>
+<span class="px-3 py-1 bg-success/10 text-success border border-success/30 text-[10px] font-bold rounded">PASS</span>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-low p-6 rounded-xl flex items-center justify-between group hover:bg-surface-container-high transition-colors">
+<div>
+<div class="text-sm font-semibold text-on-surface-variant mb-1">Free text (short)</div>
+<div class="text-2xl font-bold font-headline">71/78 <span class="text-sm text-on-surface-variant font-normal">(91%)</span></div>
+</div>
+<span class="px-3 py-1 bg-success/10 text-success border border-success/30 text-[10px] font-bold rounded">PASS</span>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-low p-6 rounded-xl flex items-center justify-between group hover:bg-surface-container-high transition-colors">
+<div>
+<div class="text-sm font-semibold text-on-surface-variant mb-1">Classification</div>
+<div class="text-2xl font-bold font-headline">23/24 <span class="text-sm text-on-surface-variant font-normal">(96%)</span></div>
+</div>
+<span class="px-3 py-1 bg-success/10 text-success border border-success/30 text-[10px] font-bold rounded">PASS</span>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-low border-l-4 border-warn p-6 rounded-xl flex items-center justify-between group hover:bg-surface-container-high transition-colors">
+<div>
+<div class="text-sm font-semibold text-on-surface-variant mb-1">Free text (long)</div>
+<div class="text-2xl font-bold font-headline">5/6 <span class="text-sm text-on-surface-variant font-normal">(83%)</span></div>
+</div>
+<span class="px-3 py-1 bg-warn/10 text-warn border border-warn/30 text-[10px] font-bold rounded">WARN</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Regressions & Config -->
+<div class="lg:col-span-4 space-y-8">
+<!-- Needs Attention Section -->
+<section class="bg-surface-container-low rounded-xl overflow-hidden">
+<div class="px-6 py-5 bg-surface-container-high border-b border-outline-variant/10 flex justify-between items-center">
+<h3 class="font-bold text-sm uppercase tracking-wider text-on-surface/70">Needs Attention</h3>
+<span class="px-2 py-0.5 bg-error/10 text-error text-[10px] font-bold rounded-full">2 CRITICAL</span>
+</div>
+<div class="p-6 space-y-6">
+<!-- Regression 1 -->
+<div class="space-y-3">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-label text-error/80 bg-error/5 px-2 py-0.5 rounded border border-error/20">Worst regression</span>
+<span class="text-[10px] font-label text-on-surface-variant">Score: 0.31</span>
+</div>
+<div class="text-sm font-bold text-on-surface">Classification Task #104</div>
+<div class="p-3 bg-surface-container-lowest rounded text-xs font-label leading-relaxed">
+<div class="text-on-surface-variant/50 mb-1">Expected: <span class="text-success/70">urgent</span></div>
+<div class="text-on-surface">Got: <span class="text-error/70">high_priority</span></div>
+</div>
+<button class="text-primary text-[11px] font-bold flex items-center gap-1 hover:underline">
+                                View diff <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</button>
+</div>
+<div class="h-px bg-outline-variant/10"></div>
+<!-- Regression 2 -->
+<div class="space-y-2">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-label text-on-surface-variant">Score: 0.45</span>
+<span class="text-[10px] font-label text-on-surface-variant">Free text</span>
+</div>
+<p class="text-xs text-on-surface/70 leading-relaxed italic">
+                                "The response added unnecessary disclaimer text that was not present in the original output..."
+                            </p>
+</div>
+<div class="pt-4 flex flex-col gap-4">
+<div class="flex items-center gap-2 text-on-surface-variant/40 text-[11px] font-label uppercase">
+<div class="h-px flex-1 bg-outline-variant/10"></div>
+<span>12 more</span>
+<div class="h-px flex-1 bg-outline-variant/10"></div>
+</div>
+<a class="text-center text-primary text-xs font-bold hover:underline" href="#">Show all 156 test cases</a>
+</div>
+</div>
+</section>
+<!-- Configuration Section -->
+<section>
+<button class="w-full flex items-center justify-between p-4 bg-surface-container-low hover:bg-surface-container-high rounded-xl transition-all group">
+<span class="font-bold text-sm text-on-surface/80">Configuration and details</span>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform">chevron_right</span>
+</button>
+</section>
+<!-- Quick Stats -->
+<section class="bg-gradient-to-br from-surface-container-low to-surface-container-lowest p-6 rounded-xl border border-outline-variant/5">
+<h4 class="text-[10px] font-label uppercase tracking-[0.2em] text-on-surface-variant mb-6">Model Metadata</h4>
+<div class="space-y-4">
+<div class="flex justify-between items-center text-xs">
+<span class="text-on-surface-variant">Context Window</span>
+<span class="font-label text-on-surface">200k tokens</span>
+</div>
+<div class="flex justify-between items-center text-xs">
+<span class="text-on-surface-variant">Tokenizer</span>
+<span class="font-label text-on-surface">Claude v4 Native</span>
+</div>
+<div class="flex justify-between items-center text-xs">
+<span class="text-on-surface-variant">Provider</span>
+<span class="font-label text-on-surface">Anthropic</span>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<!-- Footer Execution -->
+<footer class="w-full py-12 px-8 bg-[#0e0e0e] border-t border-[#E5E2E1]/10 mt-auto">
+<div class="max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between items-center gap-4 w-full">
+<div class="text-[#D4745E] font-bold font-label">
+                RosettaStone Intelligence
+            </div>
+<div class="flex items-center gap-8">
+<a class="font-label text-[0.6875rem] uppercase tracking-tighter text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors" href="#">Documentation</a>
+<a class="font-label text-[0.6875rem] uppercase tracking-tighter text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors" href="#">Legal</a>
+<a class="font-label text-[0.6875rem] uppercase tracking-tighter text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors" href="#">Privacy</a>
+<a class="font-label text-[0.6875rem] uppercase tracking-tighter text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors" href="#">API Status</a>
+</div>
+<div class="font-label text-[0.6875rem] uppercase tracking-tighter text-[#E5E2E1]/40">
+                © 2024 RosettaStone Intelligence
+            </div>
+</div>
+</footer>
+</body></html>

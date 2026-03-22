@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Page Not Found{% endblock %}
+
+{% block content %}
+<div class="min-h-[calc(100vh-72px)] flex flex-col items-center justify-center px-8 text-center">
+    <span class="material-symbols-outlined text-7xl text-outline/30 mb-6">explore_off</span>
+    <h1 class="text-4xl font-bold font-headline text-on-surface mb-3">404</h1>
+    <p class="text-lg text-on-surface-variant mb-8 max-w-md">The page you're looking for doesn't exist or has been moved.</p>
+    <a href="/ui/" class="px-6 py-2.5 bg-[#D4745E] text-white font-medium rounded-lg hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-[#D4745E]/20">
+        Back to Dashboard
+    </a>
+</div>
+{% endblock %}

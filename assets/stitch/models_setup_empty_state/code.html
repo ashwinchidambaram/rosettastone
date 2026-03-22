@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #131313;
+            color: #E5E2E1;
+            margin: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .glass-header {
+            background: rgba(19, 19, 19, 0.8);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "tertiary-fixed-dim": "#efbd8a",
+                        "surface-container-low": "#1c1b1b",
+                        "on-tertiary-fixed-variant": "#614018",
+                        "secondary-fixed": "#d5e8cb",
+                        "primary-fixed": "#ffdad2",
+                        "on-error": "#690005",
+                        "secondary-fixed-dim": "#b9ccb0",
+                        "on-primary-fixed": "#3d0600",
+                        "on-secondary-container": "#abbea2",
+                        "on-secondary": "#253421",
+                        "outline-variant": "#55433e",
+                        "on-primary-fixed-variant": "#7a2f1e",
+                        "primary-container": "#d67660",
+                        "secondary": "#b9ccb0",
+                        "primary": "#ffb4a3",
+                        "error": "#ffb4ab",
+                        "surface-container-lowest": "#0e0e0e",
+                        "outline": "#a38c86",
+                        "error-container": "#93000a",
+                        "tertiary-fixed": "#ffdcbc",
+                        "on-surface-variant": "#dbc1bb",
+                        "on-primary-container": "#531205",
+                        "surface-tint": "#ffb4a3",
+                        "surface-dim": "#131313",
+                        "inverse-surface": "#e5e2e1",
+                        "on-background": "#e5e2e1",
+                        "on-secondary-fixed-variant": "#3b4b36",
+                        "on-tertiary-container": "#3f2300",
+                        "surface-variant": "#353535",
+                        "surface-bright": "#393939",
+                        "background": "#131313",
+                        "inverse-on-surface": "#313030",
+                        "tertiary": "#efbd8a",
+                        "surface-container-high": "#2a2a2a",
+                        "on-tertiary": "#472a03",
+                        "on-primary": "#5c190a",
+                        "on-error-container": "#ffdad6",
+                        "on-surface": "#e5e2e1",
+                        "surface-container": "#20201f",
+                        "surface": "#131313",
+                        "surface-container-highest": "#353535",
+                        "tertiary-container": "#b4885a",
+                        "inverse-primary": "#984633",
+                        "on-secondary-fixed": "#101f0d",
+                        "secondary-container": "#3d4d38",
+                        "on-tertiary-fixed": "#2c1700",
+                        "primary-fixed-dim": "#ffb4a3"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-surface overflow-x-hidden">
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 w-full h-[72px] z-50 flex items-center justify-between px-8 bg-[#131313]/80 backdrop-blur-md shadow-2xl shadow-[#E5E2E1]/5 no-border-tonal-shift bg-[#1c1b1b]">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black tracking-tighter text-[#E5E2E1]">RosettaStone</span>
+<nav class="hidden md:flex items-center gap-6 font-['Inter'] font-bold text-sm tracking-tight">
+<a class="text-[#D4745E] border-b-2 border-[#D4745E] pb-1" href="#">Models</a>
+<a class="text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors" href="#">Migrations</a>
+<a class="text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors" href="#">Costs</a>
+<a class="text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors" href="#">Alerts</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden lg:flex items-center bg-surface-container-highest px-3 py-1.5 rounded-md text-sm text-on-surface-variant gap-2 mr-4">
+<span class="material-symbols-outlined text-sm">search</span>
+<span class="opacity-50">Search models...</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 hover:bg-[#393939] rounded-md transition-all active:scale-95 duration-150 text-[#E5E2E1]/60">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<button class="p-2 hover:bg-[#393939] rounded-md transition-all active:scale-95 duration-150 text-[#E5E2E1]/60">
+<span class="material-symbols-outlined">help</span>
+</button>
+<button class="p-2 hover:bg-[#393939] rounded-md transition-all active:scale-95 duration-150 text-[#E5E2E1]/60">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="min-h-screen pt-[72px] flex flex-col items-center justify-center px-6 relative overflow-hidden">
+<!-- Abstract Background Detail -->
+<div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-[#D4745E]/5 rounded-full blur-[120px] pointer-events-none"></div>
+<!-- Empty State Hero -->
+<div class="text-center max-w-2xl mb-12 relative z-10">
+<h1 class="text-[36px] font-semibold tracking-tight text-[#E8DCC4] mb-3 leading-tight">Welcome to RosettaStone</h1>
+<p class="text-[18px] text-[#BDBDBD] font-normal">Let's set up your model landscape.</p>
+</div>
+<!-- Onboarding Card (The Monolith) -->
+<div class="w-full max-w-[540px] bg-[#3D3D3D] rounded-xl p-8 shadow-2xl shadow-black/40 relative z-10 border border-[#4A4A4A]/30">
+<h2 class="text-[18px] font-medium text-on-surface mb-8">Which models are you currently using?</h2>
+<div class="space-y-4 mb-6">
+<div class="relative">
+<input class="w-full bg-[#2C2C2C] border-2 border-[#4A4A4A] rounded-md px-4 py-3.5 text-on-surface placeholder:text-[#E5E2E1]/30 focus:outline-none focus:border-[#D4745E] transition-all font-mono text-sm" placeholder="openai/gpt-4o" type="text"/>
+</div>
+<div class="relative">
+<input class="w-full bg-[#2C2C2C] border-2 border-[#4A4A4A] rounded-md px-4 py-3.5 text-on-surface placeholder:text-[#E5E2E1]/30 focus:outline-none focus:border-[#D4745E] transition-all font-mono text-sm" placeholder="anthropic/claude-sonnet-4" type="text"/>
+</div>
+</div>
+<div class="flex items-center justify-between mb-8">
+<button class="text-[#D4745E] text-sm font-medium hover:underline flex items-center gap-1.5 transition-all active:scale-95">
+<span class="material-symbols-outlined text-sm">add</span>
+                    + Add another model
+                </button>
+<span class="text-[12px] text-[#9E9E9E] font-mono">
+                    We use LiteLLM model identifiers
+                </span>
+</div>
+<button class="w-full bg-[#D4745E] hover:bg-[#D4745E]/90 text-[#F9F7F4] font-semibold py-4 rounded-lg shadow-lg shadow-[#D4745E]/10 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group">
+                Set up models
+                <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+<!-- Secondary Actions -->
+<div class="mt-12 flex flex-col items-center gap-8 relative z-10">
+<a class="text-[#D4745E] text-[15px] font-medium hover:brightness-125 transition-all flex items-center gap-2" href="#">
+                Or import from migration results
+                <span class="material-symbols-outlined text-[18px]">open_in_new</span>
+</a>
+<div class="flex flex-col items-center gap-4">
+<span class="text-sm text-[#BDBDBD]/60 font-medium">Or connect your infrastructure:</span>
+<div class="flex flex-wrap justify-center gap-3">
+<button class="flex items-center gap-2 px-6 py-2.5 rounded-full border border-[#4A4A4A] text-[#BDBDBD] text-sm hover:bg-[#4A4A4A]/20 transition-all active:scale-95">
+<span class="material-symbols-outlined text-[18px]">database</span>
+                        Connect Redis cache
+                    </button>
+<button class="flex items-center gap-2 px-6 py-2.5 rounded-full border border-[#4A4A4A] text-[#BDBDBD] text-sm hover:bg-[#4A4A4A]/20 transition-all active:scale-95">
+<span class="material-symbols-outlined text-[18px]">hub</span>
+                        Connect LangSmith
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer Shell -->
+<footer class="w-full py-12 px-8 bg-[#0e0e0e] flex flex-col md:flex-row justify-between items-center gap-4 font-['JetBrains_Mono'] text-[0.6875rem] uppercase tracking-widest">
+<div class="text-[#E5E2E1]/40">
+            © 2024 RosettaStone Intelligence
+        </div>
+<div class="flex items-center gap-8">
+<a class="text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors opacity-80 hover:opacity-100" href="#">Documentation</a>
+<a class="text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors opacity-80 hover:opacity-100" href="#">API Reference</a>
+<a class="text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors opacity-80 hover:opacity-100" href="#">Status</a>
+<a class="text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors opacity-80 hover:opacity-100" href="#">Privacy</a>
+</div>
+</footer>
+</body></html>

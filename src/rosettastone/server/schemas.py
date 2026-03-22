@@ -103,6 +103,16 @@ class MigrationDetail(BaseModel):
     recommendation: str | None
     recommendation_reasoning: str | None
 
+    # Latency metrics
+    source_latency_p50: float | None = None
+    source_latency_p95: float | None = None
+    target_latency_p50: float | None = None
+    target_latency_p95: float | None = None
+
+    # Cost projection
+    projected_source_cost_per_call: float | None = None
+    projected_target_cost_per_call: float | None = None
+
     config: dict[str, object]
     per_type_scores: dict[str, TypeScoreStats]
     warnings: list[str]

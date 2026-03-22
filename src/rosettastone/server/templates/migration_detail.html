@@ -20,13 +20,33 @@
     </a>
     <div class="flex flex-wrap items-center justify-between gap-6">
         <div class="flex items-center gap-4">
-            {% if migration.recommendation == "Do not ship" %}
+            {% if migration.status in ['pending', 'running'] %}
+            <h1 class="text-[28px] font-semibold text-[#E8DCC4] font-headline tracking-tight">
+                {{ migration.source }} <span class="text-on-surface-variant/30 mx-2">&rarr;</span> {{ migration.target }}
+            </h1>
+            <span class="px-3 py-1 bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/30 text-[11px] font-bold uppercase tracking-widest rounded-full flex items-center gap-1.5">
+                <span class="inline-block w-2 h-2 rounded-full bg-[#D4A574] animate-pulse"></span>
+                {{ migration.status|title }}
+            </span>
+            {% elif migration.status == 'failed' %}
             <h1 class="text-[28px] font-bold text-[#E8DCC4] tracking-tight flex items-center gap-3">
                 <span class="font-mono text-xl opacity-60">{{ migration.source }}</span>
                 <span class="material-symbols-outlined text-outline">trending_flat</span>
                 <span class="font-mono text-xl">{{ migration.target }}</span>
             </h1>
             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-error/20 text-error border border-error/30 tracking-widest uppercase">FAILED</span>
+            {% elif migration.recommendation == "Do not ship" %}
+            <h1 class="text-[28px] font-bold text-[#E8DCC4] tracking-tight flex items-center gap-3">
+                <span class="font-mono text-xl opacity-60">{{ migration.source }}</span>
+                <span class="material-symbols-outlined text-outline">trending_flat</span>
+                <span class="font-mono text-xl">{{ migration.target }}</span>
+            </h1>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-error/20 text-error border border-error/30 tracking-widest uppercase">DO NOT SHIP</span>
+            {% elif migration.status == 'blocked' %}
+            <h1 class="text-[28px] font-semibold text-[#E8DCC4] font-headline tracking-tight">
+                {{ migration.source }} <span class="text-on-surface-variant/30 mx-2">&rarr;</span> {{ migration.target }}
+            </h1>
+            <span class="px-3 py-1 bg-error/10 text-error border border-error/30 text-[11px] font-bold uppercase tracking-widest rounded-full">Blocked</span>
             {% else %}
             <h1 class="text-[28px] font-semibold text-[#E8DCC4] font-headline tracking-tight">
                 {{ migration.source }} <span class="text-on-surface-variant/30 mx-2">&rarr;</span> {{ migration.target }}
@@ -40,11 +60,11 @@
         </div>
         <div class="flex items-center gap-3">
             {% if migration.recommendation == "Safe to ship" %}
-            <button class="flex items-center gap-2 px-4 py-2 bg-surface-container-high hover:bg-surface-bright text-on-surface text-sm font-medium rounded-lg transition-all">
+            <button class="flex items-center gap-2 px-4 py-2 bg-surface-container-high hover:bg-surface-bright text-on-surface text-sm font-medium rounded-lg transition-all" aria-label="View version history">
                 <span class="material-symbols-outlined text-[18px]">history</span>
                 Version History
             </button>
-            <button class="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-primary-container to-primary text-on-primary-container text-sm font-bold rounded-lg transition-all active:scale-95 shadow-lg shadow-primary/10">
+            <button class="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-primary-container to-primary text-on-primary-container text-sm font-bold rounded-lg transition-all active:scale-95 shadow-lg shadow-primary/10" aria-label="Deploy migration to production">
                 <span class="material-symbols-outlined text-[18px]">rocket_launch</span>
                 Deploy to Prod
             </button>
@@ -58,7 +78,80 @@
     </div>
 </div>
 
-{% if migration.recommendation == "Safe to ship" %}
+{% if migration.status in ['pending', 'running'] %}
+{# ─── PENDING / RUNNING STATE ─── #}
+<div id="migration-status"
+     hx-get="/ui/migrations/{{ migration.id }}"
+     hx-trigger="every 5s"
+     hx-select="#migration-status"
+     hx-swap="outerHTML">
+<div class="flex flex-col items-center justify-center py-24 text-center">
+    <div class="relative mb-8">
+        <div class="w-20 h-20 rounded-full border-4 border-[#D4A574]/20 border-t-[#D4A574] animate-spin"></div>
+    </div>
+    <h2 class="text-2xl font-bold font-headline text-on-surface mb-3">
+        {% if migration.status == 'pending' %}Queued for execution{% else %}Migration in progress...{% endif %}
+    </h2>
+    <p class="text-on-surface-variant max-w-md mb-6">
+        {% if migration.status == 'pending' %}
+        Your migration is queued and will start shortly. This page will update automatically.
+        {% else %}
+        Running preflight checks, baseline evaluation, GEPA optimization, and validation. This may take several minutes.
+        {% endif %}
+    </p>
+    <div class="flex items-center gap-2 text-xs text-on-surface-variant/60 font-label">
+        <span class="material-symbols-outlined text-sm">schedule</span>
+        Auto-refreshing every 5 seconds
+    </div>
+</div>
+</div>
+
+{% elif migration.status == 'failed' and migration.recommendation in ['Unknown', ''] %}
+{# ─── FAILED STATE (not from DO NOT SHIP — actual runtime failure) ─── #}
+<div class="mb-16 bg-[#3D3D3D] rounded-xl p-8 border-l-4 border-error shadow-2xl">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="material-symbols-outlined text-error text-3xl">error</span>
+        <h2 class="text-[28px] font-extrabold text-error tracking-tight">Migration Failed</h2>
+    </div>
+    <p class="text-on-surface-variant max-w-2xl leading-relaxed mb-6">
+        {{ migration.reasoning|default('An error occurred during the migration process.') }}
+    </p>
+    <a href="/ui/migrations/new?source={{ migration.source_full|default(migration.source) }}" class="px-6 py-2.5 bg-[#D4745E] text-white font-bold rounded-lg hover:brightness-110 transition-all active:scale-95 shadow-lg inline-block">
+        Retry migration
+    </a>
+</div>
+
+{% elif migration.status == 'blocked' %}
+{# ─── BLOCKED STATE (preflight blockers) ─── #}
+<div class="mb-16 bg-[#3D3D3D] rounded-xl p-8 border-l-4 border-error shadow-2xl">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="material-symbols-outlined text-error text-3xl">block</span>
+        <h2 class="text-[28px] font-extrabold text-error tracking-tight">Migration Blocked</h2>
+    </div>
+    <p class="text-on-surface-variant max-w-2xl leading-relaxed mb-6">
+        Pre-flight checks prevented this migration from running. {{ migration.reasoning|default('') }}
+    </p>
+    <a href="/ui/migrations/new?source={{ migration.source_full|default(migration.source) }}" class="px-6 py-2.5 bg-[#D4745E] text-white font-bold rounded-lg hover:brightness-110 transition-all active:scale-95 shadow-lg inline-block">
+        Adjust settings and retry
+    </a>
+</div>
+
+{% elif migration.status == 'dry_run_complete' %}
+{# ─── DRY RUN COMPLETE ─── #}
+<div class="mb-16 bg-[#3D3D3D] rounded-xl p-8 border-l-4 border-[#D4A574] shadow-2xl">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="material-symbols-outlined text-[#D4A574] text-3xl">check_circle</span>
+        <h2 class="text-[28px] font-extrabold text-[#D4A574] tracking-tight">Dry Run Complete</h2>
+    </div>
+    <p class="text-on-surface-variant max-w-2xl leading-relaxed mb-6">
+        Pre-flight checks passed successfully. Ready to run the full migration.
+    </p>
+    <a href="/ui/migrations/new?source={{ migration.source_full|default(migration.source) }}" class="px-6 py-2.5 bg-[#D4745E] text-white font-bold rounded-lg hover:brightness-110 transition-all active:scale-95 shadow-lg inline-block">
+        Run full migration
+    </a>
+</div>
+
+{% elif migration.recommendation == "Safe to ship" %}
 {# ─── SAFE TO SHIP LAYOUT ─── #}
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
     <!-- Left Column: Recommendation & Analysis -->
@@ -105,6 +198,34 @@
                 <div class="text-xs text-on-surface-variant/70 font-medium">Improvement from GEPA</div>
             </div>
         </section>
+
+        {% if migration.source_latency_p50 %}
+        <!-- Latency & Cost KPIs -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="bg-surface-container-low p-6 rounded-xl">
+                <div class="text-2xl font-bold text-on-surface font-headline mb-1">{{ "%.0f"|format(migration.source_latency_p50 * 1000) }}ms</div>
+                <div class="text-xs text-on-surface-variant/70 font-medium">Source p50 Latency</div>
+                {% if migration.source_latency_p95 %}<div class="text-[10px] text-on-surface-variant/50 mt-1">p95: {{ "%.0f"|format(migration.source_latency_p95 * 1000) }}ms</div>{% endif %}
+            </div>
+            <div class="bg-surface-container-low p-6 rounded-xl">
+                <div class="text-2xl font-bold text-on-surface font-headline mb-1">{{ "%.0f"|format(migration.target_latency_p50 * 1000) }}ms</div>
+                <div class="text-xs text-on-surface-variant/70 font-medium">Target p50 Latency</div>
+                {% if migration.target_latency_p95 %}<div class="text-[10px] text-on-surface-variant/50 mt-1">p95: {{ "%.0f"|format(migration.target_latency_p95 * 1000) }}ms</div>{% endif %}
+            </div>
+            {% if migration.projected_source_cost_per_call %}
+            <div class="bg-surface-container-low p-6 rounded-xl">
+                <div class="text-2xl font-bold text-on-surface font-headline mb-1">${{ "%.4f"|format(migration.projected_source_cost_per_call) }}</div>
+                <div class="text-xs text-on-surface-variant/70 font-medium">Source Cost/Call</div>
+            </div>
+            {% endif %}
+            {% if migration.projected_target_cost_per_call %}
+            <div class="bg-surface-container-low p-6 rounded-xl">
+                <div class="text-2xl font-bold text-on-surface font-headline mb-1">${{ "%.4f"|format(migration.projected_target_cost_per_call) }}</div>
+                <div class="text-xs text-on-surface-variant/70 font-medium">Target Cost/Call</div>
+            </div>
+            {% endif %}
+        </section>
+        {% endif %}
 
         <!-- Results by Output Type -->
         {% if migration.per_type %}
@@ -243,6 +364,31 @@
         <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Improvement from GEPA</span>
     </div>
 </div>
+
+{% if migration.source_latency_p50 %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+    <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+        <span class="text-[32px] font-bold text-on-surface mb-2">{{ "%.0f"|format(migration.source_latency_p50 * 1000) }}ms</span>
+        <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Source p50</span>
+    </div>
+    <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+        <span class="text-[32px] font-bold text-on-surface mb-2">{{ "%.0f"|format(migration.target_latency_p50 * 1000) }}ms</span>
+        <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Target p50</span>
+    </div>
+    {% if migration.projected_source_cost_per_call %}
+    <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+        <span class="text-[32px] font-bold text-on-surface mb-2">${{ "%.4f"|format(migration.projected_source_cost_per_call) }}</span>
+        <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Source $/call</span>
+    </div>
+    {% endif %}
+    {% if migration.projected_target_cost_per_call %}
+    <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+        <span class="text-[32px] font-bold text-on-surface mb-2">${{ "%.4f"|format(migration.projected_target_cost_per_call) }}</span>
+        <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Target $/call</span>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
 
 <!-- Results Grid -->
 {% if migration.per_type %}

@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, func, select
 
+from rosettastone.server.api.utils import _get_migration_or_404
 from rosettastone.server.database import get_session
 from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningRecord
 from rosettastone.server.schemas import (
@@ -24,9 +23,6 @@ from rosettastone.server.schemas import (
 )
 
 router = APIRouter()
-
-TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 # ---------------------------------------------------------------------------
@@ -292,8 +288,8 @@ def _format_recommendation(rec: str | None) -> str:
 def _format_time_ago(dt: datetime) -> str:
     """Format datetime as relative time string."""
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    now = datetime.now(timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
+    now = datetime.now(UTC)
     diff_seconds = (now - dt).total_seconds()
 
     if diff_seconds < 0:
@@ -341,6 +337,14 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
         "improvement": round((record.improvement or 0) * 100),
         "reasoning": record.recommendation_reasoning or "",
     }
+
+    # Latency/cost metrics
+    result["source_latency_p50"] = record.source_latency_p50
+    result["source_latency_p95"] = record.source_latency_p95
+    result["target_latency_p50"] = record.target_latency_p50
+    result["target_latency_p95"] = record.target_latency_p95
+    result["projected_source_cost_per_call"] = record.projected_source_cost_per_call
+    result["projected_target_cost_per_call"] = record.projected_target_cost_per_call
 
     # Test case count
     count_stmt = select(func.count()).select_from(TestCaseRecord).where(
@@ -590,20 +594,18 @@ def _migration_to_detail(record: MigrationRecord, session: Session) -> Migration
         duration_seconds=record.duration_seconds,
         recommendation=record.recommendation,
         recommendation_reasoning=record.recommendation_reasoning,
+        source_latency_p50=record.source_latency_p50,
+        source_latency_p95=record.source_latency_p95,
+        target_latency_p50=record.target_latency_p50,
+        target_latency_p95=record.target_latency_p95,
+        projected_source_cost_per_call=record.projected_source_cost_per_call,
+        projected_target_cost_per_call=record.projected_target_cost_per_call,
         config=config,
         per_type_scores=per_type_scores,
         warnings=warnings,
         safety_warnings=safety_warnings,
         test_cases=test_case_summaries,
     )
-
-
-def _get_migration_or_404(migration_id: int, session: Session) -> MigrationRecord:
-    """Fetch a migration by ID or raise 404."""
-    record = session.get(MigrationRecord, migration_id)
-    if record is None:
-        raise HTTPException(status_code=404, detail="Migration not found")
-    return record
 
 
 # ---------------------------------------------------------------------------
@@ -758,15 +760,14 @@ async def dashboard(
 
     if not records and empty != "false":
         # No models registered — show empty state
-        return templates.TemplateResponse(
-            "models_empty.html",
-            {"request": request, "active_nav": "models"},
+        return request.app.state.templates.TemplateResponse(
+            request, "models_empty.html", {"active_nav": "models"},
         )
 
     models = [_model_to_template_dict(r) for r in records] if records else DUMMY_MODELS
-    return templates.TemplateResponse(
-        "models.html",
-        {"request": request, "models": models, "alerts": DUMMY_ALERTS, "active_nav": "models"},
+    return request.app.state.templates.TemplateResponse(
+        request, "models.html",
+        {"models": models, "alerts": DUMMY_ALERTS, "active_nav": "models"},
     )
 
 
@@ -784,9 +785,179 @@ async def migrations_page(
     else:
         migrations = DUMMY_MIGRATIONS  # fallback when DB is empty
 
-    return templates.TemplateResponse(
-        "migrations.html",
-        {"request": request, "migrations": migrations, "active_nav": "migrations"},
+    return request.app.state.templates.TemplateResponse(
+        request, "migrations.html",
+        {"migrations": migrations, "active_nav": "migrations"},
+    )
+
+
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB
+
+
+@router.get("/ui/migrations/new", response_class=HTMLResponse)
+async def new_migration_form(
+    request: Request,
+    source: str | None = Query(None),
+) -> HTMLResponse:
+    """Render the new migration form."""
+    return request.app.state.templates.TemplateResponse(
+        request, "migration_new.html",
+        {"active_nav": "migrations", "source_model": source or "", "error": None},
+    )
+
+
+@router.post("/ui/migrations/new")
+async def create_migration_from_form(
+    request: Request,
+    source_model: str = Form(...),
+    target_model: str = Form(...),
+    data_file: UploadFile = None,  # type: ignore[assignment]
+    gepa_auto: str = Form("light"),
+    dry_run: str | None = Form(None),
+    store_prompt_content: str | None = Form(None),
+    reflection_model: str = Form("openai/gpt-4o"),
+    judge_model: str = Form("openai/gpt-4o"),
+    session: Session = Depends(get_session),
+):
+    """Handle form submission: validate, save file, create record, submit to executor."""
+    templates = request.app.state.templates
+
+    # Validate file upload
+    if data_file is None or data_file.filename == "":
+        return templates.TemplateResponse(
+            request, "migration_new.html",
+            {
+                "active_nav": "migrations",
+                "source_model": source_model,
+                "target_model": target_model,
+                "error": "Please upload a JSONL data file.",
+            },
+            status_code=422,
+        )
+
+    # Check file size
+    content = await data_file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        return templates.TemplateResponse(
+            request, "migration_new.html",
+            {
+                "active_nav": "migrations",
+                "source_model": source_model,
+                "target_model": target_model,
+                "error": "File size exceeds 50MB limit.",
+            },
+            status_code=422,
+        )
+
+    # UTF-8 validation
+    try:
+        text_content = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return templates.TemplateResponse(
+            request, "migration_new.html",
+            {
+                "active_nav": "migrations",
+                "source_model": source_model,
+                "target_model": target_model,
+                "error": "File is not valid UTF-8 text.",
+            },
+            status_code=422,
+        )
+
+    # JSONL parse validation — check first non-empty line
+    first_line = ""
+    for line in text_content.splitlines():
+        stripped = line.strip()
+        if stripped:
+            first_line = stripped
+            break
+
+    if not first_line:
+        return templates.TemplateResponse(
+            request, "migration_new.html",
+            {
+                "active_nav": "migrations",
+                "source_model": source_model,
+                "target_model": target_model,
+                "error": "File is empty or contains no data.",
+            },
+            status_code=422,
+        )
+
+    try:
+        first_obj = json.loads(first_line)
+    except json.JSONDecodeError as e:
+        return templates.TemplateResponse(
+            request, "migration_new.html",
+            {
+                "active_nav": "migrations",
+                "source_model": source_model,
+                "target_model": target_model,
+                "error": f"First line is not valid JSON: {e}",
+            },
+            status_code=422,
+        )
+
+    # Schema validation — must have prompt and response keys
+    if not isinstance(first_obj, dict) or "prompt" not in first_obj or "response" not in first_obj:
+        return templates.TemplateResponse(
+            request, "migration_new.html",
+            {
+                "active_nav": "migrations",
+                "source_model": source_model,
+                "target_model": target_model,
+                "error": "JSONL entries must contain 'prompt' and 'response' fields.",
+            },
+            status_code=422,
+        )
+
+    # Create the migration record first to get the ID
+    record = MigrationRecord(
+        source_model=source_model,
+        target_model=target_model,
+        status="pending",
+        created_at=datetime.now(UTC),
+        config_json=json.dumps({
+            "source_model": source_model,
+            "target_model": target_model,
+        }),
+    )
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+
+    migration_id = record.id
+
+    # Save uploaded file to per-migration directory
+    from pathlib import Path
+
+    output_dir = Path.home() / ".rosettastone" / "migrations" / str(migration_id)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    data_path = output_dir / "data.jsonl"
+    data_path.write_bytes(content)
+
+    # Build config dict for the background task
+    config_dict = {
+        "source_model": source_model,
+        "target_model": target_model,
+        "data_path": str(data_path),
+        "gepa_auto": gepa_auto,
+        "dry_run": dry_run == "true",
+        "store_prompt_content": store_prompt_content == "true",
+        "reflection_model": reflection_model,
+        "judge_model": judge_model,
+    }
+
+    # Submit to background executor
+    from rosettastone.server.api.tasks import run_migration_background
+
+    executor = request.app.state.executor
+    executor.submit(run_migration_background, migration_id, config_dict)
+
+    # Redirect to the migration detail page (303 See Other)
+    return RedirectResponse(
+        url=f"/ui/migrations/{migration_id}",
+        status_code=303,
     )
 
 
@@ -807,9 +978,9 @@ async def migration_detail_page(
         if migration is None:
             raise HTTPException(status_code=404, detail="Migration not found")
 
-    return templates.TemplateResponse(
-        "migration_detail.html",
-        {"request": request, "migration": migration, "active_nav": "migrations"},
+    return request.app.state.templates.TemplateResponse(
+        request, "migration_detail.html",
+        {"migration": migration, "active_nav": "migrations"},
     )
 
 
@@ -829,10 +1000,10 @@ async def executive_report_page(
         if migration is None:
             raise HTTPException(status_code=404, detail="Migration not found")
 
-    report_date = datetime.now(timezone.utc).strftime("%B %-d, %Y")
-    return templates.TemplateResponse(
-        "executive_report.html",
-        {"request": request, "migration": migration, "report_date": report_date, "active_nav": "migrations"},
+    report_date = datetime.now(UTC).strftime("%B %-d, %Y")
+    return request.app.state.templates.TemplateResponse(
+        request, "executive_report.html",
+        {"migration": migration, "report_date": report_date, "active_nav": "migrations"},
     )
 
 
@@ -845,9 +1016,8 @@ async def costs_page(request: Request, session: Session = Depends(get_session)) 
     if costs is None:
         costs = DUMMY_COSTS  # fallback when no data
 
-    return templates.TemplateResponse(
-        "costs.html",
-        {"request": request, "costs": costs, "active_nav": "costs"},
+    return request.app.state.templates.TemplateResponse(
+        request, "costs.html", {"costs": costs, "active_nav": "costs"},
     )
 
 
@@ -869,9 +1039,8 @@ async def alerts_page(request: Request, session: Session = Depends(get_session))
     else:
         alerts = DUMMY_ALERTS  # fallback when DB is empty
 
-    return templates.TemplateResponse(
-        "alerts.html",
-        {"request": request, "alerts": alerts, "active_nav": "alerts"},
+    return request.app.state.templates.TemplateResponse(
+        request, "alerts.html", {"alerts": alerts, "active_nav": "alerts"},
     )
 
 

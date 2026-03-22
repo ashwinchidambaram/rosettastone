@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RosettaStone | Monolith Intelligence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-fixed": "#d5e8cb",
+              "on-surface": "#e5e2e1",
+              "inverse-on-surface": "#313030",
+              "on-primary": "#5c190a",
+              "tertiary-fixed-dim": "#efbd8a",
+              "outline-variant": "#55433e",
+              "on-tertiary": "#472a03",
+              "on-surface-variant": "#dbc1bb",
+              "primary-container": "#d67660",
+              "outline": "#a38c86",
+              "primary-fixed-dim": "#ffb4a3",
+              "on-primary-fixed-variant": "#7a2f1e",
+              "on-error-container": "#ffdad6",
+              "on-background": "#e5e2e1",
+              "tertiary": "#efbd8a",
+              "on-primary-fixed": "#3d0600",
+              "surface-dim": "#131313",
+              "secondary-fixed-dim": "#b9ccb0",
+              "on-secondary-fixed": "#101f0d",
+              "secondary-container": "#3d4d38",
+              "on-error": "#690005",
+              "on-secondary-fixed-variant": "#3b4b36",
+              "surface-tint": "#ffb4a3",
+              "background": "#131313",
+              "surface-bright": "#393939",
+              "on-tertiary-fixed": "#2c1700",
+              "secondary": "#b9ccb0",
+              "on-secondary-container": "#abbea2",
+              "error-container": "#93000a",
+              "primary-fixed": "#ffdad2",
+              "surface-container-low": "#1c1b1b",
+              "on-tertiary-fixed-variant": "#614018",
+              "surface-container": "#20201f",
+              "primary": "#ffb4a3",
+              "inverse-surface": "#e5e2e1",
+              "inverse-primary": "#984633",
+              "tertiary-fixed": "#ffdcbc",
+              "surface-container-highest": "#353535",
+              "tertiary-container": "#b4885a",
+              "surface-variant": "#353535",
+              "error": "#ffb4ab",
+              "on-tertiary-container": "#3f2300",
+              "on-primary-container": "#531205",
+              "surface-container-high": "#2a2a2a",
+              "surface-container-lowest": "#0e0e0e",
+              "on-secondary": "#253421",
+              "surface": "#131313",
+              "terracotta": "#D4745E",
+              "sage": "#8B9D83",
+              "gold": "#D4A574",
+              "critical": "#D85650"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["JetBrains Mono"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #131313; color: #e5e2e1; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-nav { background: rgba(19, 19, 19, 0.8); backdrop-filter: blur(20px); }
+        .no-border-tonal-shift { border: none !important; }
+        .ghost-border { border: 1px solid rgba(163, 140, 134, 0.15); }
+    </style>
+</head>
+<body class="selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopNavBar (Shared Component) -->
+<nav class="fixed top-0 w-full h-[72px] bg-[#131313]/80 backdrop-blur-xl flex justify-between items-center px-8 z-50 shadow-[0_8px_32px_rgba(0,0,0,0.5)] no-border-tonal-shift">
+<div class="text-xl font-black text-[#D4745E] uppercase tracking-widest font-['Inter']">MONOLITH</div>
+<div class="hidden md:flex gap-8 items-center">
+<a class="text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors font-bold tracking-tight" href="#">Models</a>
+<a class="text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors font-bold tracking-tight" href="#">Migrations</a>
+<a class="text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors font-bold tracking-tight" href="#">Costs</a>
+<a class="text-[#D4745E] border-b-2 border-[#D4745E] pb-1 font-bold tracking-tight" href="#">Alerts</a>
+</div>
+<div class="flex items-center gap-6">
+<span class="material-symbols-outlined text-[#E5E2E1]/60 hover:bg-[#2a2a2a] p-2 rounded-full cursor-pointer transition-all">search</span>
+<span class="material-symbols-outlined text-[#E5E2E1]/60 hover:bg-[#2a2a2a] p-2 rounded-full cursor-pointer transition-all">notifications</span>
+<span class="material-symbols-outlined text-[#E5E2E1]/60 hover:bg-[#2a2a2a] p-2 rounded-full cursor-pointer transition-all">settings</span>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="Close up of a professional male user profile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVWTJj3gPj00IiEC18vjtmxep5K-WFjVp8QsRFDGqC4CpsjXpx5qox8nQF_o2bJUouyzGp41ZRAivGCHGaF5G4777wUlo-iw2r1Ul9U3NsLCl9BCVFkZ4YAkcAQTx5ci8SzZLsi8OhtnjErhfFa_Tpblq9mKWJ3yinwZNyEiRJJAKoDeikkqMNdFRe7J5fuB-qpf8bFuDBoubhtWF7ITYRj9naWVVKsF5b6-KQjFf3V5erae-Axs0I6M4pOe-XAjWRb9APEZVcHIzN"/>
+</div>
+</div>
+</nav>
+<main class="pt-[72px] min-h-screen">
+<!-- Hero: Critical Status Section -->
+<section class="relative px-8 pt-16 pb-24 overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-br from-error-container/20 to-transparent pointer-events-none"></div>
+<div class="max-w-7xl mx-auto relative z-10">
+<div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+<div class="space-y-4">
+<div class="flex items-center gap-4 text-critical">
+<span class="material-symbols-outlined text-5xl" style="font-variation-settings: 'FILL' 1;">warning</span>
+<span class="font-['JetBrains_Mono'] text-sm tracking-widest uppercase opacity-80">System Priority: Omega</span>
+</div>
+<h1 class="text-5xl md:text-7xl font-black tracking-tighter leading-none text-on-surface">
+                            3 Critical Alerts.<br/>
+<span class="text-critical">ACTION REQUIRED.</span>
+</h1>
+<p class="text-on-surface-variant max-w-xl text-lg">
+                            RosettaStone migration protocols have encountered schema drift in 3 primary nodes. 
+                            Manual override of batch processes is recommended to maintain parity.
+                        </p>
+</div>
+<div class="flex flex-col gap-4">
+<button class="bg-gradient-to-br from-[#D4745E] to-[#D67660] text-on-primary px-10 py-5 rounded-lg font-bold text-lg hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-primary/20">
+                            Start Batch Migration
+                        </button>
+<button class="ghost-border px-10 py-5 rounded-lg font-bold text-on-surface hover:bg-surface-container-high transition-colors">
+                            View Drift Logs
+                        </button>
+</div>
+</div>
+</div>
+</section>
+<!-- KPI Section -->
+<section class="px-8 pb-24">
+<div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+<!-- KPI Card 1 -->
+<div class="bg-surface-container-low p-8 rounded-xl relative group">
+<div class="text-sm font-['JetBrains_Mono'] text-on-surface-variant mb-2 uppercase">Active Instances</div>
+<div class="text-4xl font-black text-on-surface">1,204</div>
+<div class="mt-4 flex items-center gap-2 text-sage text-xs font-bold">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+<span>+12% vs last epoch</span>
+</div>
+</div>
+<!-- KPI Card 2 -->
+<div class="bg-surface-container-low p-8 rounded-xl relative group">
+<div class="text-sm font-['JetBrains_Mono'] text-on-surface-variant mb-2 uppercase">Global Latency (P99)</div>
+<div class="text-4xl font-black text-on-surface">82ms</div>
+<div class="mt-4 flex items-center gap-2 text-gold text-xs font-bold">
+<span class="material-symbols-outlined text-sm">warning</span>
+<span>Approaching threshold (100ms)</span>
+</div>
+</div>
+<!-- KPI Card 3 -->
+<div class="bg-surface-container-low p-8 rounded-xl relative group">
+<div class="text-sm font-['JetBrains_Mono'] text-on-surface-variant mb-2 uppercase">Error Budget</div>
+<div class="text-4xl font-black text-on-surface">99.92%</div>
+<div class="mt-4 flex items-center gap-2 text-sage text-xs font-bold">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+<span>Within SLA compliance</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Active Intelligence Reports -->
+<section class="px-8 pb-32">
+<div class="max-w-7xl mx-auto">
+<div class="flex justify-between items-end mb-12">
+<div>
+<h2 class="text-3xl font-black tracking-tight text-on-surface">Active Intelligence Reports</h2>
+<p class="text-on-surface-variant mt-2 font-['JetBrains_Mono'] text-xs">Real-time heuristic monitoring for RosettaStone core</p>
+</div>
+<button class="text-terracotta font-bold text-sm hover:underline">Export Report Data</button>
+</div>
+<div class="grid grid-cols-1 gap-4">
+<!-- Critical Alert Card -->
+<div class="bg-surface-container-low p-6 rounded-xl border-l-4 border-critical flex items-center justify-between group hover:bg-surface-container-high transition-all">
+<div class="flex items-center gap-6">
+<div class="w-12 h-12 rounded-lg bg-error-container/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-critical">history_toggle_off</span>
+</div>
+<div>
+<h3 class="font-bold text-lg text-on-surface">Deprecation Warning: Rosetta-V2-Legacy</h3>
+<p class="text-sm text-on-surface-variant">API endpoint shutdown scheduled for end of cycle. 14 critical dependencies found.</p>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-xs font-['JetBrains_Mono'] text-on-surface-variant">TIMELINE</div>
+<div class="text-critical font-bold">48h remaining</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+</div>
+</div>
+<!-- Warning Alert Card -->
+<div class="bg-surface-container-low p-6 rounded-xl border-l-4 border-gold flex items-center justify-between group hover:bg-surface-container-high transition-all">
+<div class="flex items-center gap-6">
+<div class="w-12 h-12 rounded-lg bg-tertiary-container/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-gold">payments</span>
+</div>
+<div>
+<h3 class="font-bold text-lg text-on-surface">Projected Price Change: Compute Cluster Delta</h3>
+<p class="text-sm text-on-surface-variant">Estimated 15% increase in operational cost due to regional demand spike.</p>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-xs font-['JetBrains_Mono'] text-on-surface-variant">IMPACT</div>
+<div class="text-gold font-bold">+$4,200/mo</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+</div>
+</div>
+<!-- Success/Info Card -->
+<div class="bg-surface-container-low p-6 rounded-xl border-l-4 border-sage flex items-center justify-between group hover:bg-surface-container-high transition-all">
+<div class="flex items-center gap-6">
+<div class="w-12 h-12 rounded-lg bg-secondary-container/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-sage">model_training</span>
+</div>
+<div>
+<h3 class="font-bold text-lg text-on-surface">New Models Available: Monolith Prime-X</h3>
+<p class="text-sm text-on-surface-variant">Higher reasoning capability with 20% lower latency. Deployment ready.</p>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-xs font-['JetBrains_Mono'] text-on-surface-variant">STATUS</div>
+<div class="text-sage font-bold">Available</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Notification Settings Section -->
+<section class="px-8 py-24 bg-surface-container-lowest">
+<div class="max-w-3xl mx-auto">
+<h3 class="text-2xl font-bold mb-8 text-on-surface">Notification Settings</h3>
+<div class="space-y-6">
+<label class="flex items-start gap-4 p-4 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group">
+<div class="pt-1">
+<input checked="" class="w-5 h-5 rounded border-outline bg-surface-container-high text-terracotta focus:ring-terracotta" type="checkbox"/>
+</div>
+<div>
+<span class="block font-bold text-on-surface">Email: Critical System Alerts</span>
+<span class="text-sm text-on-surface-variant">Immediate dispatch for priority Omega incidents.</span>
+</div>
+</label>
+<label class="flex items-start gap-4 p-4 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group">
+<div class="pt-1">
+<input class="w-5 h-5 rounded border-outline bg-surface-container-high text-terracotta focus:ring-terracotta" type="checkbox"/>
+</div>
+<div>
+<span class="block font-bold text-on-surface">Email: Cost &amp; Efficiency Reports</span>
+<span class="text-sm text-on-surface-variant">Weekly summaries of compute utilization and spending.</span>
+</div>
+</label>
+<label class="flex items-start gap-4 p-4 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group">
+<div class="pt-1">
+<input checked="" class="w-5 h-5 rounded border-outline bg-surface-container-high text-terracotta focus:ring-terracotta" type="checkbox"/>
+</div>
+<div>
+<span class="block font-bold text-on-surface">Push: Model Performance Drift</span>
+<span class="text-sm text-on-surface-variant">Alerts when heuristic accuracy drops below threshold.</span>
+</div>
+</label>
+</div>
+<div class="mt-12 flex justify-end">
+<button class="bg-surface-container-highest px-8 py-3 rounded-lg font-bold text-on-surface hover:bg-surface-bright transition-colors">
+                        Save Preferences
+                    </button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer (Shared Component) -->
+<footer class="bg-[#0e0e0e] w-full py-12 px-8 bg-gradient-to-t from-[#131313] to-transparent">
+<div class="flex flex-col md:flex-row justify-between items-center max-w-7xl mx-auto">
+<div class="mb-8 md:mb-0">
+<div class="text-[#D4745E] font-bold text-lg font-['Inter'] mb-2">MONOLITH INTELLIGENCE</div>
+<p class="text-[#E5E2E1]/40 text-[0.6875rem] font-['JetBrains_Mono'] uppercase tracking-tighter">© 2024 Celestial Monolith Intelligence</p>
+</div>
+<div class="flex gap-8">
+<a class="text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors text-[0.6875rem] font-['JetBrains_Mono'] uppercase tracking-tighter hover:underline decoration-[#D4745E]" href="#">Documentation</a>
+<a class="text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors text-[0.6875rem] font-['JetBrains_Mono'] uppercase tracking-tighter hover:underline decoration-[#D4745E]" href="#">Support</a>
+<a class="text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors text-[0.6875rem] font-['JetBrains_Mono'] uppercase tracking-tighter hover:underline decoration-[#D4745E]" href="#">API Reference</a>
+<a class="text-[#E5E2E1]/40 hover:text-[#D4745E] transition-colors text-[0.6875rem] font-['JetBrains_Mono'] uppercase tracking-tighter hover:underline decoration-[#D4745E]" href="#">Status</a>
+</div>
+</div>
+</footer>
+</body></html>

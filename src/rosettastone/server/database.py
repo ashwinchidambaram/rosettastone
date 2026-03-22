@@ -29,7 +29,7 @@ def get_engine():
         _engine = create_engine(
             f"sqlite:///{db_path}",
             echo=False,
-            connect_args={"check_same_thread": False},
+            connect_args={"check_same_thread": False, "timeout": 30},
         )
         # Enable WAL mode for concurrent reads
         with _engine.connect() as conn:
@@ -39,10 +39,33 @@ def get_engine():
 
 
 def init_db() -> None:
-    """Create all tables if they don't exist."""
+    """Create all tables if they don't exist, and migrate schema for new columns."""
     import rosettastone.server.models  # noqa: F401 — ensure models registered
 
-    SQLModel.metadata.create_all(get_engine())
+    engine = get_engine()
+    SQLModel.metadata.create_all(engine)
+
+    # Lightweight schema migration: add columns that may be missing on existing DBs
+    _migrate_add_columns(engine)
+
+
+def _migrate_add_columns(engine) -> None:
+    """Add any new columns to existing tables (idempotent)."""
+    new_columns = [
+        ("migrations", "source_latency_p50", "REAL"),
+        ("migrations", "source_latency_p95", "REAL"),
+        ("migrations", "target_latency_p50", "REAL"),
+        ("migrations", "target_latency_p95", "REAL"),
+        ("migrations", "projected_source_cost_per_call", "REAL"),
+        ("migrations", "projected_target_cost_per_call", "REAL"),
+    ]
+    with engine.connect() as conn:
+        for table, column, col_type in new_columns:
+            try:
+                conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+            except Exception:
+                pass  # Column already exists
+        conn.commit()
 
 
 def get_session() -> Generator[Session, None, None]:

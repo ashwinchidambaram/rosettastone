@@ -313,3 +313,29 @@ body {
 [data-theme="light"] .rounded-xl {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.03);
 }
+
+/* ============================================================
+   Focus-visible styles for keyboard navigation / accessibility
+   ============================================================ */
+:focus-visible {
+    outline: 2px solid #D4745E;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+a:focus-visible,
+button:focus-visible {
+    outline: 2px solid #D4745E;
+    outline-offset: 2px;
+}
+
+/* Skip-to-content link (visible only on focus) */
+.sr-only:focus {
+    position: fixed !important;
+    width: auto !important;
+    height: auto !important;
+    clip: auto !important;
+    clip-path: none !important;
+    overflow: visible !important;
+    white-space: nowrap !important;
+}

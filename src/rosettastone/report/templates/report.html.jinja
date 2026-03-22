@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Migration Report — {{ config.get('source_model', 'N/A') }} to {{ config.get('target_model', 'N/A') }}</title>
+    <style>
+        :root {
+            --color-bg: #ffffff;
+            --color-bg-alt: #f8f9fa;
+            --color-text: #212529;
+            --color-text-muted: #6c757d;
+            --color-border: #dee2e6;
+            --color-green: #198754;
+            --color-yellow: #ffc107;
+            --color-red: #dc3545;
+            --color-blue: #0d6efd;
+            --color-card-bg: #ffffff;
+            --color-card-shadow: rgba(0, 0, 0, 0.08);
+            --color-header-bg: #1a1a2e;
+            --color-header-text: #ffffff;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-bg: #1a1a2e;
+                --color-bg-alt: #16213e;
+                --color-text: #e8e8e8;
+                --color-text-muted: #adb5bd;
+                --color-border: #495057;
+                --color-card-bg: #16213e;
+                --color-card-shadow: rgba(0, 0, 0, 0.3);
+                --color-header-bg: #0f0f23;
+                --color-header-text: #e8e8e8;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--color-text);
+            background-color: var(--color-bg);
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        header {
+            background-color: var(--color-header-bg);
+            color: var(--color-header-text);
+            padding: 30px 40px;
+            margin: 0 -20px 30px -20px;
+            border-bottom: 3px solid var(--color-blue);
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            font-size: 0.95rem;
+            opacity: 0.85;
+        }
+
+        nav#toc {
+            background-color: var(--color-bg-alt);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 20px 28px;
+            margin-bottom: 30px;
+        }
+
+        nav#toc h2 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        nav#toc ul {
+            list-style: none;
+            columns: 2;
+        }
+
+        nav#toc li {
+            margin-bottom: 6px;
+        }
+
+        nav#toc a {
+            color: var(--color-blue);
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+
+        nav#toc a:hover {
+            text-decoration: underline;
+        }
+
+        section {
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--color-border);
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .card {
+            background-color: var(--color-card-bg);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 4px var(--color-card-shadow);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            background-color: var(--color-card-bg);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 16px 20px;
+            text-align: center;
+            box-shadow: 0 2px 4px var(--color-card-shadow);
+        }
+
+        .metric-card .label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--color-text-muted);
+            margin-bottom: 4px;
+        }
+
+        .metric-card .value {
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+
+        .score-green { color: var(--color-green); }
+        .score-yellow { color: var(--color-yellow); }
+        .score-red { color: var(--color-red); }
+
+        .recommendation-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+
+        .recommendation-badge.go { background-color: #d4edda; color: #155724; }
+        .recommendation-badge.conditional { background-color: #fff3cd; color: #856404; }
+        .recommendation-badge.no-go { background-color: #f8d7da; color: #721c24; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 10px 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        th {
+            background-color: var(--color-bg-alt);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--color-text-muted);
+        }
+
+        tr:hover {
+            background-color: var(--color-bg-alt);
+        }
+
+        details {
+            margin-bottom: 16px;
+        }
+
+        details summary {
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--color-border);
+            user-select: none;
+        }
+
+        details summary:hover {
+            color: var(--color-blue);
+        }
+
+        details[open] summary {
+            margin-bottom: 16px;
+        }
+
+        .warning-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .warning-list li {
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            border-left: 4px solid var(--color-yellow);
+            background-color: var(--color-bg-alt);
+            border-radius: 0 4px 4px 0;
+            font-size: 0.9rem;
+        }
+
+        .safety-list li {
+            border-left-color: var(--color-red);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 40px;
+            border-top: 1px solid var(--color-border);
+            font-size: 0.85rem;
+            color: var(--color-text-muted);
+        }
+
+        @media print {
+            header {
+                background-color: #1a1a2e !important;
+                color: #ffffff !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            body {
+                max-width: 100%;
+                font-size: 11pt;
+            }
+
+            .chart-container {
+                page-break-inside: avoid;
+            }
+
+            details {
+                open: true;
+            }
+
+            details[open] summary {
+                page-break-after: avoid;
+            }
+
+            section {
+                page-break-inside: avoid;
+            }
+
+            nav#toc ul {
+                columns: 1;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .metrics-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            nav#toc ul {
+                columns: 1;
+            }
+
+            header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>LLM Migration Report</h1>
+        <p>{{ config.get('source_model', 'N/A') }} &rarr; {{ config.get('target_model', 'N/A') }}</p>
+    </header>
+
+    <nav id="toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#executive-summary">Executive Summary</a></li>
+            <li><a href="#recommendation">Recommendation</a></li>
+            <li><a href="#key-metrics">Key Metrics</a></li>
+            {% if per_type_scores %}<li><a href="#per-type-breakdown">Per-Type Breakdown</a></li>{% endif %}
+            <li><a href="#score-distribution">Score Distribution</a></li>
+            <li><a href="#per-case-results">Per-Case Results</a></li>
+            {% if validation_results %}<li><a href="#worst-regressions">Worst Regressions</a></li>{% endif %}
+            {% if safety_warnings %}<li><a href="#safety-findings">Safety Findings</a></li>{% endif %}
+            {% if warnings %}<li><a href="#warnings">Warnings</a></li>{% endif %}
+            <li><a href="#cost-summary">Cost Summary</a></li>
+            <li><a href="#configuration">Configuration</a></li>
+        </ul>
+    </nav>
+
+    <section id="executive-summary">
+        <h2>Executive Summary</h2>
+        <div class="card">
+            <p>
+                Migration evaluation from <strong>{{ config.get('source_model', 'N/A') }}</strong>
+                to <strong>{{ config.get('target_model', 'N/A') }}</strong> completed in
+                {{ "%.1f" | format(duration_seconds) }}s across {{ total_test_cases }} test cases.
+                {% if total_test_cases > 0 %}
+                The target model achieved a win rate of
+                {{ "%.0f" | format(wins / [total_test_cases, 1] | max * 100) }}%
+                ({{ wins }}/{{ total_test_cases }})
+                with a confidence score of {{ "%.1f" | format(confidence_score * 100) }}%.
+                {% endif %}
+            </p>
+        </div>
+    </section>
+
+    <section id="recommendation">
+        <h2>Recommendation</h2>
+        <div class="card">
+            {% if recommendation %}
+            {% if recommendation == 'GO' %}
+            <span class="recommendation-badge go">GO</span>
+            {% elif recommendation == 'CONDITIONAL' %}
+            <span class="recommendation-badge conditional">CONDITIONAL</span>
+            {% elif recommendation == 'NO_GO' %}
+            <span class="recommendation-badge no-go">NO GO</span>
+            {% else %}
+            <span class="recommendation-badge conditional">{{ recommendation }}</span>
+            {% endif %}
+            {% if recommendation_reasoning %}
+            <p>{{ recommendation_reasoning }}</p>
+            {% endif %}
+            {% else %}
+            <p>No recommendation generated.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section id="key-metrics">
+        <h2>Key Metrics</h2>
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="label">Confidence Score</div>
+                <div class="value {% if confidence_score >= 0.9 %}score-green{% elif confidence_score >= 0.8 %}score-yellow{% else %}score-red{% endif %}">
+                    {{ "%.1f" | format(confidence_score * 100) }}%
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Baseline Score</div>
+                <div class="value {% if baseline_score >= 0.9 %}score-green{% elif baseline_score >= 0.8 %}score-yellow{% else %}score-red{% endif %}">
+                    {{ "%.1f" | format(baseline_score * 100) }}%
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Improvement</div>
+                <div class="value {% if improvement >= 0 %}score-green{% else %}score-red{% endif %}">
+                    +{{ "%.1f" | format(improvement * 100) }}%
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Win Rate</div>
+                <div class="value">
+                    {{ wins }}/{{ total_test_cases }}
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Total Cost</div>
+                <div class="value">${{ "%.4f" | format(cost_usd) }}</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Duration</div>
+                <div class="value">{{ "%.1f" | format(duration_seconds) }}s</div>
+            </div>
+        </div>
+    </section>
+
+    {% if per_type_scores %}
+    <section id="per-type-breakdown">
+        <h2>Per-Type Breakdown</h2>
+        <div class="card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Output Type</th>
+                        <th>Win Rate</th>
+                        <th>Samples</th>
+                        <th>Mean</th>
+                        <th>P10</th>
+                        <th>P50</th>
+                        <th>P90</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for type_name, stats in per_type_scores.items() %}
+                    <tr>
+                        <td><strong>{{ type_name }}</strong></td>
+                        <td class="{% if stats.get('win_rate', 0) >= 0.9 %}score-green{% elif stats.get('win_rate', 0) >= 0.8 %}score-yellow{% else %}score-red{% endif %}">
+                            {{ "%.1f" | format(stats.get('win_rate', 0) * 100) }}%
+                        </td>
+                        <td>{{ stats.get('sample_count', 0) }}</td>
+                        <td>{{ "%.3f" | format(stats.get('mean', 0)) }}</td>
+                        <td>{{ "%.3f" | format(stats.get('p10', 0)) }}</td>
+                        <td>{{ "%.3f" | format(stats.get('p50', 0)) }}</td>
+                        <td>{{ "%.3f" | format(stats.get('p90', 0)) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    <section id="score-distribution">
+        <h2>Score Distribution</h2>
+        <div class="card">
+            {% if validation_results %}
+            <div class="chart-container">
+                <canvas id="scoreDistributionChart"></canvas>
+            </div>
+            {% if per_type_scores %}
+            <div class="chart-container">
+                <canvas id="perTypeChart"></canvas>
+            </div>
+            {% endif %}
+            {% else %}
+            <p>No validation results available for charting.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section id="per-case-results">
+        <details>
+            <summary>Per-Case Results ({{ total_test_cases }} cases)</summary>
+            {% if validation_results %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Composite Score</th>
+                        <th>Win</th>
+                        <th>Top Metric</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in validation_results %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="{% if r.composite_score >= 0.9 %}score-green{% elif r.composite_score >= 0.8 %}score-yellow{% else %}score-red{% endif %}">
+                            {{ "%.3f" | format(r.composite_score) }}
+                        </td>
+                        <td>{{ "Yes" if r.is_win else "No" }}</td>
+                        <td>
+                            {% if r.scores %}
+                            {{ r.scores.keys() | list | first }}: {{ "%.3f" | format(r.scores.values() | list | first) }}
+                            {% else %}
+                            N/A
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>No validation results available.</p>
+            {% endif %}
+        </details>
+    </section>
+
+    {% if validation_results %}
+    <section id="worst-regressions">
+        <details>
+            <summary>Worst Regressions</summary>
+            {% for r in validation_results | sort(attribute='composite_score') | batch(3) | first %}
+            <div class="card">
+                <h3>Case {{ loop.index }} &mdash; Score: <span class="{% if r.composite_score >= 0.9 %}score-green{% elif r.composite_score >= 0.8 %}score-yellow{% else %}score-red{% endif %}">{{ "%.3f" | format(r.composite_score) }}</span></h3>
+                <table>
+                    {% for metric, score in r.scores.items() %}
+                    <tr>
+                        <td><strong>{{ metric }}</strong></td>
+                        <td class="{% if score >= 0.9 %}score-green{% elif score >= 0.8 %}score-yellow{% else %}score-red{% endif %}">{{ "%.3f" | format(score) }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% endfor %}
+        </details>
+    </section>
+    {% endif %}
+
+    {% if safety_warnings %}
+    <section id="safety-findings">
+        <h2>Safety Findings</h2>
+        <div class="card">
+            <ul class="warning-list safety-list">
+                {% for w in safety_warnings %}
+                <li>
+                    {% if w is mapping %}
+                    <strong>[{{ w.get('severity', 'INFO') }}]</strong> {{ w.get('message', w | string) }}
+                    {% else %}
+                    {{ w }}
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if warnings %}
+    <section id="warnings">
+        <h2>Warnings</h2>
+        <div class="card">
+            <ul class="warning-list">
+                {% for w in warnings %}
+                <li>{{ w }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </section>
+    {% endif %}
+
+    <section id="cost-summary">
+        <h2>Cost Summary</h2>
+        <div class="card">
+            <table>
+                <tr>
+                    <td><strong>Total API Cost</strong></td>
+                    <td>${{ "%.4f" | format(cost_usd) }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Duration</strong></td>
+                    <td>{{ "%.1f" | format(duration_seconds) }}s</td>
+                </tr>
+                <tr>
+                    <td><strong>Test Cases</strong></td>
+                    <td>{{ total_test_cases }}</td>
+                </tr>
+                {% if total_test_cases > 0 %}
+                <tr>
+                    <td><strong>Cost per Test Case</strong></td>
+                    <td>${{ "%.6f" | format(cost_usd / [total_test_cases, 1] | max) }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+    </section>
+
+    <section id="configuration">
+        <details>
+            <summary>Configuration</summary>
+            <div class="card">
+                <table>
+                    {% for key, value in config.items() %}
+                    <tr>
+                        <td><strong>{{ key }}</strong></td>
+                        <td>{{ value }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </details>
+    </section>
+
+    <footer>
+        <p>Generated by RosettaStone &mdash; LLM Migration Tool</p>
+    </footer>
+
+    {% if embed_mode %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    {% else %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    {% endif %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof Chart === 'undefined') return;
+
+            {% if validation_results %}
+            // Score Distribution Chart
+            var scores = [
+                {% for r in validation_results %}
+                {{ "%.4f" | format(r.composite_score) }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ];
+
+            var labels = [
+                {% for r in validation_results %}
+                'Case {{ loop.index }}'{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ];
+
+            var colors = scores.map(function(s) {
+                if (s >= 0.9) return 'rgba(25, 135, 84, 0.7)';
+                if (s >= 0.8) return 'rgba(255, 193, 7, 0.7)';
+                return 'rgba(220, 53, 69, 0.7)';
+            });
+
+            var borderColors = scores.map(function(s) {
+                if (s >= 0.9) return 'rgb(25, 135, 84)';
+                if (s >= 0.8) return 'rgb(255, 193, 7)';
+                return 'rgb(220, 53, 69)';
+            });
+
+            var distCtx = document.getElementById('scoreDistributionChart');
+            if (distCtx) {
+                new Chart(distCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Composite Score',
+                            data: scores,
+                            backgroundColor: colors,
+                            borderColor: borderColors,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 1.0,
+                                title: {
+                                    display: true,
+                                    text: 'Score'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Per-Case Composite Scores'
+                            },
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+
+            {% if per_type_scores %}
+            // Per-Type Chart
+            var typeLabels = [
+                {% for type_name in per_type_scores.keys() %}
+                '{{ type_name }}'{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ];
+
+            var winRates = [
+                {% for stats in per_type_scores.values() %}
+                {{ "%.4f" | format(stats.get('win_rate', 0)) }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ];
+
+            var means = [
+                {% for stats in per_type_scores.values() %}
+                {{ "%.4f" | format(stats.get('mean', 0)) }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ];
+
+            var typeCtx = document.getElementById('perTypeChart');
+            if (typeCtx) {
+                new Chart(typeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: typeLabels,
+                        datasets: [
+                            {
+                                label: 'Win Rate',
+                                data: winRates,
+                                backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                                borderColor: 'rgb(13, 110, 253)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Mean Score',
+                                data: means,
+                                backgroundColor: 'rgba(25, 135, 84, 0.7)',
+                                borderColor: 'rgb(25, 135, 84)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 1.0,
+                                title: {
+                                    display: true,
+                                    text: 'Score'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Performance by Output Type'
+                            }
+                        }
+                    }
+                });
+            }
+            {% endif %}
+            {% endif %}
+        });
+    </script>
+</body>
+</html>

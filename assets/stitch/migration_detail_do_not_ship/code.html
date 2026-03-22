@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Migration Detail | RosettaStone</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-secondary": "#253421",
+                        "on-primary-fixed-variant": "#7a2f1e",
+                        "on-background": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "primary": "#ffb4a3",
+                        "inverse-on-surface": "#313030",
+                        "surface-tint": "#ffb4a3",
+                        "primary-fixed": "#ffdad2",
+                        "on-secondary-fixed-variant": "#3b4b36",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-lowest": "#0e0e0e",
+                        "secondary-container": "#3d4d38",
+                        "tertiary-fixed": "#ffdcbc",
+                        "on-primary-container": "#531205",
+                        "tertiary-fixed-dim": "#efbd8a",
+                        "on-tertiary-container": "#3f2300",
+                        "surface-dim": "#131313",
+                        "surface-container-low": "#1c1b1b",
+                        "on-secondary-fixed": "#101f0d",
+                        "surface-container-highest": "#353535",
+                        "surface-bright": "#393939",
+                        "surface-container": "#20201f",
+                        "on-primary": "#5c190a",
+                        "on-primary-fixed": "#3d0600",
+                        "on-surface-variant": "#dbc1bb",
+                        "inverse-primary": "#984633",
+                        "tertiary": "#efbd8a",
+                        "secondary-fixed-dim": "#b9ccb0",
+                        "on-surface": "#e5e2e1",
+                        "outline-variant": "#55433e",
+                        "on-secondary-container": "#abbea2",
+                        "primary-fixed-dim": "#ffb4a3",
+                        "outline": "#a38c86",
+                        "on-tertiary-fixed-variant": "#614018",
+                        "surface": "#131313",
+                        "secondary": "#b9ccb0",
+                        "on-tertiary": "#472a03",
+                        "surface-variant": "#353535",
+                        "error": "#ffb4ab",
+                        "inverse-surface": "#e5e2e1",
+                        "background": "#131313",
+                        "primary-container": "#d67660",
+                        "on-tertiary-fixed": "#2c1700",
+                        "on-error": "#690005",
+                        "secondary-fixed": "#d5e8cb",
+                        "tertiary-container": "#b4885a",
+                        "surface-container-high": "#2a2a2a"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { background-color: #131313; }
+        .no-border-tonal-shift { border: none !important; }
+    </style>
+</head>
+<body class="font-body text-on-background min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full h-[72px] z-50 bg-[#131313]/80 backdrop-blur-md shadow-[0px_64px_64px_rgba(229,226,225,0.06)] flex items-center justify-between px-16 max-w-full no-border-tonal-shift">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tighter text-[#E5E2E1]">RosettaStone</span>
+<nav class="hidden md:flex gap-6 items-center ml-12">
+<a class="font-['Inter'] font-medium text-sm tracking-tight text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors" href="#">Models</a>
+<a class="font-['Inter'] font-medium text-sm tracking-tight text-[#D4745E] border-b-2 border-[#D4745E] pb-1" href="#">Migrations</a>
+<a class="font-['Inter'] font-medium text-sm tracking-tight text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors" href="#">Costs</a>
+<a class="font-['Inter'] font-medium text-sm tracking-tight text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors" href="#">Alerts</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-[#E5E2E1]/60 hover:bg-[#2a2a2a] rounded-md transition-all active:scale-95 duration-200">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<button class="p-2 text-[#E5E2E1]/60 hover:bg-[#2a2a2a] rounded-md transition-all active:scale-95 duration-200">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden ml-2 bg-surface-container-highest">
+<img alt="User profile avatar" data-alt="Abstract geometric avatar profile picture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCIbKTc1vn2rOnhEkuqH78zPxuakVK59DR9zprGJPQxgw25ZZ6WYPw1Zmj30ohyMv5ve2tIRwHYV3oVb4GrF3qGMlz2apxXJkWS7Jys-JWYtwDnKscTJQSVlVFSRyk5rL90Yt9VW2RBtsVjxwhYB2H-KzsrEg1CYe0n5LJ9wj8EUEhbM0SuOWDuL61dd3NitN8O7MPxUFLt2b1o-DNLBK-iwOPgjav6SWk4H4My0Vd4FjqoYPbXrxAUKTK235omLJiof9dxQvW3PCTe"/>
+</div>
+</div>
+</header>
+<main class="mt-[72px] flex-grow px-16 py-12 max-w-7xl mx-auto w-full">
+<!-- Breadcrumb -->
+<div class="mb-8">
+<a class="text-[#D4745E] font-medium flex items-center gap-2 hover:opacity-80 transition-opacity" href="#">
+<span class="material-symbols-outlined text-sm">arrow_back</span>
+<span>Migrations</span>
+</a>
+</div>
+<!-- Header Section -->
+<div class="flex items-center justify-between mb-12">
+<div class="flex items-center gap-4">
+<h1 class="text-[28px] font-bold text-[#E8DCC4] tracking-tight flex items-center gap-3">
+<span class="font-mono text-xl opacity-60">gpt-3.5-turbo</span>
+<span class="material-symbols-outlined text-outline">trending_flat</span>
+<span class="font-mono text-xl">gpt-4o-mini</span>
+</h1>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-error/20 text-error border border-error/30 tracking-widest uppercase">FAILED</span>
+</div>
+<div class="text-right">
+<p class="text-[10px] font-mono uppercase tracking-[0.2em] text-on-surface-variant">Last Evaluated</p>
+<p class="text-sm font-medium">Oct 24, 2024 — 14:02 UTC</p>
+</div>
+</div>
+<!-- Recommendation Card (Answer First) -->
+<div class="mb-16 bg-[#3D3D3D] rounded-xl p-8 border-l-4 border-[#D85650] shadow-2xl relative overflow-hidden">
+<!-- Background Texture for depth -->
+<div class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-error/5 to-transparent pointer-events-none"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-[#D85650] text-3xl font-bold">cancel</span>
+<h2 class="text-[28px] font-extrabold text-[#D85650] tracking-tight">Do not ship</h2>
+</div>
+<p class="text-on-surface-variant max-w-2xl leading-relaxed mb-8">
+                    The target model failed to maintain parity in critical JSON structures and shows significant logic regressions. 
+                    Migration at this stage would result in data corruption for downstream parsers and a 12% decrease in reasoning accuracy for complex prompts.
+                </p>
+<div class="flex gap-4">
+<button class="px-6 py-2.5 bg-[#D4745E] text-on-primary-container font-semibold rounded-md hover:brightness-110 active:scale-95 transition-all shadow-lg">
+                        View full report
+                    </button>
+<button class="px-6 py-2.5 border border-outline/30 text-on-surface font-semibold rounded-md hover:bg-surface-bright active:scale-95 transition-all">
+                        Adjust optimization settings
+                    </button>
+</div>
+</div>
+</div>
+<!-- KPI Cards Row -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+<div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+<span class="text-[32px] font-bold text-[#D85650] mb-2">61%</span>
+<span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Confidence (after optimization)</span>
+</div>
+<div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+<span class="text-[32px] font-bold text-[#BDBDBD] mb-2">58%</span>
+<span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Baseline (before optimization)</span>
+</div>
+<div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
+<span class="text-[32px] font-bold text-[#BDBDBD] mb-2">+3%</span>
+<span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Improvement from GEPA</span>
+</div>
+</div>
+<!-- Results Grid -->
+<div class="mb-16">
+<h3 class="headline-md font-bold mb-8 text-[#E8DCC4]">Results by output type</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- JSON outputs -->
+<div class="bg-surface-container-low p-6 rounded-xl border-l-4 border-[#D85650] flex justify-between items-start">
+<div>
+<p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant mb-2">JSON outputs</p>
+<p class="text-2xl font-bold mb-1">12/48 (25%)</p>
+<p class="text-sm text-[#D85650]">Structural mismatches</p>
+</div>
+<span class="px-2 py-1 rounded text-[10px] font-bold bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20 tracking-tighter">FAIL</span>
+</div>
+<!-- Logic & Reasoning -->
+<div class="bg-surface-container-low p-6 rounded-xl border-l-4 border-[#D85650] flex justify-between items-start">
+<div>
+<p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant mb-2">Logic &amp; Reasoning</p>
+<p class="text-2xl font-bold mb-1">34/78 (43%)</p>
+<p class="text-sm text-[#D85650]">Significant regressions</p>
+</div>
+<span class="px-2 py-1 rounded text-[10px] font-bold bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20 tracking-tighter">FAIL</span>
+</div>
+<!-- Classification -->
+<div class="bg-surface-container-low p-6 rounded-xl border-l-4 border-tertiary-container flex justify-between items-start">
+<div>
+<p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant mb-2">Classification</p>
+<p class="text-2xl font-bold mb-1">21/24 (87%)</p>
+<p class="text-sm text-tertiary-container">Minor parity issues</p>
+</div>
+<span class="px-2 py-1 rounded text-[10px] font-bold bg-tertiary-container/10 text-tertiary-container border border-tertiary-container/20 tracking-tighter">WARN</span>
+</div>
+<!-- Tone & Style -->
+<div class="bg-surface-container-low p-6 rounded-xl border-l-4 border-secondary flex justify-between items-start">
+<div>
+<p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant mb-2">Tone &amp; Style</p>
+<p class="text-2xl font-bold mb-1">6/6 (100%)</p>
+<p class="text-sm text-secondary">Matches baseline</p>
+</div>
+<span class="px-2 py-1 rounded text-[10px] font-bold bg-secondary/10 text-secondary border border-secondary/20 tracking-tighter">PASS</span>
+</div>
+</div>
+</div>
+<!-- Critical Regressions List -->
+<div>
+<div class="flex items-center justify-between mb-8">
+<h3 class="headline-md font-bold text-[#E8DCC4]">Critical regressions</h3>
+<span class="text-xs font-mono text-on-surface-variant">Showing 3 of 14</span>
+</div>
+<div class="space-y-4">
+<div class="bg-surface-container-lowest p-5 rounded-lg flex items-center justify-between group hover:bg-surface-container-low transition-all">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#D85650]">warning</span>
+<div>
+<p class="font-mono text-sm">Schema Violation: Missing key <code class="bg-surface-container-high px-1 rounded text-primary">"metadata.version"</code></p>
+<p class="text-xs text-on-surface-variant mt-1">Impacts all automated data ingestion pipelines.</p>
+</div>
+</div>
+<a class="text-primary text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity" href="#">View diff →</a>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-lg flex items-center justify-between group hover:bg-surface-container-low transition-all">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#D85650]">warning</span>
+<div>
+<p class="font-mono text-sm">Reasoning Loop: Infinite recursion on boolean logic prompts</p>
+<p class="text-xs text-on-surface-variant mt-1">Found in 14 test cases related to tax calculation.</p>
+</div>
+</div>
+<a class="text-primary text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity" href="#">View diff →</a>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-lg flex items-center justify-between group hover:bg-surface-container-low transition-all">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#D85650]">warning</span>
+<div>
+<p class="font-mono text-sm">Instruction Drift: Ignored system constraint <code class="bg-surface-container-high px-1 rounded text-primary">"DO_NOT_HALLUCINATE"</code></p>
+<p class="text-xs text-on-surface-variant mt-1">Target model invented 4 fictional citations in RAG test.</p>
+</div>
+</div>
+<a class="text-primary text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity" href="#">View diff →</a>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="w-full py-12 px-16 mt-auto bg-[#0e0e0e] flex flex-col md:flex-row justify-between items-center tonal-shift-bg">
+<div class="mb-6 md:mb-0">
+<span class="font-['JetBrains_Mono'] text-[10px] uppercase tracking-widest text-[#E5E2E1]/40">© 2024 RosettaStone Intelligence. All rights reserved.</span>
+</div>
+<div class="flex gap-8">
+<a class="font-['JetBrains_Mono'] text-[10px] uppercase tracking-widest text-[#E5E2E1]/40 hover:text-[#D4745E] transition-opacity" href="#">Documentation</a>
+<a class="font-['JetBrains_Mono'] text-[10px] uppercase tracking-widest text-[#E5E2E1]/40 hover:text-[#D4745E] transition-opacity" href="#">API Reference</a>
+<a class="font-['JetBrains_Mono'] text-[10px] uppercase tracking-widest text-[#E5E2E1]/40 hover:text-[#D4745E] transition-opacity" href="#">Status</a>
+<a class="font-['JetBrains_Mono'] text-[10px] uppercase tracking-widest text-[#E5E2E1]/40 hover:text-[#D4745E] transition-opacity" href="#">Privacy</a>
+</div>
+</footer>
+</body></html>

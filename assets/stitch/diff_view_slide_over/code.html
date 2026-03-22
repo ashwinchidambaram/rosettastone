@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-tint": "#ffb4a3",
+              "surface-container": "#20201f",
+              "secondary": "#b9ccb0",
+              "tertiary": "#efbd8a",
+              "surface-container-lowest": "#0e0e0e",
+              "outline": "#a38c86",
+              "on-tertiary-fixed": "#2c1700",
+              "error-container": "#93000a",
+              "on-error-container": "#ffdad6",
+              "surface": "#131313",
+              "on-tertiary": "#472a03",
+              "error": "#ffb4ab",
+              "background": "#131313",
+              "on-secondary-fixed": "#101f0d",
+              "tertiary-fixed": "#ffdcbc",
+              "surface-container-highest": "#353535",
+              "on-primary-fixed-variant": "#7a2f1e",
+              "primary": "#ffb4a3",
+              "surface-container-high": "#2a2a2a",
+              "on-primary": "#5c190a",
+              "surface-bright": "#393939",
+              "on-primary-container": "#531205",
+              "inverse-primary": "#984633",
+              "tertiary-container": "#b4885a",
+              "on-error": "#690005",
+              "surface-container-low": "#1c1b1b",
+              "inverse-surface": "#e5e2e1",
+              "on-secondary-container": "#abbea2",
+              "on-background": "#e5e2e1",
+              "on-surface-variant": "#dbc1bb",
+              "secondary-fixed": "#d5e8cb",
+              "on-primary-fixed": "#3d0600",
+              "primary-fixed-dim": "#ffb4a3",
+              "outline-variant": "#55433e",
+              "secondary-container": "#3d4d38",
+              "inverse-on-surface": "#313030",
+              "primary-container": "#d67660",
+              "surface-dim": "#131313",
+              "secondary-fixed-dim": "#b9ccb0",
+              "primary-fixed": "#ffdad2",
+              "tertiary-fixed-dim": "#efbd8a",
+              "on-tertiary-container": "#3f2300",
+              "on-surface": "#e5e2e1",
+              "on-secondary": "#253421",
+              "on-secondary-fixed-variant": "#3b4b36",
+              "surface-variant": "#353535",
+              "on-tertiary-fixed-variant": "#614018",
+              "brand-gold": "#D4A574",
+              "brand-blue": "#7A9FB5",
+              "brand-red": "#D85650",
+              "brand-green": "#8B9D83"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"],
+              "mono": ["JetBrains Mono"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: #353535; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body overflow-hidden">
+<!-- Background Content (Simulating Dashboard) -->
+<main class="h-screen w-full flex bg-surface">
+<!-- Shared SideNavBar Component -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-[#1c1b1b] flex flex-col h-full py-6">
+<div class="px-6 mb-8">
+<h1 class="text-lg font-bold text-[#E5E2E1]">Project Alpha</h1>
+<p class="text-xs text-[#E5E2E1]/50">Deep Space Node</p>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="flex items-center px-6 py-3 text-[#E5E2E1]/50 hover:bg-[#2a2a2a] hover:text-[#E5E2E1] transition-all cursor-pointer">
+<span class="material-symbols-outlined mr-3">dashboard</span>
+<span class="text-sm">Dashboard</span>
+</div>
+<div class="flex items-center px-6 py-3 bg-[#2a2a2a] text-[#D4745E] border-r-4 border-[#D4745E] cursor-pointer">
+<span class="material-symbols-outlined mr-3">difference</span>
+<span class="text-sm font-semibold">Diff View</span>
+</div>
+<div class="flex items-center px-6 py-3 text-[#E5E2E1]/50 hover:bg-[#2a2a2a] hover:text-[#E5E2E1] transition-all cursor-pointer">
+<span class="material-symbols-outlined mr-3">leaderboard</span>
+<span class="text-sm">Metrics</span>
+</div>
+</nav>
+</aside>
+<!-- Main Workspace -->
+<div class="ml-64 w-full relative">
+<!-- Shared TopNavBar Component -->
+<header class="fixed top-0 w-[calc(100%-16rem)] h-[72px] z-40 bg-[#131313]/80 backdrop-blur-md flex items-center justify-between px-8 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black text-[#E5E2E1] tracking-tighter uppercase">Celestial Monolith</span>
+<nav class="flex gap-6">
+<span class="text-[#E5E2E1]/60 text-sm font-bold tracking-tight hover:text-[#D4745E] transition-colors cursor-pointer">Models</span>
+<span class="text-[#D4745E] border-b-2 border-[#D4745E] pb-1 text-sm font-bold tracking-tight cursor-pointer">Evaluations</span>
+<span class="text-[#E5E2E1]/60 text-sm font-bold tracking-tight hover:text-[#D4745E] transition-colors cursor-pointer">Logs</span>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#E5E2E1]/60 cursor-pointer">settings</span>
+<span class="material-symbols-outlined text-[#E5E2E1]/60 cursor-pointer">notifications</span>
+<div class="h-8 w-8 rounded-full bg-surface-container-highest overflow-hidden">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="Stylized user avatar profile picture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlwkkZVWyVlRFptGnQyBJsp-zaw5y6TlA_LkyyHlaz3-Q_uBjT1M7Z54kevGv0i5nwwCudjYIfOSfgwm5mTIrpvZVwF0lunYwwzCeO3zb3Iqe0uEF64KxpQ0bWyPA0uFeturUlFy1tbg1sIvPizeoVFTrM7Fq0wSvV46SgDA-0nQ3tqe65yLK1r2rZCVC662w9csXfh_PM02mytcQVUaIku2V5FneTou4zNnaBNpol1pAVL-dhokTuCCsBFnz2X5xtzOSUvVvkUs30"/>
+</div>
+</div>
+</header>
+<!-- Dimmed Overlay -->
+<div class="absolute inset-0 bg-black/60 z-50 backdrop-blur-[2px]"></div>
+<!-- SLIDE OVER PANEL -->
+<section class="absolute right-0 top-0 h-full w-[55%] bg-[#2C2C2C] z-[60] shadow-2xl flex flex-col border-l border-white/5">
+<!-- Panel Header -->
+<div class="px-8 pt-8 pb-4 flex justify-between items-start">
+<div class="space-y-3">
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded bg-brand-blue/20 text-brand-blue text-[10px] font-bold tracking-wider uppercase">Free text</span>
+</div>
+<div class="flex items-end gap-3">
+<h2 class="text-5xl font-semibold text-brand-gold font-headline leading-none">0.72</h2>
+<span class="px-1.5 py-0.5 rounded bg-brand-red text-white text-[10px] font-black mb-1">LOSS</span>
+</div>
+</div>
+<button class="p-2 hover:bg-white/5 rounded-full transition-colors">
+<span class="material-symbols-outlined text-[#BDBDBD] text-3xl">close</span>
+</button>
+</div>
+<!-- Metric Bars -->
+<div class="px-8 py-6 space-y-5">
+<div class="space-y-2">
+<div class="flex justify-between text-[11px] font-mono text-on-surface/60 uppercase tracking-widest">
+<span>BERTScore</span>
+<span class="text-on-surface">0.78</span>
+</div>
+<div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-brand-green/40 rounded-full" style="width: 78%"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[11px] font-mono text-on-surface/60 uppercase tracking-widest">
+<span>Embedding similarity</span>
+<span class="text-on-surface">0.81</span>
+</div>
+<div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-brand-green rounded-full" style="width: 81%"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[11px] font-mono text-on-surface/60 uppercase tracking-widest">
+<span>Composite</span>
+<span class="text-brand-gold font-bold">0.72</span>
+</div>
+<div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-brand-gold rounded-full" style="width: 72%"></div>
+</div>
+</div>
+</div>
+<!-- Tab Toggle -->
+<div class="px-8 border-b border-white/5 flex gap-8">
+<button class="pb-3 text-sm font-bold text-on-surface border-b-2 border-[#D4745E] tracking-tight">Side-by-side</button>
+<button class="pb-3 text-sm font-bold text-on-surface/40 hover:text-on-surface/70 transition-colors tracking-tight">Unified</button>
+</div>
+<!-- Scrollable Content Area -->
+<div class="flex-1 overflow-y-auto custom-scrollbar">
+<!-- PII Warning Banner -->
+<div class="m-6 p-4 bg-brand-gold/10 border-l-4 border-brand-gold flex items-center gap-3">
+<span class="material-symbols-outlined text-brand-gold text-sm" style="font-variation-settings: 'FILL' 1;">warning</span>
+<p class="text-[14px] text-brand-gold font-medium">Content may contain sensitive data from production prompts</p>
+</div>
+<!-- Diff View -->
+<div class="mx-6 mb-8 rounded-xl bg-[#1A1A1A] overflow-hidden border border-white/5">
+<div class="grid grid-cols-2 border-b border-white/5">
+<div class="px-5 py-3 border-r border-white/5">
+<span class="text-[12px] font-mono text-[#9E9E9E] uppercase tracking-tighter">Expected (gpt-4o)</span>
+</div>
+<div class="px-5 py-3">
+<span class="text-[12px] font-mono text-[#9E9E9E] uppercase tracking-tighter">Actual (claude-sonnet-4)</span>
+</div>
+</div>
+<div class="grid grid-cols-2 font-mono text-[14px] leading-relaxed">
+<!-- Left Column (Expected) -->
+<div class="p-5 border-r border-white/5 text-[#E8DCC4] whitespace-pre-wrap">
+<span class="block mb-2 opacity-40 select-none">1 | {</span>
+<span class="block mb-2 opacity-40 select-none">2 |   "quarter": "Q3 2024",</span>
+<span class="block mb-2 opacity-40 select-none">3 |   "revenue": {</span>
+<span class="block mb-2 opacity-40 select-none">4 |     "actual": 14200000,</span>
+<span class="block mb-2 opacity-40 select-none">5 |     "forecast": <span class="bg-[rgba(216,86,80,0.2)] text-brand-red px-1 rounded">13850000</span>,</span>
+<span class="block mb-2 opacity-40 select-none">6 |     "growth": "12.4%"</span>
+<span class="block mb-2 opacity-40 select-none">7 |   },</span>
+<span class="block mb-2 opacity-40 select-none">8 |   "notes": "Strong <span class="bg-[rgba(216,86,80,0.2)] text-brand-red px-1 rounded">upside</span> in enterprise"</span>
+<span class="block mb-2 opacity-40 select-none">9 | }</span>
+</div>
+<!-- Right Column (Actual) -->
+<div class="p-5 text-[#E8DCC4] whitespace-pre-wrap">
+<span class="block mb-2 opacity-40 select-none">1 | {</span>
+<span class="block mb-2 opacity-40 select-none">2 |   "quarter": "Q3 2024",</span>
+<span class="block mb-2 opacity-40 select-none">3 |   "revenue": {</span>
+<span class="block mb-2 opacity-40 select-none">4 |     "actual": 14200000,</span>
+<span class="block mb-2 opacity-40 select-none">5 |     "forecast": <span class="bg-[rgba(139,157,131,0.2)] text-brand-green px-1 rounded">13900000</span>,</span>
+<span class="block mb-2 opacity-40 select-none">6 |     "growth": "12.4%"</span>
+<span class="block mb-2 opacity-40 select-none">7 |   },</span>
+<span class="block mb-2 opacity-40 select-none">8 |   "notes": "Strong <span class="bg-[rgba(139,157,131,0.2)] text-brand-green px-1 rounded">momentum</span> in enterprise"</span>
+<span class="block mb-2 opacity-40 select-none">9 | }</span>
+</div>
+</div>
+</div>
+<!-- Additional Metadata Section -->
+<div class="mx-6 p-8 rounded-xl bg-surface-container-low border border-white/5 mb-10">
+<h3 class="text-brand-gold text-[12px] font-bold uppercase tracking-[0.2em] mb-6">Trace Evidence</h3>
+<div class="grid grid-cols-3 gap-8">
+<div>
+<p class="text-[10px] text-on-surface/40 uppercase mb-1">Latency</p>
+<p class="font-mono text-sm">842ms</p>
+</div>
+<div>
+<p class="text-[10px] text-on-surface/40 uppercase mb-1">Tokens</p>
+<p class="font-mono text-sm">1,240</p>
+</div>
+<div>
+<p class="text-[10px] text-on-surface/40 uppercase mb-1">Node</p>
+<p class="font-mono text-sm">US-EAST-1</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer CTA -->
+<div class="p-6 bg-surface-container-high border-t border-white/5 flex justify-end gap-3">
+<button class="px-6 py-2 text-xs font-bold text-on-surface/60 hover:text-on-surface transition-colors">DISCARD</button>
+<button class="px-6 py-2 bg-brand-gold text-surface-container-lowest text-xs font-black rounded-md hover:brightness-110 transition-all">APPROVE VARIANCE</button>
+</div>
+</section>
+</div>
+</main>
+</body></html>

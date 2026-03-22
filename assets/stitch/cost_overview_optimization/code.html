@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RosettaStone | Costs</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "secondary": "#b9ccb0",
+                        "outline-variant": "#55433e",
+                        "on-secondary": "#253421",
+                        "on-primary": "#5c190a",
+                        "surface-container": "#20201f",
+                        "outline": "#a38c86",
+                        "on-secondary-fixed": "#101f0d",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e5e2e1",
+                        "primary": "#ffb4a3",
+                        "on-tertiary-fixed": "#2c1700",
+                        "surface-container-high": "#2a2a2a",
+                        "primary-fixed-dim": "#ffb4a3",
+                        "tertiary": "#efbd8a",
+                        "surface-container-highest": "#353535",
+                        "surface": "#131313",
+                        "on-primary-container": "#531205",
+                        "on-tertiary": "#472a03",
+                        "inverse-surface": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "on-primary-fixed": "#3d0600",
+                        "secondary-container": "#3d4d38",
+                        "inverse-on-surface": "#313030",
+                        "tertiary-container": "#b4885a",
+                        "on-error": "#690005",
+                        "on-surface": "#e5e2e1",
+                        "surface-container-lowest": "#0e0e0e",
+                        "secondary-fixed-dim": "#b9ccb0",
+                        "tertiary-fixed-dim": "#efbd8a",
+                        "secondary-fixed": "#d5e8cb",
+                        "surface-bright": "#393939",
+                        "on-secondary-fixed-variant": "#3b4b36",
+                        "error": "#ffb4ab",
+                        "surface-variant": "#353535",
+                        "inverse-primary": "#984633",
+                        "primary-fixed": "#ffdad2",
+                        "on-tertiary-container": "#3f2300",
+                        "on-surface-variant": "#dbc1bb",
+                        "surface-container-low": "#1c1b1b",
+                        "primary-container": "#d67660",
+                        "tertiary-fixed": "#ffdcbc",
+                        "background": "#131313",
+                        "surface-tint": "#ffb4a3",
+                        "on-primary-fixed-variant": "#7a2f1e",
+                        "surface-dim": "#131313",
+                        "on-secondary-container": "#abbea2",
+                        "on-tertiary-fixed-variant": "#614018"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["JetBrains Mono"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            background-color: #131313;
+            color: #e5e2e1;
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+<!-- TopNavBar Execution -->
+<nav class="fixed top-0 w-full h-[72px] z-50 bg-[#131313]/80 backdrop-blur-xl flex items-center justify-between px-8 w-full max-w-none shadow-[0_64px_64px_-12px_rgba(229,226,225,0.06)]">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black text-[#E5E2E1] tracking-tighter">RosettaStone</span>
+<div class="hidden md:flex items-center gap-6 font-['Inter'] font-bold tracking-tight">
+<a class="text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors" href="#">Models</a>
+<a class="text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors" href="#">Migrations</a>
+<a class="text-[#D4745E] border-b-2 border-[#D4745E] pb-1" href="#">Costs</a>
+<a class="text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors" href="#">Alerts</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="bg-surface-container-highest px-4 py-1.5 rounded-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-48 text-on-surface" placeholder="Search costs..." type="text"/>
+</div>
+<button class="p-2 rounded-full hover:bg-[#2a2a2a] transition-all duration-200 active:scale-95">
+<span class="material-symbols-outlined text-[#E5E2E1]" data-icon="settings">settings</span>
+</button>
+<button class="p-2 rounded-full hover:bg-[#2a2a2a] transition-all duration-200 active:scale-95">
+<span class="material-symbols-outlined text-[#E5E2E1]" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</nav>
+<!-- SideNavBar (Hidden on desktop as per Shell Visibility rules, but kept for mobile logic) -->
+<!-- Content Canvas -->
+<main class="pt-[72px] pb-16 px-8 max-w-7xl mx-auto">
+<!-- Header Section -->
+<header class="flex items-center justify-between py-12">
+<h1 class="text-[28px] font-semibold text-[#E8DCC4] tracking-tight">Cost overview</h1>
+<div class="relative group">
+<button class="bg-[#2a2a2a] hover:bg-[#393939] text-[#E5E2E1] px-5 py-2.5 rounded-lg flex items-center gap-3 transition-all">
+<span class="text-sm font-medium">This month</span>
+<span class="material-symbols-outlined text-sm" data-icon="expand_more">expand_more</span>
+</button>
+</div>
+</header>
+<!-- KPI Section -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+<!-- Estimated Card -->
+<div class="bg-[#2a2a2a] p-8 rounded-2xl shadow-[0_64px_64px_-12px_rgba(229,226,225,0.06)] flex flex-col justify-between">
+<div>
+<span class="text-[32px] font-bold text-[#E8DCC4] block mb-1">$1,247</span>
+<span class="text-[#BDBDBD] text-sm font-medium">Estimated this month</span>
+</div>
+<div class="mt-4 pt-4 border-t border-[#393939] flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="trending_up">trending_up</span>
+<span class="text-xs text-[#BDBDBD] font-['JetBrains_Mono']">+12.4% vs last month</span>
+</div>
+</div>
+<!-- Savings Card -->
+<div class="bg-[#2a2a2a] p-8 rounded-2xl shadow-[0_64px_64px_-12px_rgba(229,226,225,0.06)] flex flex-col justify-between">
+<div>
+<span class="text-[32px] font-bold text-[#8B9D83] block mb-1">$312</span>
+<span class="text-[#BDBDBD] text-sm font-medium">Potential savings</span>
+</div>
+<div class="mt-4 pt-4 border-t border-[#393939] flex items-center gap-2">
+<span class="material-symbols-outlined text-[#8B9D83] text-sm" data-icon="auto_awesome">auto_awesome</span>
+<span class="text-xs text-[#BDBDBD] font-['JetBrains_Mono']">2 actionable optimizations</span>
+</div>
+</div>
+<!-- Optimization Card -->
+<div class="bg-[#2a2a2a] p-8 rounded-2xl shadow-[0_64px_64px_-12px_rgba(229,226,225,0.06)] flex flex-col justify-between">
+<div>
+<span class="text-[32px] font-bold text-[#E8DCC4] block mb-1">$935</span>
+<span class="text-[#BDBDBD] text-sm font-medium">After optimization</span>
+</div>
+<div class="mt-4 pt-4 border-t border-[#393939] flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="check_circle">check_circle</span>
+<span class="text-xs text-[#BDBDBD] font-['JetBrains_Mono']">Target budget reached</span>
+</div>
+</div>
+</section>
+<!-- Cost by Model Section -->
+<section class="mb-20">
+<h2 class="text-[22px] font-semibold text-[#E8DCC4] mb-8">Cost by model</h2>
+<div class="bg-surface-container-low p-10 rounded-2xl space-y-8">
+<!-- GPT-4o -->
+<div class="space-y-3">
+<div class="flex justify-between items-end">
+<span class="font-['JetBrains_Mono'] text-sm text-on-surface">openai/gpt-4o</span>
+<span class="font-['JetBrains_Mono'] text-sm text-[#E8DCC4] font-bold">$823 (66%)</span>
+</div>
+<div class="h-10 w-full bg-[#2a2a2a] rounded-full overflow-hidden">
+<div class="h-full bg-[#D4745E]/40 w-[66%] rounded-r-lg"></div>
+</div>
+</div>
+<!-- Claude Sonnet -->
+<div class="space-y-3">
+<div class="flex justify-between items-end">
+<span class="font-['JetBrains_Mono'] text-sm text-on-surface">anthropic/claude-sonnet-4</span>
+<span class="font-['JetBrains_Mono'] text-sm text-[#E8DCC4] font-bold">$312 (25%)</span>
+</div>
+<div class="h-10 w-full bg-[#2a2a2a] rounded-full overflow-hidden">
+<div class="h-full bg-[#8B9D83]/40 w-[25%] rounded-r-lg"></div>
+</div>
+</div>
+<!-- GPT-4o Mini -->
+<div class="space-y-3">
+<div class="flex justify-between items-end">
+<span class="font-['JetBrains_Mono'] text-sm text-on-surface">openai/gpt-4o-mini</span>
+<span class="font-['JetBrains_Mono'] text-sm text-[#E8DCC4] font-bold">$112 (9%)</span>
+</div>
+<div class="h-10 w-full bg-[#2a2a2a] rounded-full overflow-hidden">
+<div class="h-full bg-[#D4A574]/40 w-[9%] rounded-r-lg"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Optimization Opportunities -->
+<section>
+<h2 class="text-[22px] font-semibold text-[#E8DCC4] mb-8">Optimization opportunities</h2>
+<div class="grid grid-cols-1 gap-6">
+<!-- Opp 1 -->
+<div class="bg-[#8B9D83]/5 border-l-4 border-[#8B9D83] p-8 flex gap-6 items-start">
+<div class="bg-[#D4A574]/10 p-3 rounded-lg">
+<span class="material-symbols-outlined text-[#D4A574] text-3xl" data-icon="lightbulb">lightbulb</span>
+</div>
+<div class="flex-1">
+<h3 class="text-[#E5E2E1] font-bold text-lg mb-2">Switch gpt-4o → gpt-4o-mini for classification tasks.</h3>
+<p class="text-[#BDBDBD] text-sm mb-4 leading-relaxed">Estimated savings: $180/month. These tasks don't need frontier reasoning and show 99.4% parity on current benchmark tests.</p>
+<a class="text-[#D4745E] font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all" href="#">
+                            Evaluate this →
+                        </a>
+</div>
+</div>
+<!-- Opp 2 -->
+<div class="bg-[#8B9D83]/5 border-l-4 border-[#8B9D83] p-8 flex gap-6 items-start">
+<div class="bg-[#D4A574]/10 p-3 rounded-lg">
+<span class="material-symbols-outlined text-[#D4A574] text-3xl" data-icon="bolt">bolt</span>
+</div>
+<div class="flex-1">
+<h3 class="text-[#E5E2E1] font-bold text-lg mb-2">Consolidate prompts to reduce token overhead on repetitive queries.</h3>
+<p class="text-[#BDBDBD] text-sm mb-4 leading-relaxed">Estimated savings: $132/month. By batched processing, you can reduce context-window re-initialization costs across 4 specific worker nodes.</p>
+<a class="text-[#D4745E] font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all" href="#">
+                            Review clusters →
+                        </a>
+</div>
+</div>
+</div>
+</section>
+<!-- Background Detail (Visual Interest) -->
+<div class="fixed top-0 right-0 -z-10 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none"></div>
+<div class="fixed bottom-0 left-0 -z-10 w-[400px] h-[400px] bg-secondary/5 blur-[100px] rounded-full pointer-events-none"></div>
+</main>
+<!-- Footer Space -->
+<footer class="mt-20 py-12 px-8 border-t border-[#1c1b1b] text-center">
+<p class="text-[0.6875rem] font-['JetBrains_Mono'] uppercase tracking-widest text-[#E5E2E1]/20">
+            RosettaStone Intelligence OS • Built for High-Level Model Architecture
+        </p>
+</footer>
+</body></html>

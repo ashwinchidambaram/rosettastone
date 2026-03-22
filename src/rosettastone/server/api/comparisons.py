@@ -2,22 +2,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
 from rosettastone.server.api.migrations import _test_case_to_diff_dict
+from rosettastone.server.api.utils import _get_migration_or_404
 from rosettastone.server.database import get_session
 from rosettastone.server.models import MigrationRecord, TestCaseRecord
 from rosettastone.server.schemas import DiffData, ScoreDistribution, TypeScoreStats
 
 router = APIRouter()
-
-TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 # ---------------------------------------------------------------------------
@@ -44,30 +39,22 @@ DUMMY_DIFF = {
 # ---------------------------------------------------------------------------
 
 
-def _get_migration_or_404(migration_id: int, session: Session) -> MigrationRecord:
-    """Fetch a migration by ID or raise 404."""
-    record = session.get(MigrationRecord, migration_id)
-    if record is None:
-        raise HTTPException(status_code=404, detail="Migration not found")
-    return record
-
-
 def _compute_distributions(migration_id: int, session: Session) -> list[ScoreDistribution]:
     """Compute score distributions per output type from TestCaseRecords."""
     stmt = select(TestCaseRecord).where(TestCaseRecord.migration_id == migration_id)
     test_cases = list(session.exec(stmt).all())
 
-    # Group scores by output type
-    scores_by_type: dict[str, list[float]] = {}
+    # Group test cases by output type
+    cases_by_type: dict[str, list[TestCaseRecord]] = {}
     for tc in test_cases:
         output_type = tc.output_type
-        if output_type not in scores_by_type:
-            scores_by_type[output_type] = []
-        scores_by_type[output_type].append(tc.composite_score)
+        if output_type not in cases_by_type:
+            cases_by_type[output_type] = []
+        cases_by_type[output_type].append(tc)
 
     distributions: list[ScoreDistribution] = []
-    for output_type, scores in sorted(scores_by_type.items()):
-        scores.sort()
+    for output_type, cases in sorted(cases_by_type.items()):
+        scores = sorted(tc.composite_score for tc in cases)
         n = len(scores)
         if n == 0:
             continue
@@ -87,7 +74,7 @@ def _compute_distributions(migration_id: int, session: Session) -> list[ScoreDis
             frac = idx - lower
             return sorted_vals[lower] + frac * (sorted_vals[upper] - sorted_vals[lower])
 
-        win_count = sum(1 for s in scores if s >= 0.5)
+        win_count = sum(1 for tc in cases if tc.is_win)
 
         # Build histogram: 10 buckets from 0.0 to 1.0
         histogram = [0] * 10
@@ -191,9 +178,8 @@ async def diff_fragment(
     else:
         diff = DUMMY_DIFF  # fallback
 
-    return templates.TemplateResponse(
-        "fragments/diff_slideout.html",
-        {"request": request, "diff": diff},
+    return request.app.state.templates.TemplateResponse(
+        request, "fragments/diff_slideout.html", {"diff": diff},
     )
 
 

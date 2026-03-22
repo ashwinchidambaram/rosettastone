@@ -1,0 +1,42 @@
+## Executive Summary
+
+Migration from **{{ source_model }}** to **{{ target_model }}** — Recommendation: **{{ recommendation | default('N/A') }}**.
+
+{{ recommendation_reasoning | default('') }}
+
+### Key Metrics
+
+- **Confidence Score:** {{ "%.1f" | format(confidence_score * 100) }}%
+- **Baseline Score:** {{ "%.1f" | format(baseline_score * 100) }}%
+- **Improvement:** +{{ "%.1f" | format(improvement * 100) }}%
+- **Win Rate:** {{ wins }}/{{ total_test_cases }} ({{ "%.0f" | format(wins / [total_test_cases, 1] | max * 100) }}%)
+- **Total Cost:** ${{ "%.4f" | format(cost_usd) }}
+- **Duration:** {{ "%.1f" | format(duration_seconds) }}s
+
+{% if per_type_scores %}
+### Performance by Output Type
+
+{% for type_name, stats in per_type_scores.items() %}
+- **{{ type_name }}**: Win rate {{ "%.1f" | format(stats.get('win_rate', 0) * 100) }}% ({{ stats.get('sample_count', 0) }} samples), median score {{ "%.3f" | format(stats.get('median', 0)) }}
+{% endfor %}
+{% endif %}
+
+{% if safety_warnings %}
+### Safety Concerns
+
+{% for w in safety_warnings %}
+{% if w is mapping %}
+- [{{ w.get('severity', 'INFO') }}] {{ w.get('message', w | string) }}
+{% else %}
+- {{ w }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if warnings %}
+### Caveats
+
+{% for w in warnings %}
+- {{ w }}
+{% endfor %}
+{% endif %}

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Models | RosettaStone</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "outline": "#a38c86",
+                        "outline-variant": "#E0E0E0",
+                        "surface-container-high": "#F3EFE8",
+                        "surface-container-lowest": "#FFFFFF",
+                        "surface-container-low": "#F9F7F4",
+                        "primary-container": "#d67660",
+                        "background": "#F9F7F4",
+                        "surface": "#F9F7F4",
+                        "on-surface": "#2C2C2C",
+                        "on-surface-variant": "#616161",
+                        "primary": "#D4745E",
+                        "tertiary": "#D4A574",
+                        "error": "#93000a",
+                    },
+                    fontFamily: {
+                        "headline": ["Inter", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["JetBrains Mono", "monospace"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "12px",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F9F7F4;
+            color: #2C2C2C;
+        }
+        .glass-nav {
+            background-color: rgba(249, 247, 244, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid #E0E0E0;
+        }
+    </style>
+</head>
+<body class="antialiased">
+<!-- TopNavBar Shared Component -->
+<header class="glass-nav sticky top-0 z-50 flex justify-between items-center w-full px-8 h-[72px] max-w-full mx-auto">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tighter text-stone-900">RosettaStone</span>
+<nav class="hidden md:flex items-center gap-6 h-[72px]">
+<!-- Active Navigation: Models -->
+<a class="text-[#D4745E] border-b-2 border-[#D4745E] pb-5 mt-5 font-medium text-sm tracking-tight transition-all" href="#">Models</a>
+<a class="text-stone-500 hover:text-stone-800 pb-5 mt-5 font-medium text-sm tracking-tight transition-colors" href="#">Datasets</a>
+<a class="text-stone-500 hover:text-stone-800 pb-5 mt-5 font-medium text-sm tracking-tight transition-colors" href="#">Deployments</a>
+<a class="text-stone-500 hover:text-stone-800 pb-5 mt-5 font-medium text-sm tracking-tight transition-colors" href="#">API</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-lg">search</span>
+<input class="bg-stone-100/50 border-none rounded-lg py-2 pl-10 pr-4 text-sm w-64 focus:ring-1 focus:ring-primary/30 transition-all" placeholder="Search resources..." type="text"/>
+</div>
+<button class="p-2 hover:bg-stone-100/50 rounded-lg transition-all active:scale-95 duration-200">
+<span class="material-symbols-outlined text-stone-600" data-icon="dark_mode">dark_mode</span>
+</button>
+<button class="p-2 hover:bg-stone-100/50 rounded-lg transition-all active:scale-95 duration-200">
+<span class="material-symbols-outlined text-stone-600" data-icon="settings">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-stone-200 overflow-hidden ml-2 ring-1 ring-stone-200">
+<img class="h-full w-full object-cover" data-alt="User profile avatar portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxk2SvHcTl0bIvvLM-ZWlZJF6CgsZiQ8T8e7bf6HBUADFoZoYsNrBVWj_YTw_xXJ0BgZkdci6fXl407rVF-liKzUIZL0qlWoxymLc4JzJ_vdyGOWFgydrHeUXZykeVg-0Q99vokkYUrG4luy8O6VjDCRuI0mOMPUgyvcKM0NVl9SOTVHCZ3ckUwiHaaCah2S5SuUHxaPUVs4alSxQJvZ7H9l-UxLruyB65YRm2nJWh0ydZRJWuSDNqlbZRh61O0HDaW6Wlg66pJbNb"/>
+</div>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-8 py-12">
+<!-- Attention Banner -->
+<section class="mb-12">
+<div class="bg-[#F7E9D1] border-l-4 border-[#D4A574] p-5 rounded-r-lg flex items-start gap-4">
+<span class="material-symbols-outlined text-[#D4A574] mt-0.5" data-icon="warning" style="font-variation-settings: 'FILL' 1;">warning</span>
+<div>
+<h2 class="font-bold text-[#2C2C2C] text-lg leading-tight">2 things need your attention</h2>
+<ul class="mt-2 space-y-1">
+<li class="flex items-center gap-2 text-[#2C2C2C]/80 text-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-[#D4A574]"></span>
+                            gpt-4o-0613 is deprecated
+                        </li>
+<li class="flex items-center gap-2 text-[#2C2C2C]/80 text-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-[#D4A574]"></span>
+                            Claude Haiku 4.5 costs 40 percent less
+                        </li>
+</ul>
+</div>
+</div>
+</section>
+<!-- Your Models Section -->
+<section class="mb-16">
+<div class="flex justify-between items-end mb-8">
+<div>
+<h3 class="text-2xl font-bold tracking-tight text-[#2C2C2C]">Your models</h3>
+<p class="text-[#616161] text-sm mt-1">Models currently deployed in your active production environments.</p>
+</div>
+<button class="text-sm font-semibold text-[#D4745E] hover:underline flex items-center gap-1">
+                    Manage infrastructure <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<!-- Card 1 -->
+<div class="bg-white rounded-2xl border border-[#E0E0E0] p-6 shadow-[0_2px_8px_rgba(44,44,44,0.06)] flex flex-col justify-between hover:shadow-lg transition-shadow">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-[#616161]">Active</span>
+</div>
+<span class="material-symbols-outlined text-[#E0E0E0]">more_vert</span>
+</div>
+<h4 class="font-bold text-[#2C2C2C] text-lg mb-1">openai/gpt-4o</h4>
+<p class="text-[#616161] text-xs font-mono mb-4">Context: 128k • $5.00/1M</p>
+</div>
+<button class="mt-4 text-[#D4745E] font-semibold text-sm flex items-center gap-1 hover:gap-2 transition-all">
+                        Run migration <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+<!-- Card 2 -->
+<div class="bg-white rounded-2xl border border-[#E0E0E0] p-6 shadow-[0_2px_8px_rgba(44,44,44,0.06)] hover:shadow-lg transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-[#616161]">Active</span>
+</div>
+</div>
+<h4 class="font-bold text-[#2C2C2C] text-lg mb-1">anthropic/claude-sonnet-4</h4>
+<p class="text-[#616161] text-xs font-mono">Context: 200k • $3.00/1M</p>
+<div class="mt-8 pt-4 border-t border-stone-50">
+<div class="flex justify-between text-[10px] text-stone-400 font-bold uppercase">
+<span>Usage</span>
+<span>84%</span>
+</div>
+<div class="w-full h-1 bg-stone-100 rounded-full mt-2 overflow-hidden">
+<div class="bg-emerald-500 h-full w-[84%]"></div>
+</div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-white rounded-2xl border border-[#E0E0E0] p-6 shadow-[0_2px_8px_rgba(44,44,44,0.06)] hover:shadow-lg transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-[#616161]">Active</span>
+</div>
+</div>
+<h4 class="font-bold text-[#2C2C2C] text-lg mb-1">openai/gpt-4o-mini</h4>
+<p class="text-[#616161] text-xs font-mono">Context: 128k • $0.15/1M</p>
+</div>
+<!-- Card 4 -->
+<div class="bg-white rounded-2xl border border-[#E0E0E0] border-l-4 border-l-[#D4A574] p-6 shadow-[0_2px_8px_rgba(44,44,44,0.06)] hover:shadow-lg transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-[#D4A574]"></span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-[#D4A574]">Deprecated</span>
+</div>
+</div>
+<h4 class="font-bold text-[#2C2C2C] text-lg mb-1">openai/gpt-4o-0613</h4>
+<p class="text-[#616161] text-xs font-mono">Legacy support ending in 14 days</p>
+<div class="mt-4 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#F7E9D1] text-[#D4A574]">
+                        Action required
+                    </div>
+</div>
+</div>
+</section>
+<!-- Explore Models Section -->
+<section>
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+<h3 class="text-2xl font-bold tracking-tight text-[#2C2C2C]">Explore models</h3>
+<div class="relative w-full md:w-96">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#BDBDBD]">search</span>
+<input class="w-full bg-[#F9F7F4] border-2 border-[#BDBDBD] rounded-xl py-3 pl-12 pr-4 focus:border-[#D4745E] focus:ring-0 transition-all text-sm outline-none" placeholder="Search model name, provider or task..." type="text"/>
+</div>
+</div>
+<div class="bg-white rounded-2xl border border-[#E0E0E0] overflow-hidden shadow-sm">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-[#F3EFE8] text-[#2C2C2C] text-xs font-bold uppercase tracking-wider">
+<th class="px-6 py-4">Model</th>
+<th class="px-6 py-4">Provider</th>
+<th class="px-6 py-4">Cost/1M Input</th>
+<th class="px-6 py-4">Context Window</th>
+<th class="px-6 py-4">Match %</th>
+</tr>
+</thead>
+<tbody class="text-sm">
+<!-- Row 1 -->
+<tr class="bg-white hover:bg-[#F3EFE8]/30 transition-colors">
+<td class="px-6 py-5 font-bold text-[#2C2C2C]">Llama 3.1 405B</td>
+<td class="px-6 py-5 text-[#616161]">Meta AI</td>
+<td class="px-6 py-5 font-mono">$2.00</td>
+<td class="px-6 py-5 text-[#616161]">128k</td>
+<td class="px-6 py-5">
+<div class="relative w-24 h-6 flex items-center">
+<div class="absolute inset-0 bg-[#D4745E]/20 rounded-full w-[98%]"></div>
+<span class="relative z-10 pl-3 font-bold text-[#D4745E]">98%</span>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="bg-[#F3EFE8] hover:bg-[#F3EFE8]/70 transition-colors">
+<td class="px-6 py-5 font-bold text-[#2C2C2C]">Mistral Large 2</td>
+<td class="px-6 py-5 text-[#616161]">Mistral AI</td>
+<td class="px-6 py-5 font-mono">$4.00</td>
+<td class="px-6 py-5 text-[#616161]">128k</td>
+<td class="px-6 py-5">
+<div class="relative w-24 h-6 flex items-center">
+<div class="absolute inset-0 bg-[#D4745E]/20 rounded-full w-[94%]"></div>
+<span class="relative z-10 pl-3 font-bold text-[#D4745E]">94%</span>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="bg-white hover:bg-[#F3EFE8]/30 transition-colors">
+<td class="px-6 py-5 font-bold text-[#2C2C2C]">Gemini 1.5 Pro</td>
+<td class="px-6 py-5 text-[#616161]">Google DeepMind</td>
+<td class="px-6 py-5 font-mono">$3.50</td>
+<td class="px-6 py-5 text-[#616161]">2M</td>
+<td class="px-6 py-5">
+<div class="relative w-24 h-6 flex items-center">
+<div class="absolute inset-0 bg-[#D4745E]/20 rounded-full w-[89%]"></div>
+<span class="relative z-10 pl-3 font-bold text-[#D4745E]">89%</span>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="bg-[#F3EFE8] hover:bg-[#F3EFE8]/70 transition-colors">
+<td class="px-6 py-5 font-bold text-[#2C2C2C]">Claude 3.5 Haiku</td>
+<td class="px-6 py-5 text-[#616161]">Anthropic</td>
+<td class="px-6 py-5 font-mono">$0.25</td>
+<td class="px-6 py-5 text-[#616161]">200k</td>
+<td class="px-6 py-5">
+<div class="relative w-24 h-6 flex items-center">
+<div class="absolute inset-0 bg-[#D4745E]/20 rounded-full w-[85%]"></div>
+<span class="relative z-10 pl-3 font-bold text-[#D4745E]">85%</span>
+</div>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="bg-white hover:bg-[#F3EFE8]/30 transition-colors">
+<td class="px-6 py-5 font-bold text-[#2C2C2C]">Cohere Command R+</td>
+<td class="px-6 py-5 text-[#616161]">Cohere</td>
+<td class="px-6 py-5 font-mono">$3.00</td>
+<td class="px-6 py-5 text-[#616161]">128k</td>
+<td class="px-6 py-5">
+<div class="relative w-24 h-6 flex items-center">
+<div class="absolute inset-0 bg-[#D4745E]/20 rounded-full w-[81%]"></div>
+<span class="relative z-10 pl-3 font-bold text-[#D4745E]">81%</span>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="p-6 flex justify-center border-t border-[#E0E0E0]">
+<button class="px-6 py-2 rounded-full border-2 border-[#E0E0E0] text-sm font-bold text-[#2C2C2C] hover:bg-[#F3EFE8] transition-all active:scale-95">
+                        Load 12 more models
+                    </button>
+</div>
+</div>
+</section>
+</main>
+<!-- Support FAB for context -->
+<div class="fixed bottom-8 right-8">
+<button class="bg-[#D4745E] text-white p-4 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all">
+<span class="material-symbols-outlined" data-icon="chat_bubble">chat_bubble</span>
+</button>
+</div>
+</body></html>

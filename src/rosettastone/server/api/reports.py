@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from sqlmodel import Session, select
 
+from rosettastone.server.api.utils import _get_migration_or_404
 from rosettastone.server.database import get_session
 from rosettastone.server.models import MigrationRecord, TestCaseRecord
 
@@ -19,14 +20,6 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 # Helper functions
 # ---------------------------------------------------------------------------
-
-
-def _get_migration_or_404(migration_id: int, session: Session) -> MigrationRecord:
-    """Fetch a migration by ID or raise 404."""
-    record = session.get(MigrationRecord, migration_id)
-    if record is None:
-        raise HTTPException(status_code=404, detail="Migration not found")
-    return record
 
 
 def _reconstruct_migration_result(record: MigrationRecord, session: Session):

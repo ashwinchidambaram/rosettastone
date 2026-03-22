@@ -50,7 +50,7 @@
                 <p class="text-[10px] font-mono text-[#D4A574] uppercase tracking-widest mb-1">Recommended Upgrade</p>
                 <p class="font-bold text-on-surface">{{ model.replacement }} (latest)</p>
             </div>
-            <a class="text-[#D4745E] font-bold text-sm inline-flex items-center gap-2 hover:translate-x-1 transition-transform" href="#">Start migration <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
+            <a class="text-[#D4745E] font-bold text-sm inline-flex items-center gap-2 hover:translate-x-1 transition-transform" href="/ui/migrations/new?source={{ model.id }}">Start migration <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
         </div>
         {% else %}
         <!-- Active Card -->
@@ -79,7 +79,7 @@
                     <p class="font-bold text-on-surface">{{ model.provider }}</p>
                 </div>
             </div>
-            <a class="text-[#D4745E] font-bold text-sm inline-flex items-center gap-2 hover:translate-x-1 transition-transform" href="#">Run migration <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
+            <a class="text-[#D4745E] font-bold text-sm inline-flex items-center gap-2 hover:translate-x-1 transition-transform" href="/ui/migrations/new?source={{ model.id }}">Run migration <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
         </div>
         {% endif %}
         {% endfor %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center px-4 py-16">
+    <div class="w-full max-w-md">
+
+        <!-- Logo / branding -->
+        <div class="text-center mb-10">
+            <h1 class="text-3xl font-black text-[#E5E2E1] tracking-tighter mb-2">RosettaStone</h1>
+            <p class="text-sm text-on-surface-variant opacity-70">Enter your API key to continue</p>
+        </div>
+
+        <!-- Card -->
+        <div class="bg-surface-container-low rounded-xl p-8 shadow-2xl shadow-black/40 border border-outline-variant/10">
+
+            {% if error %}
+            <div class="mb-6 bg-error/10 border border-error/30 rounded-xl p-4 flex items-start gap-3">
+                <span class="material-symbols-outlined text-error mt-0.5">error</span>
+                <p class="text-sm text-error">{{ error }}</p>
+            </div>
+            {% endif %}
+
+            <form method="POST" action="/ui/login" class="space-y-6">
+
+                <div>
+                    <label for="api_key" class="block text-xs font-label uppercase tracking-widest text-on-surface-variant mb-2">
+                        API Key
+                    </label>
+                    <input
+                        type="password"
+                        id="api_key"
+                        name="api_key"
+                        required
+                        autofocus
+                        placeholder="••••••••••••••••"
+                        class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-lg px-4 py-3 text-sm text-on-surface placeholder-on-surface-variant/30 focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
+                    >
+                </div>
+
+                <button
+                    type="submit"
+                    class="w-full py-3 bg-[#D4745E] text-white font-bold rounded-lg hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-[#D4745E]/20 flex items-center justify-center gap-2"
+                >
+                    <span class="material-symbols-outlined text-sm">login</span>
+                    Sign In
+                </button>
+
+            </form>
+        </div>
+
+        <!-- Footer note -->
+        <p class="text-center text-xs text-on-surface-variant/40 mt-8 font-label">
+            Set <span class="text-on-surface-variant/60">ROSETTASTONE_API_KEY</span> to enable authentication
+        </p>
+
+    </div>
+</div>
+{% endblock %}

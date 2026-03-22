@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}New Migration{% endblock %}
+
+{% block content %}
+<div class="min-h-screen pb-20 px-8 max-w-3xl mx-auto pt-16">
+
+<!-- Breadcrumb & Header -->
+<div class="mb-12">
+    <a class="flex items-center gap-2 text-[#D4745E] font-medium mb-4 hover:opacity-80 transition-opacity" href="/ui/migrations">
+        <span class="material-symbols-outlined text-sm">arrow_back</span>
+        <span>Migrations</span>
+    </a>
+    <h1 class="text-[28px] font-semibold text-[#E8DCC4] font-headline tracking-tight">New Migration</h1>
+    <p class="text-on-surface-variant text-sm mt-2 opacity-70">Configure and run a model migration with behavioral validation.</p>
+</div>
+
+{% if error %}
+<div class="mb-8 bg-error/10 border border-error/30 rounded-xl p-4 flex items-start gap-3">
+    <span class="material-symbols-outlined text-error mt-0.5">error</span>
+    <p class="text-sm text-error">{{ error }}</p>
+</div>
+{% endif %}
+
+<form method="POST" action="/ui/migrations/new" enctype="multipart/form-data" class="space-y-8">
+    {% if request.state.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}">{% endif %}
+
+    <!-- Model Selection -->
+    <section class="bg-surface-container-low rounded-xl p-6 space-y-6">
+        <h2 class="text-lg font-bold text-on-surface/90 font-headline">Model Configuration</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="source_model" class="block text-xs font-label uppercase tracking-widest text-on-surface-variant mb-2">Source Model</label>
+                <input type="text" id="source_model" name="source_model" required
+                    value="{{ source_model|default('') }}"
+                    placeholder="e.g. openai/gpt-4o"
+                    class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-lg px-4 py-3 text-sm text-on-surface placeholder-on-surface-variant/40 focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all">
+            </div>
+            <div>
+                <label for="target_model" class="block text-xs font-label uppercase tracking-widest text-on-surface-variant mb-2">Target Model</label>
+                <input type="text" id="target_model" name="target_model" required
+                    value="{{ target_model|default('') }}"
+                    placeholder="e.g. anthropic/claude-sonnet-4"
+                    class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-lg px-4 py-3 text-sm text-on-surface placeholder-on-surface-variant/40 focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all">
+            </div>
+        </div>
+    </section>
+
+    <!-- Data Upload -->
+    <section class="bg-surface-container-low rounded-xl p-6 space-y-6">
+        <h2 class="text-lg font-bold text-on-surface/90 font-headline">Training Data</h2>
+
+        <div>
+            <label for="data_file" class="block text-xs font-label uppercase tracking-widest text-on-surface-variant mb-2">JSONL File</label>
+            <input type="file" id="data_file" name="data_file" accept=".jsonl,.json" required
+                class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-lg px-4 py-3 text-sm text-on-surface file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#D4745E] file:text-white hover:file:opacity-90 transition-all">
+            <p class="text-xs text-on-surface-variant/50 mt-2">Upload a JSONL file with prompt/response pairs. Max 50MB.</p>
+        </div>
+    </section>
+
+    <!-- Options -->
+    <section class="bg-surface-container-low rounded-xl p-6 space-y-6">
+        <h2 class="text-lg font-bold text-on-surface/90 font-headline">Options</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="gepa_auto" class="block text-xs font-label uppercase tracking-widest text-on-surface-variant mb-2">GEPA Intensity</label>
+                <select id="gepa_auto" name="gepa_auto"
+                    class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-lg px-4 py-3 text-sm text-on-surface focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all">
+                    <option value="light" selected>Light (fast, fewer iterations)</option>
+                    <option value="medium">Medium (balanced)</option>
+                    <option value="heavy">Heavy (thorough, slower)</option>
+                </select>
+            </div>
+            <div class="flex flex-col justify-end gap-4">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" name="dry_run" value="true"
+                        class="w-4 h-4 rounded border-outline-variant/30 text-[#D4745E] focus:ring-[#D4745E]/50">
+                    <span class="text-sm text-on-surface">Dry run (preflight only)</span>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" name="store_prompt_content" value="true"
+                        class="w-4 h-4 rounded border-outline-variant/30 text-[#D4745E] focus:ring-[#D4745E]/50">
+                    <span class="text-sm text-on-surface">Store prompt content (enables diff view)</span>
+                </label>
+            </div>
+        </div>
+    </section>
+
+    <!-- Advanced Settings (collapsed) -->
+    <section>
+        <button type="button" class="w-full flex items-center justify-between p-4 bg-surface-container-low hover:bg-surface-container-high rounded-xl transition-all group"
+                data-action="toggle-collapse" data-target="advanced-settings" aria-expanded="false">
+            <span class="font-bold text-sm text-on-surface/80">Advanced settings</span>
+            <span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform collapse-chevron">chevron_right</span>
+        </button>
+        <div id="advanced-settings" class="collapsible-content">
+            <div class="p-6 bg-surface-container-low rounded-b-xl mt-1 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="reflection_model" class="block text-xs font-label uppercase tracking-widest text-on-surface-variant mb-2">Reflection Model</label>
+                        <input type="text" id="reflection_model" name="reflection_model"
+                            value="openai/gpt-4o"
+                            class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-lg px-4 py-3 text-sm text-on-surface focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all">
+                    </div>
+                    <div>
+                        <label for="judge_model" class="block text-xs font-label uppercase tracking-widest text-on-surface-variant mb-2">Judge Model</label>
+                        <input type="text" id="judge_model" name="judge_model"
+                            value="openai/gpt-4o"
+                            class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-lg px-4 py-3 text-sm text-on-surface focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Submit -->
+    <div class="flex justify-end gap-4 pt-4">
+        <a href="/ui/migrations" class="px-6 py-2.5 border border-outline/30 text-on-surface font-medium rounded-lg hover:bg-surface-container-high transition-all">
+            Cancel
+        </a>
+        <button type="submit" class="px-8 py-2.5 bg-[#D4745E] text-white font-bold rounded-lg hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-[#D4745E]/20 flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm">rocket_launch</span>
+            Start Migration
+        </button>
+    </div>
+
+</form>
+
+</div>
+{% endblock %}

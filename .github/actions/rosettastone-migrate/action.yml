@@ -1,0 +1,48 @@
+name: 'RosettaStone Migrate'
+description: 'Run an LLM model migration and report results in GitHub Step Summary'
+inputs:
+  source_model:
+    description: 'Source model identifier (e.g. openai/gpt-4o)'
+    required: true
+  target_model:
+    description: 'Target model identifier (e.g. anthropic/claude-sonnet-4)'
+    required: true
+  data_path:
+    description: 'Path to JSONL data file'
+    required: true
+  gepa_auto:
+    description: 'GEPA optimization intensity: light/medium/heavy'
+    required: false
+    default: 'light'
+  fail_on_nogo:
+    description: 'Exit with code 1 if recommendation is NO_GO'
+    required: false
+    default: 'true'
+  python_version:
+    description: 'Python version to use'
+    required: false
+    default: '3.11'
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python_version }}
+
+    - name: Install uv and dependencies
+      shell: bash
+      run: |
+        pip install uv
+        uv sync --dev --all-extras
+
+    - name: Run migration
+      shell: bash
+      env:
+        RS_SOURCE_MODEL: ${{ inputs.source_model }}
+        RS_TARGET_MODEL: ${{ inputs.target_model }}
+        RS_DATA_PATH: ${{ inputs.data_path }}
+        RS_GEPA_AUTO: ${{ inputs.gepa_auto }}
+        RS_FAIL_ON_NOGO: ${{ inputs.fail_on_nogo }}
+      run: |
+        uv run python ${{ github.action_path }}/run.py

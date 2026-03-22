@@ -38,6 +38,16 @@ class MigrationRecord(SQLModel, table=True):
     recommendation: str | None = None  # GO / NO_GO / CONDITIONAL
     recommendation_reasoning: str | None = None
 
+    # Latency metrics (p50/p95 in seconds, sampled after migration completes)
+    source_latency_p50: float | None = None
+    source_latency_p95: float | None = None
+    target_latency_p50: float | None = None
+    target_latency_p95: float | None = None
+
+    # Cost projection (per-call cost in USD)
+    projected_source_cost_per_call: float | None = None
+    projected_target_cost_per_call: float | None = None
+
     config_json: str = "{}"  # serialized MigrationConfig
     per_type_scores_json: str = "{}"  # serialized TypeStats dict
     warnings_json: str = "[]"  # serialized warnings list
