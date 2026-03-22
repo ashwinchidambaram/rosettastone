@@ -1,0 +1,11 @@
+version: 1
+defaults:
+  gepa_auto: "light"
+  reflection_model: "gemini/gemini-2.0-flash"
+  judge_model: "gemini/gemini-2.0-flash"
+
+migrations:
+  - name: smoke-openai-to-gemini
+    source_model: openai/gpt-4o-mini
+    target_model: gemini/gemini-2.0-flash
+    data_path: ./e2e_output/smoke_data.jsonl

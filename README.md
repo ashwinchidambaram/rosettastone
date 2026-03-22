@@ -61,6 +61,7 @@ pip install rosettastone
 pip install "rosettastone[eval]"   # adds BERTScore & sentence-transformers
 pip install "rosettastone[web]"    # adds FastAPI web dashboard
 pip install "rosettastone[all]"    # includes everything (redis, eval, web, etc.)
+pip install "rosettastone[e2e]"    # E2E testing dependencies (eval + redis + web)
 ```
 
 ### Configuration
@@ -312,6 +313,8 @@ src/rosettastone/
 ├── report/               Jinja2 markdown report generation (10-section template)
 ├── server/               Web UI — FastAPI + Jinja2 + HTMX + Tailwind
 │                         SQLite persistence, JSON API, template rendering
+├── testing/              E2E test harness — synthetic data generation,
+│                         Redis population, scenario configs
 └── utils/                Logging (never logs prompt content), LiteLLM helpers
 ```
 
@@ -383,7 +386,7 @@ uvicorn rosettastone.server.app:create_app --factory --port 8000
 |:---:|:---|:---:|
 | **1** | CLI + Python library, JSONL ingestion, GEPA optimization, multi-strategy evaluation, markdown reports | ✅ Complete |
 | **2** | Redis ingestion, LLM-as-judge evaluation, MIPROv2 optimizer, PII detection, prompt auditing, decision engine (GO/NO_GO), Rich CLI, per-output-type statistics | ✅ Complete |
-| **3** | Web UI (FastAPI + HTMX + Tailwind), side-by-side diffs, executive reports, decision-first dashboard | 🚧 In Progress |
+| **3** | Web UI (FastAPI + HTMX + Tailwind), side-by-side diffs, executive reports, decision-first dashboard | ✅ Complete |
 | **4** | LangSmith / Braintrust / OpenTelemetry adapters, CI/CD integration | ⏳ Planned |
 | **5** | Multi-step pipeline migration, A/B testing, versioning, enterprise features | ⏳ Planned |
 
@@ -425,11 +428,39 @@ git clone https://github.com/ashwinchidambaram/rosettastone.git
 cd rosettastone
 uv sync --dev --all-extras
 
-uv run pytest tests/ -v          # run tests (585 tests)
-uv run ruff check src/ tests/    # lint
-uv run ruff format src/ tests/   # format
-uv run mypy src/rosettastone/    # type check
+uv run pytest tests/ -v                      # run all unit tests (938 tests)
+uv run pytest tests/ -k "not playwright and not e2e"  # skip browser & E2E tests
+uv run ruff check src/ tests/                # lint
+uv run ruff format src/ tests/               # format
+uv run mypy src/rosettastone/                # type check
 ```
+
+### E2E Testing
+
+End-to-end tests exercise the full migration pipeline with real LLM API calls and Redis. They require API keys for OpenAI, Anthropic, and Google, plus a running Redis instance.
+
+```bash
+# smoke test only (~$0.21, ~2 min)
+ROSETTASTONE_E2E_REDIS_URL=redis://localhost:6379/15 \
+  uv run pytest tests/test_e2e/test_smoke.py -m e2e -v
+
+# full suite — 7 scenarios across cross-provider, upgrade, and downgrade (~$14, ~30 min)
+ROSETTASTONE_E2E_REDIS_URL=redis://localhost:6379/15 \
+  uv run pytest tests/test_e2e/ -m e2e -v
+
+# run via batch CLI
+uv run rosettastone batch --manifest e2e_manifests/smoke.yaml --output ./e2e_output
+```
+
+**Scenarios:**
+
+| Category | Scenarios | Expected |
+|:---|:---|:---|
+| Cross-provider | `gpt-4o-mini` → `claude-3-5-haiku`, `gpt-4o-mini` → `gemini-2.0-flash`, `gemini-2.0-flash` → `claude-3-5-haiku` | GO or CONDITIONAL |
+| Model upgrade | `gpt-4o-mini` → `gpt-4o`, `claude-3-5-haiku` → `claude-sonnet-4` | High confidence GO |
+| Model downgrade | `gpt-4o` → `gpt-4o-mini`, `claude-sonnet-4` → `claude-3-5-haiku` | CONDITIONAL or NO_GO |
+
+Synthetic test data covers 6 domains (JSON extraction, classification, short Q&A, long explanation, code generation, rewriting) with 44 prompt/response pairs generated from the source model.
 
 ---
 

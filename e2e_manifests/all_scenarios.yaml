@@ -1,0 +1,44 @@
+version: 1
+defaults:
+  gepa_auto: "light"
+  reflection_model: "gemini/gemini-2.0-flash"
+  judge_model: "gemini/gemini-2.0-flash"
+
+migrations:
+  # Category A: Cross-Provider
+  - name: A1-openai-to-anthropic
+    source_model: openai/gpt-4o-mini
+    target_model: anthropic/claude-3-5-haiku-20241022
+    data_path: ./e2e_output/openai_gpt-4o-mini_data.jsonl
+
+  - name: A2-openai-to-gemini
+    source_model: openai/gpt-4o-mini
+    target_model: gemini/gemini-2.0-flash
+    data_path: ./e2e_output/openai_gpt-4o-mini_data.jsonl
+
+  - name: A3-gemini-to-anthropic
+    source_model: gemini/gemini-2.0-flash
+    target_model: anthropic/claude-3-5-haiku-20241022
+    data_path: ./e2e_output/gemini_gemini-2.0-flash_data.jsonl
+
+  # Category B: Model Upgrade
+  - name: B1-gpt4o-mini-to-gpt4o
+    source_model: openai/gpt-4o-mini
+    target_model: openai/gpt-4o
+    data_path: ./e2e_output/openai_gpt-4o-mini_data.jsonl
+
+  - name: B2-haiku-to-sonnet
+    source_model: anthropic/claude-3-5-haiku-20241022
+    target_model: anthropic/claude-sonnet-4
+    data_path: ./e2e_output/anthropic_claude-3-5-haiku_data.jsonl
+
+  # Category C: Model Downgrade
+  - name: C1-gpt4o-to-mini
+    source_model: openai/gpt-4o
+    target_model: openai/gpt-4o-mini
+    data_path: ./e2e_output/openai_gpt-4o_data.jsonl
+
+  - name: C2-sonnet-to-haiku
+    source_model: anthropic/claude-sonnet-4
+    target_model: anthropic/claude-3-5-haiku-20241022
+    data_path: ./e2e_output/anthropic_claude-sonnet-4_data.jsonl

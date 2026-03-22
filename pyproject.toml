@@ -13,6 +13,7 @@ dependencies = [
     "typer>=0.12",
     "jinja2>=3.1",
     "rich>=13.0",
+    "python-multipart>=0.0.22",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +32,9 @@ web = [
     "httpx>=0.27",
 ]
 all = [
+    "rosettastone[eval,redis,web]",
+]
+e2e = [
     "rosettastone[eval,redis,web]",
 ]
 dev = [
@@ -66,6 +70,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
     "playwright: marks tests as Playwright end-to-end UI tests (deselect with '-m not playwright')",
+    "e2e: end-to-end tests requiring real APIs and Redis (deselect with '-m not e2e')",
 ]
 
 [tool.mypy]
