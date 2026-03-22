@@ -86,3 +86,19 @@ class WarningRecord(SQLModel, table=True):
     message: str
 
     migration: Optional["MigrationRecord"] = Relationship(back_populates="warning_records")
+
+
+class Alert(SQLModel, table=True):
+    __tablename__ = "alerts"
+
+    id: int | None = Field(default=None, primary_key=True)
+    alert_type: str  # "deprecation" | "price_change" | "new_model" | "migration_complete" | "migration_failed"  # noqa: E501
+    model_id: str | None = None  # related model identifier
+    migration_id: int | None = Field(default=None, foreign_key="migrations.id")
+    title: str  # short title
+    message: str  # detail message
+    action: str | None = None  # suggested action
+    severity: str = Field(default="info")  # "critical" | "warning" | "info"
+    is_read: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    metadata_json: str = Field(default="{}")  # extra data (dates, prices, etc.)

@@ -263,8 +263,10 @@ class TestUIEndpoints:
         assert "$1,247" in body
         assert "$312" in body
 
-    def test_alerts_page(self, ui_client: TestClient) -> None:
-        resp = ui_client.get("/ui/alerts")
+    def test_alerts_page(self, client: TestClient) -> None:
+        # /ui/alerts now requires a DB session; use the in-memory client.
+        # With no migrations in the DB it falls back to DUMMY_ALERTS.
+        resp = client.get("/ui/alerts")
         assert resp.status_code == 200
         body = resp.text
         assert "Alerts" in body

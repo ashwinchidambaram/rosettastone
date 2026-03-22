@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
     # Register API routes
+    from rosettastone.server.api.alerts import router as alerts_router
     from rosettastone.server.api.comparisons import router as comparisons_router
     from rosettastone.server.api.costs import router as costs_router
     from rosettastone.server.api.migrations import router as migrations_router
@@ -55,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(reports_router)
     app.include_router(models_router)
     app.include_router(costs_router)
+    app.include_router(alerts_router)
 
     @app.get("/api/v1/health")
     async def health() -> dict[str, str]:

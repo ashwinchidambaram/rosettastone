@@ -852,11 +852,26 @@ async def costs_page(request: Request, session: Session = Depends(get_session)) 
 
 
 @router.get("/ui/alerts", response_class=HTMLResponse)
-async def alerts_page(request: Request) -> HTMLResponse:
+async def alerts_page(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
     """Alerts hub page."""
+    from rosettastone.server.api.alerts import _alert_to_template_dict, _generate_alerts
+    from rosettastone.server.models import Alert
+
+    # Auto-generate alerts from current data (idempotent)
+    _generate_alerts(session)
+
+    # Fetch all alerts newest first
+    stmt = select(Alert).order_by(Alert.created_at.desc()).limit(50)  # type: ignore[union-attr]
+    records = list(session.exec(stmt).all())
+
+    if records:
+        alerts = [_alert_to_template_dict(a) for a in records]
+    else:
+        alerts = DUMMY_ALERTS  # fallback when DB is empty
+
     return templates.TemplateResponse(
         "alerts.html",
-        {"request": request, "alerts": DUMMY_ALERTS, "active_nav": "alerts"},
+        {"request": request, "alerts": alerts, "active_nav": "alerts"},
     )
 
 
