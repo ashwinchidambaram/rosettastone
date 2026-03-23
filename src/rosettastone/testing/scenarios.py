@@ -18,72 +18,72 @@ class ScenarioConfig:
     pair_count: int = 44
 
 
-# --- Category A: Cross-Provider ---
+# --- Category A: Cross-Provider (Anthropic ↔ Gemini) ---
 
-A1_OPENAI_TO_ANTHROPIC = ScenarioConfig(
-    name="openai-to-anthropic",
-    source_model="openai/gpt-4o-mini",
-    target_model="anthropic/claude-3-5-haiku-20241022",
-    category="cross_provider",
-    expected_recommendations=["GO", "CONDITIONAL"],
-    expected_min_confidence=0.3,
-)
-
-A2_OPENAI_TO_GEMINI = ScenarioConfig(
-    name="openai-to-gemini",
-    source_model="openai/gpt-4o-mini",
+A1_HAIKU_TO_GEMINI = ScenarioConfig(
+    name="haiku-to-gemini",
+    source_model="anthropic/claude-haiku-4-5-20251001",
     target_model="gemini/gemini-2.0-flash",
     category="cross_provider",
     expected_recommendations=["GO", "CONDITIONAL"],
     expected_min_confidence=0.3,
 )
 
-A3_GEMINI_TO_ANTHROPIC = ScenarioConfig(
-    name="gemini-to-anthropic",
+A2_GEMINI_TO_HAIKU = ScenarioConfig(
+    name="gemini-to-haiku",
     source_model="gemini/gemini-2.0-flash",
-    target_model="anthropic/claude-3-5-haiku-20241022",
+    target_model="anthropic/claude-haiku-4-5-20251001",
+    category="cross_provider",
+    expected_recommendations=["GO", "CONDITIONAL"],
+    expected_min_confidence=0.3,
+)
+
+A3_GEMINI_TO_SONNET = ScenarioConfig(
+    name="gemini-to-sonnet",
+    source_model="gemini/gemini-2.0-flash",
+    target_model="anthropic/claude-sonnet-4",
     category="cross_provider",
     expected_recommendations=["GO", "CONDITIONAL"],
     expected_min_confidence=0.3,
 )
 
 
-# --- Category B: Model Upgrade ---
+# --- Category B: Model Upgrade (same provider) ---
 
-B1_GPT4O_MINI_TO_GPT4O = ScenarioConfig(
-    name="gpt4o-mini-to-gpt4o",
-    source_model="openai/gpt-4o-mini",
-    target_model="openai/gpt-4o",
-    category="upgrade",
-    expected_recommendations=["GO", "CONDITIONAL"],
-    expected_min_confidence=0.5,
-)
-
-B2_HAIKU_TO_SONNET = ScenarioConfig(
+B1_HAIKU_TO_SONNET = ScenarioConfig(
     name="haiku-to-sonnet",
-    source_model="anthropic/claude-3-5-haiku-20241022",
+    source_model="anthropic/claude-haiku-4-5-20251001",
     target_model="anthropic/claude-sonnet-4",
     category="upgrade",
     expected_recommendations=["GO", "CONDITIONAL"],
     expected_min_confidence=0.5,
 )
 
+B2_FLASH_TO_PRO = ScenarioConfig(
+    name="flash-to-pro",
+    source_model="gemini/gemini-2.0-flash",
+    target_model="gemini/gemini-1.5-pro",
+    category="upgrade",
+    expected_recommendations=["GO", "CONDITIONAL"],
+    expected_min_confidence=0.5,
+)
 
-# --- Category C: Model Downgrade ---
 
-C1_GPT4O_TO_MINI = ScenarioConfig(
-    name="gpt4o-to-mini",
-    source_model="openai/gpt-4o",
-    target_model="openai/gpt-4o-mini",
+# --- Category C: Model Downgrade (same provider) ---
+
+C1_SONNET_TO_HAIKU = ScenarioConfig(
+    name="sonnet-to-haiku",
+    source_model="anthropic/claude-sonnet-4",
+    target_model="anthropic/claude-haiku-4-5-20251001",
     category="downgrade",
     expected_recommendations=["GO", "CONDITIONAL", "NO_GO"],
     expected_min_confidence=0.0,
 )
 
-C2_SONNET_TO_HAIKU = ScenarioConfig(
-    name="sonnet-to-haiku",
-    source_model="anthropic/claude-sonnet-4",
-    target_model="anthropic/claude-3-5-haiku-20241022",
+C2_PRO_TO_FLASH = ScenarioConfig(
+    name="pro-to-flash",
+    source_model="gemini/gemini-1.5-pro",
+    target_model="gemini/gemini-2.0-flash",
     category="downgrade",
     expected_recommendations=["GO", "CONDITIONAL", "NO_GO"],
     expected_min_confidence=0.0,
@@ -93,24 +93,24 @@ C2_SONNET_TO_HAIKU = ScenarioConfig(
 # --- Grouped lists ---
 
 CROSS_PROVIDER_SCENARIOS: list[ScenarioConfig] = [
-    A1_OPENAI_TO_ANTHROPIC,
-    A2_OPENAI_TO_GEMINI,
-    A3_GEMINI_TO_ANTHROPIC,
+    A1_HAIKU_TO_GEMINI,
+    A2_GEMINI_TO_HAIKU,
+    A3_GEMINI_TO_SONNET,
 ]
 
 UPGRADE_SCENARIOS: list[ScenarioConfig] = [
-    B1_GPT4O_MINI_TO_GPT4O,
-    B2_HAIKU_TO_SONNET,
+    B1_HAIKU_TO_SONNET,
+    B2_FLASH_TO_PRO,
 ]
 
 DOWNGRADE_SCENARIOS: list[ScenarioConfig] = [
-    C1_GPT4O_TO_MINI,
-    C2_SONNET_TO_HAIKU,
+    C1_SONNET_TO_HAIKU,
+    C2_PRO_TO_FLASH,
 ]
 
 ALL_SCENARIOS: list[ScenarioConfig] = (
     CROSS_PROVIDER_SCENARIOS + UPGRADE_SCENARIOS + DOWNGRADE_SCENARIOS
 )
 
-# Cheapest scenario for quick smoke tests (~$0.21)
-SMOKE_SCENARIO: ScenarioConfig = A2_OPENAI_TO_GEMINI
+# Cheapest scenario for quick smoke tests — gemini source (cheapest data gen) + haiku target
+SMOKE_SCENARIO: ScenarioConfig = A2_GEMINI_TO_HAIKU
