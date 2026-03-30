@@ -136,11 +136,17 @@ def create_app() -> FastAPI:
         # HTML for /ui/ routes
         if exc.status_code == 404:
             return templates.TemplateResponse(
-                request, "404.html", {"active_nav": ""}, status_code=404,
+                request,
+                "404.html",
+                {"active_nav": ""},
+                status_code=404,
             )
         if exc.status_code >= 500:
             return templates.TemplateResponse(
-                request, "500.html", {"active_nav": ""}, status_code=exc.status_code,
+                request,
+                "500.html",
+                {"active_nav": ""},
+                status_code=exc.status_code,
             )
         # Fallback for other status codes
         return JSONResponse(
@@ -156,17 +162,22 @@ def create_app() -> FastAPI:
                 content={"detail": "Internal server error"},
             )
         return templates.TemplateResponse(
-            request, "500.html", {"active_nav": ""}, status_code=500,
+            request,
+            "500.html",
+            {"active_nav": ""},
+            status_code=500,
         )
 
     # Register API routes
     from rosettastone.server.api.alerts import router as alerts_router
+    from rosettastone.server.api.audit import router as audit_router
     from rosettastone.server.api.auth import router as auth_router
     from rosettastone.server.api.comparisons import router as comparisons_router
     from rosettastone.server.api.costs import router as costs_router
     from rosettastone.server.api.migrations import router as migrations_router
     from rosettastone.server.api.models import router as models_router
     from rosettastone.server.api.reports import router as reports_router
+    from rosettastone.server.api.versioning import router as versioning_router
 
     app.include_router(migrations_router)
     app.include_router(comparisons_router)
@@ -175,6 +186,8 @@ def create_app() -> FastAPI:
     app.include_router(costs_router)
     app.include_router(alerts_router)
     app.include_router(auth_router)
+    app.include_router(versioning_router)
+    app.include_router(audit_router)
 
     @app.get("/api/v1/health")
     async def health() -> dict[str, str]:
