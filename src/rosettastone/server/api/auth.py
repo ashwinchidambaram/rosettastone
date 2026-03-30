@@ -298,7 +298,7 @@ async def auth_register(request: Request):
         session.refresh(new_user)
 
         return UserMe(
-            id=new_user.id,
+            id=new_user.id or 0,
             username=new_user.username,
             email=new_user.email,
             role=new_user.role,
