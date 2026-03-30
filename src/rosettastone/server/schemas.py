@@ -156,3 +156,63 @@ class AuditLogEntry(BaseModel):
     user_id: int | None
     details: dict[str, object]
     created_at: datetime
+
+
+class ABTestCreate(BaseModel):
+    migration_id: int
+    version_a_id: int
+    version_b_id: int
+    name: str = ""
+    traffic_split: float = 0.5
+
+
+class ABTestSummary(BaseModel):
+    id: int
+    migration_id: int
+    name: str
+    status: str
+    traffic_split: float
+    winner: str | None
+    created_at: datetime
+
+
+class ABTestMetrics(BaseModel):
+    total_results: int
+    wins_a: int
+    wins_b: int
+    ties: int
+    win_rate_a: float
+    win_rate_b: float
+    mean_score_a: float
+    mean_score_b: float
+    chi2: float | None = None
+    p_value: float | None = None
+    significant: bool | None = None
+    mean_diff: float | None = None
+    ci_lower: float | None = None
+    ci_upper: float | None = None
+
+
+class ABTestDetail(BaseModel):
+    id: int
+    migration_id: int
+    version_a_id: int
+    version_b_id: int
+    name: str
+    status: str
+    traffic_split: float
+    start_time: datetime | None
+    end_time: datetime | None
+    winner: str | None
+    created_at: datetime
+    metrics: ABTestMetrics | None = None
+
+
+class ABTestResultEntry(BaseModel):
+    id: int
+    test_case_id: int | None
+    assigned_version: str
+    score_a: float | None
+    score_b: float | None
+    winner: str | None
+    created_at: datetime
