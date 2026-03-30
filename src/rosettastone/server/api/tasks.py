@@ -10,6 +10,8 @@ from pathlib import Path
 
 from sqlmodel import Session
 
+from rosettastone.server.api.audit import log_audit
+from rosettastone.server.api.versioning import create_version
 from rosettastone.server.database import get_engine
 from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningRecord
 
@@ -208,9 +210,7 @@ def run_migration_background(
 
                     if store_content:
                         prompt = eval_result.prompt_pair.prompt
-                        tc.prompt_text = (
-                            prompt if isinstance(prompt, str) else json.dumps(prompt)
-                        )
+                        tc.prompt_text = prompt if isinstance(prompt, str) else json.dumps(prompt)
                         tc.response_text = eval_result.prompt_pair.response
                         tc.new_response_text = eval_result.new_response
 
@@ -244,12 +244,22 @@ def run_migration_background(
                 session.add(w)
 
             session.add(record)
+
+            # Auto-version and audit log (atomic with the migration record update)
+            if not is_dry_run:
+                try:
+                    create_version(migration_id, session)
+                    log_audit(session, "migration", migration_id, "complete")
+                except Exception as ver_err:
+                    logger.warning("Failed to create version/audit: %s", ver_err)
+
             session.commit()
 
     except Exception as exc:
         # Import here to avoid circular import issues in test environments
         try:
             from rosettastone.core.migrator import MigrationBlockedError
+
             is_blocked = isinstance(exc, MigrationBlockedError)
         except ImportError:
             is_blocked = False
@@ -262,9 +272,11 @@ def run_migration_background(
                 if is_blocked:
                     record.status = "blocked"
                     record.recommendation_reasoning = str(exc)
+                    log_audit(session, "migration", migration_id, "blocked")
                 else:
                     record.status = "failed"
                     record.recommendation_reasoning = f"Migration failed: {exc}"
+                    log_audit(session, "migration", migration_id, "failed")
                 session.add(record)
                 session.commit()
         except Exception as commit_err:
