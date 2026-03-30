@@ -73,7 +73,7 @@ class TestTeacherStudentOptimizer:
         mock_lm = MagicMock()
         mock_lm.return_value = "4"
 
-        with patch("dspy.LM", return_value=mock_lm) as mock_lm_cls:
+        with patch("dspy.LM", return_value=mock_lm):
             mock_predict_result = MagicMock()
             mock_predict_result.completions = MagicMock()
             # dspy.LM.__call__ returns a list of strings
