@@ -316,3 +316,56 @@ class UserUpdate(BaseModel):
     password: str | None = None
     email: str | None = None
     is_active: bool | None = None
+
+
+# ---------------------------------------------------------------------------
+# Task 5.5.7 — Annotation schemas
+# ---------------------------------------------------------------------------
+
+
+class AnnotationCreate(BaseModel):
+    migration_id: int
+    test_case_id: int | None = None
+    annotation_type: str
+    text: str
+
+
+class AnnotationSummary(BaseModel):
+    id: int
+    migration_id: int
+    test_case_id: int | None
+    annotator_id: int | None
+    annotation_type: str
+    text: str
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Task 5.5.8 — Approval workflow schemas
+# ---------------------------------------------------------------------------
+
+
+class ApprovalWorkflowCreate(BaseModel):
+    required_approvals: int = 1
+
+
+class ApprovalWorkflowSummary(BaseModel):
+    id: int
+    migration_id: int
+    required_approvals: int
+    status: str
+    current_approvals: int
+
+
+class ApprovalCreate(BaseModel):
+    decision: str  # "approve" / "reject"
+    comment: str | None = None
+
+
+class ApprovalSummary(BaseModel):
+    id: int
+    workflow_id: int
+    user_id: int | None
+    decision: str
+    comment: str | None
+    created_at: datetime
