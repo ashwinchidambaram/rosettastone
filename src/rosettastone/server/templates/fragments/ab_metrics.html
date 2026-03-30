@@ -1,0 +1,48 @@
+{% if metrics and metrics.total_results > 0 %}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+  <div class="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+    <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Results</div>
+    <div class="text-xl font-bold">{{ metrics.total_results }}</div>
+  </div>
+  <div class="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+    <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Win Rate A</div>
+    <div class="text-xl font-bold text-blue-600 dark:text-blue-400">{{ '%.1f' | format(metrics.win_rate_a * 100) }}%</div>
+  </div>
+  <div class="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+    <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Win Rate B</div>
+    <div class="text-xl font-bold text-purple-600 dark:text-purple-400">{{ '%.1f' | format(metrics.win_rate_b * 100) }}%</div>
+  </div>
+  <div class="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+    <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Significance</div>
+    <div class="text-xl font-bold">
+      {% if metrics.p_value is not none %}
+        <span class="px-2 py-0.5 rounded text-sm
+          {% if metrics.significant %}bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400
+          {% elif metrics.p_value < 0.1 %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400
+          {% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300{% endif %}">
+          p={{ '%.4f' | format(metrics.p_value) }}
+        </span>
+      {% else %}
+        —
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Win rate comparison bar -->
+<div class="mt-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+  <div class="text-sm font-medium mb-2">Win Rate Comparison</div>
+  <div class="flex h-6 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
+    {% set pct_a = (metrics.win_rate_a * 100) %}
+    {% set pct_b = (metrics.win_rate_b * 100) %}
+    <div class="bg-blue-500 h-full" style="width: {{ pct_a }}%"></div>
+    <div class="bg-purple-500 h-full" style="width: {{ pct_b }}%"></div>
+  </div>
+  <div class="flex justify-between mt-1 text-xs text-gray-500">
+    <span>A: {{ '%.1f' | format(pct_a) }}%</span>
+    <span>B: {{ '%.1f' | format(pct_b) }}%</span>
+  </div>
+</div>
+{% else %}
+<p class="text-sm text-gray-500 dark:text-gray-400">No results yet.</p>
+{% endif %}

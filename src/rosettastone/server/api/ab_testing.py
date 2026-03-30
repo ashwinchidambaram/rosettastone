@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
 from sqlmodel import Session, func, select
 
 from rosettastone.decision.ab_stats import compute_ab_significance
@@ -352,3 +353,58 @@ def conclude_ab_test(
     session.refresh(ab_test)
 
     return _ab_test_to_detail(ab_test)
+
+
+# ---------------------------------------------------------------------------
+# UI routes
+# ---------------------------------------------------------------------------
+
+
+@router.get("/ui/ab-tests", response_class=HTMLResponse)
+async def ab_tests_page(
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    """List all A/B tests."""
+    stmt = select(ABTest).order_by(ABTest.created_at.desc()).limit(100)  # type: ignore[arg-type]
+    ab_tests = list(session.exec(stmt).all())
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "ab_tests.html",
+        {"active_nav": "ab_tests", "ab_tests": ab_tests},
+    )
+
+
+@router.get("/ui/ab-tests/{ab_test_id}", response_class=HTMLResponse)
+async def ab_test_detail_page(
+    ab_test_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    """A/B test detail page."""
+    ab_test = session.get(ABTest, ab_test_id)
+    if not ab_test:
+        raise HTTPException(status_code=404, detail="A/B test not found")
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "ab_test_detail.html",
+        {"active_nav": "ab_tests", "ab_test": ab_test},
+    )
+
+
+@router.get("/ui/ab-tests/{ab_test_id}/metrics-fragment", response_class=HTMLResponse)
+async def ab_test_metrics_fragment(
+    ab_test_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    """HTMX fragment: live A/B test metrics."""
+    metrics = _build_metrics(ab_test_id, session)
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "fragments/ab_metrics.html",
+        {"metrics": metrics},
+    )
