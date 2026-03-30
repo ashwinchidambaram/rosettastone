@@ -1,0 +1,39 @@
+# Version control
+.git
+
+# Virtual environments
+.venv
+
+# Python caches
+__pycache__
+.mypy_cache
+.ruff_cache
+.pytest_cache
+*.pyc
+*.pyo
+*.egg-info
+
+# Tests and documentation
+tests/
+docs/
+
+# Environment variables
+.env
+.env.*
+
+# Application output
+migration_output/
+batch_output/
+
+# Developer tools
+.claude/
+claude_agents/
+
+# OS files
+.DS_Store
+
+# Redis
+dump.rdb
+
+# Node.js (if used)
+node_modules/
