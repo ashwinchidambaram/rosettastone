@@ -71,6 +71,7 @@ def _pipeline_to_detail(
 @router.post("/api/v1/pipelines/migrate", response_model=PipelineSummary, status_code=201)
 def create_pipeline(
     body: PipelineCreate,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> PipelineSummary:
     """Submit a YAML pipeline config to create a new PipelineRecord.
@@ -109,6 +110,12 @@ def create_pipeline(
     session.add(pipeline)
     session.commit()
     session.refresh(pipeline)
+
+    # Submit to background executor
+    from rosettastone.server.pipeline_runner import run_pipeline_background
+
+    executor = request.app.state.executor
+    executor.submit(run_pipeline_background, pipeline.id)
 
     return _pipeline_to_summary(pipeline)
 
