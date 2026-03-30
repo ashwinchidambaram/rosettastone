@@ -244,3 +244,35 @@ class PipelineSummary(BaseModel):
 class PipelineDetail(PipelineSummary):
     stages: list[PipelineStageSummary]
     config_yaml: str
+
+
+# ---------------------------------------------------------------------------
+# Task 5.5.3c — Multi-user auth schemas
+# ---------------------------------------------------------------------------
+
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class UserRegister(BaseModel):
+    username: str
+    password: str
+    email: str | None = None
+    role: str = "viewer"  # Default role for new users
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: int
+    role: str
+
+
+class UserMe(BaseModel):
+    id: int
+    username: str
+    email: str | None
+    role: str
+    is_active: bool

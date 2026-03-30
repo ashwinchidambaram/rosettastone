@@ -10,6 +10,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from sqlmodel import func, select
 from starlette.middleware.base import BaseHTTPMiddleware
 
 router = APIRouter()
@@ -134,7 +135,8 @@ async def login_page(request: Request):
     if get_api_key() is None:
         return RedirectResponse(url="/ui/", status_code=302)
     templates = request.app.state.templates
-    return templates.TemplateResponse(request, "login.html", {})
+    multi_user = os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
+    return templates.TemplateResponse(request, "login.html", {"multi_user": multi_user})
 
 
 @router.post("/ui/login")
@@ -172,3 +174,223 @@ async def logout(request: Request):
     response = RedirectResponse(url="/ui/login", status_code=302)
     response.delete_cookie(key="rosettastone_session")
     return response
+
+
+# ---------------------------------------------------------------------------
+# Task 5.5.3c — Multi-user auth endpoints
+# ---------------------------------------------------------------------------
+
+_MULTI_USER_INACTIVE = JSONResponse(status_code=404, content={"detail": "Not found"})
+_JWT_SECRET_ENV = "ROSETTASTONE_JWT_SECRET"
+_JWT_SECRET_DEFAULT = "dev-secret-change-in-production"
+
+
+def _get_jwt_secret() -> str:
+    return os.environ.get(_JWT_SECRET_ENV, _JWT_SECRET_DEFAULT)
+
+
+def _is_multi_user() -> bool:
+    return os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
+
+
+def _extract_bearer(request: Request) -> str | None:
+    """Extract Bearer token from Authorization header, or None."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header[len("Bearer "):]
+    return None
+
+
+@router.post("/api/v1/auth/login")
+async def auth_login(request: Request):
+    """Username/password login returning a JWT token. Requires ROSETTASTONE_MULTI_USER mode."""
+    from rosettastone.server.auth_utils import create_jwt, verify_password
+    from rosettastone.server.database import get_session
+    from rosettastone.server.models import User
+    from rosettastone.server.schemas import TokenResponse, UserLogin
+
+    if not _is_multi_user():
+        return _MULTI_USER_INACTIVE
+
+    client_ip = request.client.host if request.client else "unknown"
+    if _check_rate_limit(client_ip):
+        return JSONResponse(status_code=429, content={"detail": "Too many failed attempts"})
+
+    body = await request.json()
+    data = UserLogin(**body)
+
+    db_gen = get_session()
+    session = next(db_gen)
+    try:
+        user = session.exec(select(User).where(User.username == data.username)).first()
+        if user is None or not user.hashed_password:
+            _record_failed_attempt(client_ip)
+            return JSONResponse(status_code=401, content={"detail": "Invalid credentials"})
+
+        if not verify_password(data.password, user.hashed_password):
+            _record_failed_attempt(client_ip)
+            return JSONResponse(status_code=401, content={"detail": "Invalid credentials"})
+
+        if not user.is_active:
+            _record_failed_attempt(client_ip)
+            return JSONResponse(status_code=401, content={"detail": "Account inactive"})
+
+        token = create_jwt(user.id, user.role, _get_jwt_secret())
+        return TokenResponse(
+            access_token=token,
+            user_id=user.id,
+            role=user.role,
+        )
+    finally:
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
+
+
+@router.post("/api/v1/auth/register", status_code=201)
+async def auth_register(request: Request):
+    """Register a new user. First user becomes admin. Requires ROSETTASTONE_MULTI_USER mode."""
+    from rosettastone.server.auth_utils import hash_password
+    from rosettastone.server.database import get_session
+    from rosettastone.server.models import User
+    from rosettastone.server.schemas import UserMe, UserRegister
+
+    if not _is_multi_user():
+        return _MULTI_USER_INACTIVE
+
+    client_ip = request.client.host if request.client else "unknown"
+    if _check_rate_limit(client_ip):
+        return JSONResponse(status_code=429, content={"detail": "Too many failed attempts"})
+
+    body = await request.json()
+    data = UserRegister(**body)
+
+    db_gen = get_session()
+    session = next(db_gen)
+    try:
+        # Check for existing username
+        existing = session.exec(select(User).where(User.username == data.username)).first()
+        if existing is not None:
+            return JSONResponse(status_code=409, content={"detail": "Username already exists"})
+
+        # Count existing users to determine role
+        user_count = session.exec(select(func.count()).select_from(User)).one()
+        if user_count == 0:
+            # First user is always admin
+            role = "admin"
+        elif data.role == "admin":
+            return JSONResponse(
+                status_code=403, content={"detail": "Cannot self-assign admin role"}
+            )
+        else:
+            role = data.role
+
+        new_user = User(
+            username=data.username,
+            email=data.email,
+            hashed_password=hash_password(data.password),
+            role=role,
+            is_active=True,
+        )
+        session.add(new_user)
+        session.commit()
+        session.refresh(new_user)
+
+        return UserMe(
+            id=new_user.id,
+            username=new_user.username,
+            email=new_user.email,
+            role=new_user.role,
+            is_active=new_user.is_active,
+        )
+    finally:
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
+
+
+@router.post("/api/v1/auth/refresh")
+async def auth_refresh(request: Request):
+    """Accept a valid JWT and return a new JWT with fresh expiry. Requires multi-user mode."""
+    from rosettastone.server.auth_utils import create_jwt, decode_jwt
+    from rosettastone.server.database import get_session
+    from rosettastone.server.models import User
+    from rosettastone.server.schemas import TokenResponse
+
+    if not _is_multi_user():
+        return _MULTI_USER_INACTIVE
+
+    token = _extract_bearer(request)
+    if token is None:
+        return JSONResponse(status_code=401, content={"detail": "Missing Bearer token"})
+
+    secret = _get_jwt_secret()
+    try:
+        payload = decode_jwt(token, secret)
+    except Exception:
+        return JSONResponse(status_code=401, content={"detail": "Invalid or expired token"})
+
+    db_gen = get_session()
+    session = next(db_gen)
+    try:
+        user_id = int(payload["sub"])
+        user = session.get(User, user_id)
+        if user is None or not user.is_active:
+            return JSONResponse(status_code=401, content={"detail": "User not found or inactive"})
+
+        new_token = create_jwt(user.id, user.role, secret)
+        return TokenResponse(
+            access_token=new_token,
+            user_id=user.id,
+            role=user.role,
+        )
+    finally:
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
+
+
+@router.get("/api/v1/auth/me")
+async def auth_me(request: Request):
+    """Return current user info for a valid JWT. Requires ROSETTASTONE_MULTI_USER mode."""
+    from rosettastone.server.auth_utils import decode_jwt
+    from rosettastone.server.database import get_session
+    from rosettastone.server.models import User
+    from rosettastone.server.schemas import UserMe
+
+    if not _is_multi_user():
+        return _MULTI_USER_INACTIVE
+
+    token = _extract_bearer(request)
+    if token is None:
+        return JSONResponse(status_code=401, content={"detail": "Missing Bearer token"})
+
+    secret = _get_jwt_secret()
+    try:
+        payload = decode_jwt(token, secret)
+    except Exception:
+        return JSONResponse(status_code=401, content={"detail": "Invalid or expired token"})
+
+    db_gen = get_session()
+    session = next(db_gen)
+    try:
+        user_id = int(payload["sub"])
+        user = session.get(User, user_id)
+        if user is None or not user.is_active:
+            return JSONResponse(status_code=401, content={"detail": "User not found or inactive"})
+
+        return UserMe(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            role=user.role,
+            is_active=user.is_active,
+        )
+    finally:
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
