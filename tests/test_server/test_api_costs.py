@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
@@ -14,7 +12,6 @@ from sqlmodel import Session  # noqa: E402
 
 from rosettastone.server.api.costs import _compute_costs, _generate_opportunities  # noqa: E402
 from rosettastone.server.models import MigrationRecord  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers

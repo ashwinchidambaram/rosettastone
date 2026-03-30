@@ -13,7 +13,7 @@ import time
 import urllib.request
 
 import pytest
-from playwright.sync_api import Browser, Page, sync_playwright, expect
+from playwright.sync_api import Page, expect, sync_playwright
 
 BASE_URL = "http://localhost:8765"
 
@@ -971,7 +971,7 @@ class TestThemeToggle:
     def test_theme_toggle_updates_localstorage(self, dark_mode_page: Page, server: str):
         """Theme toggle updates localStorage 'rosettastone-theme' key."""
         dark_mode_page.goto(f"{server}/ui/")
-        initial_stored = dark_mode_page.evaluate("() => localStorage.getItem('rosettastone-theme')")
+        _initial_stored = dark_mode_page.evaluate("() => localStorage.getItem('rosettastone-theme')")
         dark_mode_page.locator('[data-action="toggle-theme"]').click()
         stored = dark_mode_page.evaluate("() => localStorage.getItem('rosettastone-theme')")
         assert stored == "light", f"Expected localStorage 'light', got: {stored}"

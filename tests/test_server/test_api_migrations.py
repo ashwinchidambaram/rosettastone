@@ -331,7 +331,7 @@ class TestUIWithData:
     """UI endpoint tests verifying templates render with real DB data."""
 
     def test_migrations_list_shows_real_data(
-        self, client: TestClient, sample_migration: "MigrationRecord"
+        self, client: TestClient, sample_migration: MigrationRecord
     ) -> None:
         """When DB has migrations, the list page should show real data."""
         resp = client.get("/ui/migrations")
@@ -353,7 +353,7 @@ class TestUIWithData:
         assert "Migrations" in body
 
     def test_migration_detail_shows_real_data(
-        self, client: TestClient, sample_migration: "MigrationRecord"
+        self, client: TestClient, sample_migration: MigrationRecord
     ) -> None:
         """Migration detail page should render real data from DB."""
         resp = client.get(f"/ui/migrations/{sample_migration.id}")
@@ -365,7 +365,7 @@ class TestUIWithData:
         assert "92" in body
 
     def test_recommendation_label_mapping(
-        self, client: TestClient, sample_migration: "MigrationRecord"
+        self, client: TestClient, sample_migration: MigrationRecord
     ) -> None:
         """DB 'GO' recommendation maps to 'Safe to ship' in the template."""
         resp = client.get(f"/ui/migrations/{sample_migration.id}")
@@ -377,7 +377,7 @@ class TestUIWithData:
         assert "Recommendation: Safe to switch" in body or "Safe to ship" in body
 
     def test_executive_report_with_real_data(
-        self, client: TestClient, sample_migration: "MigrationRecord"
+        self, client: TestClient, sample_migration: MigrationRecord
     ) -> None:
         """Executive report page should render with real migration data."""
         resp = client.get(f"/ui/migrations/{sample_migration.id}/executive")

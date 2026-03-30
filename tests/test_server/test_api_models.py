@@ -10,8 +10,7 @@ sqlmodel = pytest.importorskip("sqlmodel")
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlmodel import Session  # noqa: E402
 
-from rosettastone.server.models import MigrationRecord, RegisteredModel  # noqa: E402
-
+from rosettastone.server.models import MigrationRecord  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # POST /api/v1/models  — register a model
