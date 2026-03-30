@@ -247,6 +247,32 @@ class PipelineDetail(PipelineSummary):
 
 
 # ---------------------------------------------------------------------------
+# Task 5.5.6 — Team management schemas
+# ---------------------------------------------------------------------------
+
+
+class TeamCreate(BaseModel):
+    name: str
+
+
+class TeamSummary(BaseModel):
+    id: int
+    name: str
+    created_at: datetime
+
+
+class TeamMemberSummary(BaseModel):
+    user_id: int
+    team_id: int
+    role: str
+
+
+class AddTeamMember(BaseModel):
+    user_id: int
+    role: str = "member"
+
+
+# ---------------------------------------------------------------------------
 # Task 5.5.3c — Multi-user auth schemas
 # ---------------------------------------------------------------------------
 
@@ -276,3 +302,17 @@ class UserMe(BaseModel):
     email: str | None
     role: str
     is_active: bool
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    email: str | None = None
+    role: str = "viewer"
+
+
+class UserUpdate(BaseModel):
+    role: str | None = None
+    password: str | None = None
+    email: str | None = None
+    is_active: bool | None = None
