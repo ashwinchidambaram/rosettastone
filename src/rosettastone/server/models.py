@@ -167,3 +167,27 @@ class ABTestResult(SQLModel, table=True):
     winner: str | None = None  # "a", "b", or "tie"
     details_json: str = "{}"
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class PipelineRecord(SQLModel, table=True):
+    __tablename__ = "pipelines"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    config_yaml: str  # Raw YAML pipeline config
+    source_model: str
+    target_model: str
+    status: str = "pending"  # pending / running / complete / failed
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class PipelineStageRecord(SQLModel, table=True):
+    __tablename__ = "pipeline_stages"
+
+    id: int | None = Field(default=None, primary_key=True)
+    pipeline_id: int = Field(foreign_key="pipelines.id", index=True)
+    module_name: str
+    status: str = "pending"  # pending / running / complete / failed
+    optimized_prompt: str | None = None
+    score: float | None = None
+    duration_seconds: float = 0.0
