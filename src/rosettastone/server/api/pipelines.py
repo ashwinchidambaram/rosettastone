@@ -8,6 +8,7 @@ from sqlmodel import Session, func, select
 
 from rosettastone.server.database import get_session
 from rosettastone.server.models import PipelineRecord, PipelineStageRecord
+from rosettastone.server.rbac import require_role
 from rosettastone.server.schemas import (
     PaginatedResponse,
     PipelineCreate,
@@ -68,7 +69,12 @@ def _pipeline_to_detail(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/api/v1/pipelines/migrate", response_model=PipelineSummary, status_code=201)
+@router.post(
+    "/api/v1/pipelines/migrate",
+    response_model=PipelineSummary,
+    status_code=201,
+    dependencies=[Depends(require_role("editor", "admin"))],
+)
 def create_pipeline(
     body: PipelineCreate,
     request: Request,

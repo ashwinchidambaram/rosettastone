@@ -12,6 +12,7 @@ from sqlmodel import Session, func, select
 from rosettastone.server.api.utils import _get_migration_or_404
 from rosettastone.server.database import get_session
 from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningRecord
+from rosettastone.server.rbac import require_role
 from rosettastone.server.schemas import (
     MigrationDetail,
     MigrationSummary,
@@ -650,7 +651,12 @@ async def get_migration(
     return _migration_to_detail(record, session)
 
 
-@router.post("/api/v1/migrations", response_model=MigrationSummary, status_code=201)
+@router.post(
+    "/api/v1/migrations",
+    response_model=MigrationSummary,
+    status_code=201,
+    dependencies=[Depends(require_role("editor", "admin"))],
+)
 async def create_migration(
     request: Request,
     session: Session = Depends(get_session),

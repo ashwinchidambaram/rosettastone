@@ -17,6 +17,7 @@ from rosettastone.server.models import (
     MigrationRecord,
     MigrationVersion,
 )
+from rosettastone.server.rbac import require_role
 from rosettastone.server.schemas import (
     ABTestCreate,
     ABTestDetail,
@@ -108,7 +109,12 @@ def _ab_test_to_detail(ab_test: ABTest, metrics: ABTestMetrics | None = None) ->
 # ---------------------------------------------------------------------------
 
 
-@router.post("/api/v1/ab-tests", response_model=ABTestSummary, status_code=201)
+@router.post(
+    "/api/v1/ab-tests",
+    response_model=ABTestSummary,
+    status_code=201,
+    dependencies=[Depends(require_role("editor", "admin"))],
+)
 def create_ab_test(
     body: ABTestCreate,
     session: Session = Depends(get_session),
@@ -201,7 +207,11 @@ def get_ab_test(
     return _ab_test_to_detail(ab_test)
 
 
-@router.post("/api/v1/ab-tests/{ab_test_id}/start", response_model=ABTestDetail)
+@router.post(
+    "/api/v1/ab-tests/{ab_test_id}/start",
+    response_model=ABTestDetail,
+    dependencies=[Depends(require_role("editor", "admin"))],
+)
 def start_ab_test(
     ab_test_id: int,
     session: Session = Depends(get_session),
@@ -282,7 +292,11 @@ def get_ab_test_metrics(
     return metrics
 
 
-@router.post("/api/v1/ab-tests/{ab_test_id}/conclude", response_model=ABTestDetail)
+@router.post(
+    "/api/v1/ab-tests/{ab_test_id}/conclude",
+    response_model=ABTestDetail,
+    dependencies=[Depends(require_role("editor", "admin"))],
+)
 def conclude_ab_test(
     ab_test_id: int,
     session: Session = Depends(get_session),
