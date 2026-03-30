@@ -43,17 +43,80 @@ def run_preflight(config: MigrationConfig) -> PreflightReport:
     return run_all_checks(config)
 
 
+def _build_adapter(config: MigrationConfig) -> Any:
+    """Build the appropriate data adapter based on config.adapter."""
+    from rosettastone.config import AdapterChoice
+
+    adapter_type = config.adapter
+
+    # Legacy compat: if redis_url is set and adapter is still default, use Redis
+    if config.redis_url and adapter_type == AdapterChoice.JSONL:
+        adapter_type = AdapterChoice.REDIS
+
+    if adapter_type == AdapterChoice.REDIS:
+        from rosettastone.ingest.redis_adapter import RedisAdapter
+
+        if not config.redis_url:
+            raise ValueError("redis_url is required for the Redis adapter")
+        return RedisAdapter(config.redis_url, config.source_model)
+
+    if adapter_type == AdapterChoice.CSV:
+        from rosettastone.ingest.csv_adapter import CSVAdapter
+
+        if not config.data_path:
+            raise ValueError("data_path is required for the CSV adapter")
+        kwargs: dict[str, Any] = {}
+        if config.csv_delimiter:
+            kwargs["delimiter"] = config.csv_delimiter
+        if config.csv_prompt_column or config.csv_response_column:
+            from rosettastone.ingest.csv_adapter import CSVColumnMapping
+
+            kwargs["column_mapping"] = CSVColumnMapping(
+                prompt_col=config.csv_prompt_column or "prompt",
+                response_col=config.csv_response_column or "response",
+            )
+        return CSVAdapter(config.data_path, **kwargs)
+
+    if adapter_type == AdapterChoice.BRAINTRUST:
+        from rosettastone.ingest.braintrust_adapter import BraintrustAdapter
+
+        return BraintrustAdapter(
+            project_name=config.braintrust_project or "",
+            source_model=config.source_model,
+        )
+
+    if adapter_type == AdapterChoice.LANGSMITH:
+        from rosettastone.ingest.langsmith_adapter import LangSmithAdapter
+
+        if not config.langsmith_project:
+            raise ValueError("langsmith_project is required for the LangSmith adapter")
+        kwargs_ls: dict[str, Any] = {"project_name": config.langsmith_project}
+        if config.langsmith_start_date:
+            kwargs_ls["start_date"] = config.langsmith_start_date
+        if config.langsmith_end_date:
+            kwargs_ls["end_date"] = config.langsmith_end_date
+        return LangSmithAdapter(**kwargs_ls)
+
+    if adapter_type == AdapterChoice.OTEL:
+        from rosettastone.ingest.otel_adapter import OTelAdapter
+
+        otel_path = config.otel_path or config.data_path
+        if not otel_path:
+            raise ValueError("otel_path or data_path is required for the OTel adapter")
+        return OTelAdapter(export_path=otel_path, source_model=config.source_model)
+
+    # Default: JSONL
+    from rosettastone.ingest.jsonl import JSONLAdapter
+
+    if not config.data_path:
+        raise ValueError("data_path is required for the JSONL adapter")
+    return JSONLAdapter(config.data_path)
+
+
 def load_and_split_data(
     config: MigrationConfig,
 ) -> tuple[list[PromptPair], list[PromptPair], list[PromptPair]]:
-    if config.redis_url:
-        from rosettastone.ingest.redis_adapter import RedisAdapter
-
-        adapter = RedisAdapter(config.redis_url, config.source_model)
-    else:
-        from rosettastone.ingest.jsonl import JSONLAdapter
-
-        adapter = JSONLAdapter(config.data_path)
+    adapter = _build_adapter(config)
 
     from rosettastone.ingest.splitter import split_data
 
@@ -94,10 +157,17 @@ def run_pii_scan(pairs: list[PromptPair], ctx: PipelineContext, config: Migratio
     if not config.pii_scan:
         return
 
+    from rosettastone.config import PIIEngine
     from rosettastone.core.context import SafetySeverity, SafetyWarning
-    from rosettastone.safety.pii_scanner import scan_pairs
 
-    pii_warnings = scan_pairs(pairs)
+    if config.pii_engine == PIIEngine.PRESIDIO:
+        from rosettastone.safety.presidio_engine import scan_pairs_presidio
+
+        pii_warnings = scan_pairs_presidio(pairs)
+    else:
+        from rosettastone.safety.pii_scanner import scan_pairs
+
+        pii_warnings = scan_pairs(pairs)
     for pw in pii_warnings:
         ctx.safety_warnings.append(
             SafetyWarning(
@@ -137,12 +207,22 @@ def run_prompt_audit(
         )
 
 
-def run_pii_scan_text(text: str, ctx: PipelineContext) -> None:
+def run_pii_scan_text(
+    text: str, ctx: PipelineContext, config: MigrationConfig | None = None
+) -> None:
     """Scan optimized prompt text for HIGH-severity PII (blocker)."""
+    from rosettastone.config import PIIEngine
     from rosettastone.core.context import SafetySeverity, SafetyWarning
-    from rosettastone.safety.pii_scanner import scan_text
 
-    findings = scan_text(text)
+    use_presidio = config and config.pii_engine == PIIEngine.PRESIDIO
+    if use_presidio:
+        from rosettastone.safety.presidio_engine import scan_text_presidio
+
+        findings = scan_text_presidio(text)
+    else:
+        from rosettastone.safety.pii_scanner import scan_text
+
+        findings = scan_text(text)
     for pii_type, severity in findings:
         if severity == "HIGH":
             ctx.safety_warnings.append(
