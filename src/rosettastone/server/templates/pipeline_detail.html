@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}RosettaStone | Pipeline {{ pipeline.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-2xl font-bold">Pipeline: {{ pipeline.name }}</h2>
+    <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+      {{ pipeline.status }}
+    </span>
+  </div>
+  <p class="text-gray-500">Pipeline detail — full UI coming in 5.4.8.</p>
+  <dl class="mt-4 grid grid-cols-2 gap-4 text-sm">
+    <div>
+      <dt class="text-gray-500">Source model</dt>
+      <dd class="font-medium">{{ pipeline.source_model }}</dd>
+    </div>
+    <div>
+      <dt class="text-gray-500">Target model</dt>
+      <dd class="font-medium">{{ pipeline.target_model }}</dd>
+    </div>
+  </dl>
+  {% if stages %}
+  <h3 class="mt-8 text-lg font-semibold">Stages</h3>
+  <ul class="mt-2 space-y-1 text-sm">
+    {% for stage in stages %}
+    <li class="flex gap-4">
+      <span class="font-medium">{{ stage.module_name }}</span>
+      <span class="text-gray-500">{{ stage.status }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="mt-4 text-gray-400">No stages recorded yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

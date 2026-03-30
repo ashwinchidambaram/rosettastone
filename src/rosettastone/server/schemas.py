@@ -216,3 +216,31 @@ class ABTestResultEntry(BaseModel):
     score_b: float | None
     winner: str | None
     created_at: datetime
+
+
+class PipelineCreate(BaseModel):
+    config_yaml: str
+    source_model: str
+    target_model: str
+
+
+class PipelineStageSummary(BaseModel):
+    module_name: str
+    status: str
+    optimized_prompt: str | None
+    score: float | None
+    duration_seconds: float | None
+
+
+class PipelineSummary(BaseModel):
+    id: int
+    name: str
+    source_model: str
+    target_model: str
+    status: str
+    created_at: datetime
+
+
+class PipelineDetail(PipelineSummary):
+    stages: list[PipelineStageSummary]
+    config_yaml: str

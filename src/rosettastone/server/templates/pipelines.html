@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}RosettaStone | Pipelines{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-2xl font-bold">Pipelines</h2>
+  </div>
+  <p class="text-gray-500">Pipeline list — full UI coming in 5.4.8.</p>
+  {% if pipelines %}
+  <ul class="mt-4 space-y-2">
+    {% for pipeline in pipelines %}
+    <li>
+      <a href="/ui/pipelines/{{ pipeline.id }}" class="hover:underline font-medium">
+        {{ pipeline.name }}
+      </a>
+      <span class="ml-2 text-sm text-gray-500">{{ pipeline.status }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="mt-4 text-gray-400">No pipelines yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
