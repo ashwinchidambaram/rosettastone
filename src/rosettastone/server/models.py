@@ -137,3 +137,33 @@ class AuditLog(SQLModel, table=True):
     user_id: int | None = None  # null for system actions, FK to users later
     details_json: str = "{}"
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class ABTest(SQLModel, table=True):
+    __tablename__ = "ab_tests"
+
+    id: int | None = Field(default=None, primary_key=True)
+    migration_id: int = Field(foreign_key="migrations.id", index=True)
+    version_a_id: int = Field(foreign_key="migration_versions.id")
+    version_b_id: int = Field(foreign_key="migration_versions.id")
+    name: str = ""
+    traffic_split: float = 0.5  # fraction assigned to version_a
+    status: str = "draft"  # draft / running / concluded
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    winner: str | None = None  # "a", "b", or "inconclusive"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class ABTestResult(SQLModel, table=True):
+    __tablename__ = "ab_test_results"
+
+    id: int | None = Field(default=None, primary_key=True)
+    ab_test_id: int = Field(foreign_key="ab_tests.id", index=True)
+    test_case_id: int | None = None
+    assigned_version: str  # "a" or "b"
+    score_a: float | None = None
+    score_b: float | None = None
+    winner: str | None = None  # "a", "b", or "tie"
+    details_json: str = "{}"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
