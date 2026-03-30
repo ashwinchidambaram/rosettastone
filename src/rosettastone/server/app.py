@@ -169,6 +169,7 @@ def create_app() -> FastAPI:
         )
 
     # Register API routes
+    from rosettastone.server.api.ab_testing import router as ab_testing_router
     from rosettastone.server.api.alerts import router as alerts_router
     from rosettastone.server.api.audit import router as audit_router
     from rosettastone.server.api.auth import router as auth_router
@@ -188,6 +189,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(versioning_router)
     app.include_router(audit_router)
+    app.include_router(ab_testing_router)
 
     @app.get("/api/v1/health")
     async def health() -> dict[str, str]:
