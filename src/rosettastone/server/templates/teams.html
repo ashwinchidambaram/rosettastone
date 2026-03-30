@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}RosettaStone | Teams{% endblock %}
+
+{% block content %}
+<div class="pb-24 px-8 max-w-[1440px] mx-auto min-h-screen pt-8">
+
+<!-- Header -->
+<div class="mb-10 flex flex-wrap items-center justify-between gap-6">
+  <div>
+    <h1 class="text-[28px] font-semibold text-[#E8DCC4] font-headline tracking-tight">Teams</h1>
+    <p class="text-sm text-on-surface-variant mt-1">Organize users into teams for scoped access and collaboration.</p>
+  </div>
+  {% if multi_user %}
+  <button data-action="toggle-collapse"
+          data-target="create-team-form"
+          aria-expanded="false"
+          class="flex items-center gap-2 px-4 py-2 bg-[#D4745E] hover:brightness-110 text-white text-sm font-bold rounded-lg transition-all active:scale-95 shadow-md shadow-[#D4745E]/20">
+    <span class="material-symbols-outlined text-[18px]">group_add</span>
+    Create Team
+  </button>
+  {% endif %}
+</div>
+
+{% if not multi_user %}
+<!-- Single-user mode notice -->
+<div class="bg-surface-container-low border border-outline-variant/20 rounded-xl p-8 flex items-start gap-4">
+  <span class="material-symbols-outlined text-on-surface-variant text-3xl mt-0.5" aria-hidden="true">groups</span>
+  <div>
+    <h2 class="text-base font-semibold text-on-surface mb-1">Multi-user mode is not enabled</h2>
+    <p class="text-sm text-on-surface-variant leading-relaxed">
+      Set <code class="font-mono bg-surface-container-highest px-1.5 py-0.5 rounded text-[#D4A574]">ROSETTASTONE_MULTI_USER=true</code> in your environment to enable teams and role-based collaboration.
+    </p>
+  </div>
+</div>
+
+{% else %}
+<!-- Create Team inline form (collapsed by default) -->
+<div id="create-team-form" class="collapsible-content mb-8">
+  <div class="bg-surface-container-low border border-outline-variant/20 rounded-xl p-6">
+    <h2 class="text-sm font-bold text-on-surface/80 uppercase tracking-wider mb-5">New Team</h2>
+    <form method="POST" action="/api/v1/teams" class="flex flex-col sm:flex-row gap-4">
+      {% if request.state.csrf_token %}
+      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+      {% endif %}
+      <div class="flex-1 flex flex-col gap-1.5">
+        <label class="text-xs font-medium text-on-surface-variant" for="new-team-name">Team Name</label>
+        <input id="new-team-name" name="name" type="text" required
+               class="bg-surface-container-high border border-outline-variant/30 rounded-lg px-3 py-2 text-sm text-on-surface placeholder-on-surface-variant/40 focus:outline-none focus:border-[#D4745E]/60 transition-colors"
+               placeholder="e.g. Platform Engineering">
+      </div>
+      <div class="flex items-end gap-3">
+        <button type="submit"
+                class="px-5 py-2 bg-[#D4745E] hover:brightness-110 text-white text-sm font-bold rounded-lg transition-all active:scale-95">
+          Create Team
+        </button>
+        <button type="button"
+                data-action="toggle-collapse"
+                data-target="create-team-form"
+                class="px-5 py-2 bg-surface-container-high hover:bg-surface-bright text-on-surface text-sm font-medium rounded-lg transition-all">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Teams Card List -->
+{% if teams %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  {% for team in teams %}
+  <div class="bg-surface-container-low border border-outline-variant/10 rounded-xl p-6 hover:bg-surface-container-high transition-colors group">
+    <div class="flex items-start justify-between mb-4">
+      <div class="w-10 h-10 rounded-xl bg-[#D4745E]/10 border border-[#D4745E]/20 flex items-center justify-center">
+        <span class="material-symbols-outlined text-[#D4745E] text-xl" aria-hidden="true">groups</span>
+      </div>
+      <!-- Admin actions -->
+      <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button type="button"
+                hx-delete="/api/v1/teams/{{ team.id }}"
+                hx-confirm="Delete team {{ team.name }}? This will remove all memberships."
+                class="p-1.5 rounded text-on-surface-variant hover:text-error hover:bg-error/5 transition-colors"
+                aria-label="Delete team {{ team.name }}">
+          <span class="material-symbols-outlined text-[16px]">delete</span>
+        </button>
+      </div>
+    </div>
+    <h3 class="text-base font-semibold text-on-surface mb-1">{{ team.name }}</h3>
+    <p class="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-widest">
+      Created {{ team.created_at.strftime('%Y-%m-%d') }}
+    </p>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<!-- Empty state -->
+<div class="bg-surface-container-low rounded-xl p-12 text-center border border-outline-variant/10">
+  <span class="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-4 block" aria-hidden="true">groups</span>
+  <p class="text-on-surface-variant text-sm mb-2">No teams yet.</p>
+  <p class="text-xs text-on-surface-variant/60">Create a team to start organizing users for collaboration.</p>
+</div>
+{% endif %}
+
+{% endif %}
+
+</div>
+{% endblock %}

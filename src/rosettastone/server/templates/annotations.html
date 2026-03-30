@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}RosettaStone | Annotation Queue{% endblock %}
+
+{% block content %}
+<div class="pb-24 px-8 max-w-[1440px] mx-auto min-h-screen pt-8">
+
+<!-- Header -->
+<div class="mb-10">
+  <h1 class="text-[28px] font-semibold text-[#E8DCC4] font-headline tracking-tight">Annotation Queue</h1>
+  <p class="text-sm text-on-surface-variant mt-1">Review and track human annotations across migrations.</p>
+</div>
+
+{% if not multi_user %}
+<!-- Single-user mode notice -->
+<div class="bg-surface-container-low border border-outline-variant/20 rounded-xl p-8 flex items-start gap-4">
+  <span class="material-symbols-outlined text-on-surface-variant text-3xl mt-0.5" aria-hidden="true">rate_review</span>
+  <div>
+    <h2 class="text-base font-semibold text-on-surface mb-1">Multi-user mode is not enabled</h2>
+    <p class="text-sm text-on-surface-variant leading-relaxed">
+      Set <code class="font-mono bg-surface-container-highest px-1.5 py-0.5 rounded text-[#D4A574]">ROSETTASTONE_MULTI_USER=true</code> to enable the annotation queue and collaborative review workflows.
+    </p>
+  </div>
+</div>
+
+{% elif not annotations %}
+<!-- Empty state -->
+<div class="bg-surface-container-low rounded-xl p-12 text-center border border-outline-variant/10">
+  <span class="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-4 block" aria-hidden="true">rate_review</span>
+  <p class="text-on-surface-variant text-sm mb-2">No annotations yet.</p>
+  <p class="text-xs text-on-surface-variant/60">Annotations will appear here as reviewers tag migration test cases.</p>
+</div>
+
+{% else %}
+<!-- Annotations Table -->
+<div class="bg-surface-container-low rounded-xl overflow-hidden border border-outline-variant/10 shadow-xl shadow-black/20">
+  <div class="px-6 py-5 bg-surface-container-high border-b border-outline-variant/10 flex items-center justify-between">
+    <h2 class="font-bold text-sm uppercase tracking-wider text-on-surface/70">All Annotations</h2>
+    <span class="text-xs font-label text-on-surface-variant">{{ annotations|length }} total</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm" aria-label="Annotation queue">
+      <thead>
+        <tr class="border-b border-outline-variant/10">
+          <th class="px-6 py-3 text-left text-[10px] font-label uppercase tracking-widest text-on-surface-variant">Migration</th>
+          <th class="px-6 py-3 text-left text-[10px] font-label uppercase tracking-widest text-on-surface-variant">Type</th>
+          <th class="px-6 py-3 text-left text-[10px] font-label uppercase tracking-widest text-on-surface-variant">Note</th>
+          <th class="px-6 py-3 text-left text-[10px] font-label uppercase tracking-widest text-on-surface-variant">Annotator</th>
+          <th class="px-6 py-3 text-left text-[10px] font-label uppercase tracking-widest text-on-surface-variant">Created</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-outline-variant/10">
+        {% for annotation in annotations %}
+        <tr class="hover:bg-surface-container-high/50 transition-colors">
+          <!-- Migration ID (linked) -->
+          <td class="px-6 py-4">
+            <a href="/ui/migrations/{{ annotation.migration_id }}"
+               class="font-label text-xs text-[#D4745E] hover:underline">
+              #{{ annotation.migration_id }}
+            </a>
+          </td>
+          <!-- Type badge -->
+          <td class="px-6 py-4">
+            {% if annotation.annotation_type == 'regression' %}
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/30">regression</span>
+            {% elif annotation.annotation_type == 'improvement' %}
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#8B9D83]/10 text-[#8B9D83] border border-[#8B9D83]/30">improvement</span>
+            {% elif annotation.annotation_type == 'edge_case' %}
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/30">edge case</span>
+            {% else %}
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-container-highest text-on-surface-variant border border-outline-variant/30">{{ annotation.annotation_type }}</span>
+            {% endif %}
+          </td>
+          <!-- Text (truncated) -->
+          <td class="px-6 py-4 text-on-surface-variant max-w-[320px]">
+            <span title="{{ annotation.text }}">
+              {% if annotation.text|length > 100 %}
+                {{ annotation.text[:100] }}&hellip;
+              {% else %}
+                {{ annotation.text }}
+              {% endif %}
+            </span>
+          </td>
+          <!-- Annotator ID -->
+          <td class="px-6 py-4 font-label text-xs text-on-surface-variant">
+            {% if annotation.annotator_id %}
+            <span class="flex items-center gap-1">
+              <span class="material-symbols-outlined text-[13px]" aria-hidden="true">account_circle</span>
+              #{{ annotation.annotator_id }}
+            </span>
+            {% else %}
+            <span class="text-on-surface-variant/40">—</span>
+            {% endif %}
+          </td>
+          <!-- Created At -->
+          <td class="px-6 py-4 font-label text-xs text-on-surface-variant">
+            {{ annotation.created_at.strftime('%Y-%m-%d %H:%M') }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

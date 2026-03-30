@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse, Response
 from sqlmodel import Session, select
 
 from rosettastone.server.database import get_session
@@ -49,6 +49,22 @@ def _membership_to_summary(membership: TeamMembership) -> TeamMemberSummary:
 # ---------------------------------------------------------------------------
 # API endpoints
 # ---------------------------------------------------------------------------
+
+
+@router.get("/ui/teams", response_class=HTMLResponse)
+async def teams_page(
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Render the teams UI page."""
+    multi_user = _multi_user_enabled()
+    teams = list(session.exec(select(Team).order_by(Team.id)).all()) if multi_user else []
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "teams.html",
+        {"active_nav": "teams", "teams": teams, "multi_user": multi_user},
+    )
 
 
 @router.get("/api/v1/teams", response_model=list[TeamSummary])

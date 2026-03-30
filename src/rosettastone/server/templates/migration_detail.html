@@ -547,5 +547,27 @@
 </div>
 {% endif %}
 
+<!-- Approval Gate (5.5) -->
+{% if migration.status not in ['pending', 'running'] %}
+<div class="mt-12">
+  <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+    <span class="material-symbols-outlined text-[20px]" aria-hidden="true">verified</span>
+    Approval Workflow
+  </h3>
+  <div class="bg-surface-container-low rounded-xl p-6 border border-outline-variant/10">
+    <p class="text-sm text-on-surface-variant">
+      Approval workflow status is available via the API:
+      <code class="font-mono bg-surface-container-highest px-1.5 py-0.5 rounded text-[#D4A574] text-xs ml-1">GET /api/v1/migrations/{{ migration.id }}/approval-status</code>
+    </p>
+    <p class="text-xs text-on-surface-variant/60 mt-3">
+      Use the API to create a workflow (<code class="font-mono">POST /api/v1/migrations/{{ migration.id }}/approval-workflow</code>),
+      submit approvals (<code class="font-mono">POST /api/v1/migrations/{{ migration.id }}/approve</code>),
+      or rejections (<code class="font-mono">POST /api/v1/migrations/{{ migration.id }}/reject</code>).
+      Requires <code class="font-mono">ROSETTASTONE_MULTI_USER=true</code>.
+    </p>
+  </div>
+</div>
+{% endif %}
+
 </div>
 {% endblock %}

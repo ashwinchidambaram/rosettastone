@@ -103,6 +103,8 @@
             <a class="{% if active_nav == 'audit' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/audit-log">Audit Log</a>
             <a class="{% if active_nav == 'ab_tests' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/ab-tests">A/B Tests</a>
             <a class="{% if active_nav == 'pipelines' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/pipelines">Pipelines</a>
+            <a class="{% if active_nav == 'users' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/users">Users</a>
+            <a class="{% if active_nav == 'teams' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/teams">Teams</a>
         </div>
     </div>
     <div class="flex items-center gap-4">
@@ -159,6 +161,16 @@
         <a href="/ui/pipelines" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'pipelines' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
             <span class="material-symbols-outlined text-lg" aria-hidden="true">account_tree</span>
             Pipelines
+        </a>
+        <!-- Admin / multi-user collaboration pages -->
+        <div class="h-px bg-outline-variant/10 my-2"></div>
+        <a href="/ui/users" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'users' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
+            <span class="material-symbols-outlined text-lg" aria-hidden="true">group</span>
+            Users
+        </a>
+        <a href="/ui/teams" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'teams' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
+            <span class="material-symbols-outlined text-lg" aria-hidden="true">people</span>
+            Teams
         </a>
     </nav>
 </div>

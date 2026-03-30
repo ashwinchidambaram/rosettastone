@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from sqlmodel import Session, func, select
 
 from rosettastone.server.auth_utils import hash_password
@@ -168,6 +169,22 @@ def update_user(
     session.refresh(user)
 
     return _user_to_me(user)
+
+
+@router.get("/ui/users", response_class=HTMLResponse)
+async def users_page(
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Render the user management UI page."""
+    multi_user = os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
+    users = list(session.exec(select(User).order_by(User.id)).all()) if multi_user else []
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "users.html",
+        {"active_nav": "users", "users": users, "multi_user": multi_user},
+    )
 
 
 @router.delete(

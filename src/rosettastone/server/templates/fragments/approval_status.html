@@ -1,0 +1,22 @@
+{% if workflow %}
+<div class="p-4 bg-surface-container rounded-lg border border-outline-variant/10">
+  <div class="text-sm font-medium text-on-surface mb-3">Approval Workflow</div>
+  <div class="space-y-2 text-sm">
+    <div class="flex justify-between items-center">
+      <span class="text-on-surface-variant">Status</span>
+      <span class="font-mono text-xs
+        {% if workflow.status == 'approved' %}text-[#8B9D83]
+        {% elif workflow.status == 'pending' %}text-[#D4A574]
+        {% else %}text-error{% endif %}">
+        {{ workflow.status }}
+      </span>
+    </div>
+    <div class="flex justify-between items-center">
+      <span class="text-on-surface-variant">Approvals</span>
+      <span class="font-mono text-xs text-on-surface">{{ workflow.current_approvals }}/{{ workflow.required_approvals }}</span>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="text-sm text-on-surface-variant">No approval workflow configured.</div>
+{% endif %}

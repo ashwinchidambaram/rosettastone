@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
 
 from rosettastone.server.database import get_session
@@ -36,6 +37,30 @@ def _annotation_to_summary(annotation: Annotation) -> AnnotationSummary:
 # ---------------------------------------------------------------------------
 # API endpoints
 # ---------------------------------------------------------------------------
+
+
+@router.get("/ui/annotations", response_class=HTMLResponse)
+async def annotations_page(
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Render the annotation queue UI page."""
+    multi_user = _multi_user_enabled()
+    if multi_user:
+        stmt = (
+            select(Annotation)
+            .order_by(Annotation.created_at.desc())  # type: ignore[union-attr]
+            .limit(200)
+        )
+        annotations = list(session.exec(stmt).all())
+    else:
+        annotations = []
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "annotations.html",
+        {"active_nav": "annotations", "annotations": annotations, "multi_user": multi_user},
+    )
 
 
 @router.get(
