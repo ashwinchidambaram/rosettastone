@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -71,12 +72,31 @@ def migrate(
         "--improvement-objectives",
         help='JSON array of objectives, e.g. \'[{"description": "be more concise"}]\'',
     ),
+    pipeline: Annotated[
+        Path | None,
+        typer.Option(
+            "--pipeline",
+            help="Path to pipeline YAML config for multi-step migration.",
+        ),
+    ] = None,
 ) -> None:
     """Run a full migration: preflight -> optimize -> evaluate -> report."""
     import json as json_mod
 
     from rosettastone.config import MigrationConfig
     from rosettastone.core.migrator import Migrator
+
+    # Handle pipeline mode
+    if pipeline:
+        from rosettastone.optimize.pipeline_config import load_pipeline_config
+
+        pipeline_config = load_pipeline_config(pipeline)
+        num_modules = len(pipeline_config.modules)
+        typer.echo(f"Pipeline mode: {pipeline_config.name} ({num_modules} modules)")
+        typer.echo(
+            "Pipeline optimization is handled server-side via POST /api/v1/pipelines/migrate"
+        )
+        return
 
     # Parse improvement objectives from JSON string
     parsed_objectives = None
