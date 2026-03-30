@@ -194,17 +194,14 @@ def ci_report(
             formatted = format_ci_json(result)
         elif format == "pr-comment":
             if not source or not target:
-                console.print(
-                    "[red]Error: pr-comment format requires --from and --to flags[/red]"
-                )
+                console.print("[red]Error: pr-comment format requires --from and --to flags[/red]")
                 raise typer.Exit(code=1)
             formatted = format_pr_comment(result, source, target)
         elif format == "quality-diff":
             formatted = format_quality_diff(result)
         else:
             console.print(
-                "[red]Unknown format: "
-                f"{format}. Use: json, pr-comment, or quality-diff[/red]"
+                f"[red]Unknown format: {format}. Use: json, pr-comment, or quality-diff[/red]"
             )
             raise typer.Exit(code=1)
 

@@ -18,11 +18,25 @@ class OptimizerChoice(StrEnum):
     MIPRO = "mipro"  # Phase 2
 
 
+class AdapterChoice(StrEnum):
+    JSONL = "jsonl"
+    REDIS = "redis"
+    CSV = "csv"
+    BRAINTRUST = "braintrust"
+    LANGSMITH = "langsmith"
+    OTEL = "otel"
+
+
+class PIIEngine(StrEnum):
+    REGEX = "regex"
+    PRESIDIO = "presidio"
+
+
 class MigrationConfig(BaseModel):
     # Required
     source_model: str
     target_model: str
-    data_path: Path
+    data_path: Path | None = None
 
     # Optional with smart defaults
     output_dir: Path = Path("./migration_output")
@@ -67,3 +81,25 @@ class MigrationConfig(BaseModel):
 
     # Phase 3: Web UI content storage
     store_prompt_content: bool = False
+
+    # Phase 4: Data adapter selection
+    adapter: AdapterChoice = AdapterChoice.JSONL
+
+    # Phase 4: Adapter-specific options
+    csv_delimiter: str | None = None
+    csv_prompt_column: str | None = None
+    csv_response_column: str | None = None
+    braintrust_project: str | None = None
+    langsmith_project: str | None = None
+    langsmith_start_date: str | None = None
+    langsmith_end_date: str | None = None
+    otel_path: Path | None = None
+
+    # Phase 4: PII engine selection
+    pii_engine: PIIEngine = PIIEngine.REGEX
+
+    # Phase 4: Clustering
+    cluster_prompts: bool = False
+
+    # Phase 4: Improvement mode
+    improvement_objectives: list[dict[str, str | float]] | None = None
