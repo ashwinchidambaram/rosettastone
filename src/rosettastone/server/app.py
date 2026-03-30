@@ -171,6 +171,8 @@ def create_app() -> FastAPI:
     # Register API routes
     from rosettastone.server.api.ab_testing import router as ab_testing_router
     from rosettastone.server.api.alerts import router as alerts_router
+    from rosettastone.server.api.annotations import router as annotations_router
+    from rosettastone.server.api.approvals import router as approvals_router
     from rosettastone.server.api.audit import router as audit_router
     from rosettastone.server.api.auth import router as auth_router
     from rosettastone.server.api.comparisons import router as comparisons_router
@@ -179,6 +181,8 @@ def create_app() -> FastAPI:
     from rosettastone.server.api.models import router as models_router
     from rosettastone.server.api.pipelines import router as pipelines_router
     from rosettastone.server.api.reports import router as reports_router
+    from rosettastone.server.api.teams import router as teams_router
+    from rosettastone.server.api.users import router as users_router
     from rosettastone.server.api.versioning import router as versioning_router
 
     app.include_router(migrations_router)
@@ -192,6 +196,10 @@ def create_app() -> FastAPI:
     app.include_router(audit_router)
     app.include_router(ab_testing_router)
     app.include_router(pipelines_router)
+    app.include_router(users_router)
+    app.include_router(teams_router)
+    app.include_router(annotations_router)
+    app.include_router(approvals_router)
 
     @app.get("/api/v1/health")
     async def health() -> dict[str, str]:
