@@ -66,10 +66,26 @@ def migrate(
     otel_path: Path | None = typer.Option(  # noqa: UP007
         None, "--otel-path", help="Path to OTel JSON export"
     ),
+    improvement_objectives: str | None = typer.Option(  # noqa: UP007
+        None,
+        "--improvement-objectives",
+        help='JSON array of objectives, e.g. \'[{"description": "be more concise"}]\'',
+    ),
 ) -> None:
     """Run a full migration: preflight -> optimize -> evaluate -> report."""
+    import json as json_mod
+
     from rosettastone.config import MigrationConfig
     from rosettastone.core.migrator import Migrator
+
+    # Parse improvement objectives from JSON string
+    parsed_objectives = None
+    if improvement_objectives:
+        try:
+            parsed_objectives = json_mod.loads(improvement_objectives)
+        except json_mod.JSONDecodeError:
+            console.print("[red]Error: --improvement-objectives must be valid JSON[/red]")
+            raise typer.Exit(code=1)
 
     config = MigrationConfig(
         source_model=source,
@@ -96,6 +112,7 @@ def migrate(
         langsmith_start_date=langsmith_start,
         langsmith_end_date=langsmith_end,
         otel_path=otel_path,
+        improvement_objectives=parsed_objectives,
     )
     migrator = Migrator(config)
     result = migrator.run()
@@ -198,7 +215,7 @@ def ci_report(
     result_path: Path = typer.Option(
         ..., "--result", "-r", help="Path to migration result JSON file"
     ),
-    format: str = typer.Option(
+    output_format: str = typer.Option(
         "json", "--format", "-f", help="Output format: json, pr-comment, or quality-diff"
     ),
     source: str | None = typer.Option(  # noqa: UP007
@@ -237,18 +254,19 @@ def ci_report(
     )
 
     try:
-        if format == "json":
+        if output_format == "json":
             formatted = format_ci_json(result)
-        elif format == "pr-comment":
+        elif output_format == "pr-comment":
             if not source or not target:
                 console.print("[red]Error: pr-comment format requires --from and --to flags[/red]")
                 raise typer.Exit(code=1)
             formatted = format_pr_comment(result, source, target)
-        elif format == "quality-diff":
+        elif output_format == "quality-diff":
             formatted = format_quality_diff(result)
         else:
             console.print(
-                f"[red]Unknown format: {format}. Use: json, pr-comment, or quality-diff[/red]"
+                f"[red]Unknown format: {output_format}. "
+                f"Use: json, pr-comment, or quality-diff[/red]"
             )
             raise typer.Exit(code=1)
 

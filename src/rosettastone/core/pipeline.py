@@ -80,8 +80,10 @@ def _build_adapter(config: MigrationConfig) -> Any:
     if adapter_type == AdapterChoice.BRAINTRUST:
         from rosettastone.ingest.braintrust_adapter import BraintrustAdapter
 
+        if not config.braintrust_project:
+            raise ValueError("braintrust_project is required for the Braintrust adapter")
         return BraintrustAdapter(
-            project_name=config.braintrust_project or "",
+            project_name=config.braintrust_project,
             source_model=config.source_model,
         )
 
@@ -121,6 +123,33 @@ def load_and_split_data(
     from rosettastone.ingest.splitter import split_data
 
     pairs = adapter.load()
+
+    # Optional: cluster prompts for analysis/dedup before splitting
+    if config.cluster_prompts and pairs:
+        try:
+            from rosettastone.cluster.embedder import PromptClusterer
+
+            clusterer = PromptClusterer()
+            cluster_result = clusterer.cluster(pairs)
+            # Use the largest cluster's pairs as a deduped representative set
+            if cluster_result.clusters:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.info(
+                    "Clustered %d pairs into %d groups (silhouette=%.2f)",
+                    len(pairs),
+                    len(cluster_result.clusters),
+                    cluster_result.silhouette_score or 0.0,
+                )
+        except ImportError:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Clustering requested but dependencies not installed. "
+                "Install with: uv pip install 'rosettastone[clustering]'"
+            )
+
     return split_data(pairs, config.train_split, config.val_split)
 
 

@@ -68,7 +68,7 @@ class Migrator:
 
         # Step 3.5: Safety checks on optimized prompt
         t0 = time.time()
-        run_pii_scan_text(optimized_prompt, ctx)
+        run_pii_scan_text(optimized_prompt, ctx, self.config)
         run_prompt_audit(optimized_prompt, train, ctx, self.config)
         ctx.timing["prompt_safety"] = time.time() - t0
 
