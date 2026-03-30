@@ -1,0 +1,21 @@
+pipeline:
+  name: "customer-support-agent"
+  source_model: "openai/gpt-4o"
+  target_model: "anthropic/claude-sonnet-4"
+  modules:
+    - name: intent_classifier
+      prompt_template: "Classify the user intent into one of: billing, technical, general"
+      input_fields: [user_message]
+      output_fields: [intent, confidence]
+
+    - name: response_generator
+      prompt_template: "Generate a helpful response based on the classified intent"
+      input_fields: [user_message, intent]
+      output_fields: [response]
+      depends_on: [intent_classifier]
+
+    - name: quality_checker
+      prompt_template: "Check response quality and suggest improvements"
+      input_fields: [response, intent]
+      output_fields: [quality_score, suggestions]
+      depends_on: [response_generator]
