@@ -8,7 +8,7 @@
 {% if alerts %}
 <section class="rounded-xl bg-[#D4A574]/10 border-l-4 border-[#D4A574] p-6">
     <div class="flex items-start gap-4">
-        <span class="material-symbols-outlined text-[#D4A574] mt-0.5">warning</span>
+        <span class="material-symbols-outlined text-[#D4A574] mt-0.5" aria-hidden="true">warning</span>
         <div class="space-y-2">
             <h3 class="font-bold text-[#E8DCC4] text-sm uppercase tracking-wider">{{ alerts|length }} things need your attention</h3>
             <ul class="space-y-1">
@@ -44,13 +44,13 @@
                     <h3 class="text-xl font-bold text-on-surface">{{ model.id }}</h3>
                     <p class="text-xs text-[#D4A574]/80">Retiring {{ model.retirement_date }}</p>
                 </div>
-                <span class="material-symbols-outlined text-outline group-hover:text-[#D4A574] transition-colors">warning</span>
+                <span class="material-symbols-outlined text-outline group-hover:text-[#D4A574] transition-colors" aria-hidden="true">warning</span>
             </div>
             <div class="bg-[#D4A574]/5 p-4 rounded-lg my-6">
                 <p class="text-[10px] font-mono text-[#D4A574] uppercase tracking-widest mb-1">Recommended Upgrade</p>
                 <p class="font-bold text-on-surface">{{ model.replacement }} (latest)</p>
             </div>
-            <a class="text-[#D4745E] font-bold text-sm inline-flex items-center gap-2 hover:translate-x-1 transition-transform" href="/ui/migrations/new?source={{ model.id }}">Start migration <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
+            <a class="text-[#D4745E] font-bold text-sm inline-flex items-center gap-2 hover:translate-x-1 transition-transform" href="/ui/migrations/new?source={{ model.id }}">Start migration <span class="material-symbols-outlined text-sm" aria-hidden="true">arrow_forward</span></a>
         </div>
         {% else %}
         <!-- Active Card -->
@@ -63,7 +63,7 @@
                     </div>
                     <h3 class="text-xl font-bold text-on-surface">{{ model.id }}</h3>
                 </div>
-                <span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">more_vert</span>
+                <span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors" aria-hidden="true">more_vert</span>
             </div>
             <div class="bg-surface-container-lowest p-4 rounded-lg my-6 flex justify-between items-center">
                 <div class="text-center px-4 border-r border-outline-variant/20">
@@ -79,7 +79,7 @@
                     <p class="font-bold text-on-surface">{{ model.provider }}</p>
                 </div>
             </div>
-            <a class="text-[#D4745E] font-bold text-sm inline-flex items-center gap-2 hover:translate-x-1 transition-transform" href="/ui/migrations/new?source={{ model.id }}">Run migration <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
+            <a class="text-[#D4745E] font-bold text-sm inline-flex items-center gap-2 hover:translate-x-1 transition-transform" href="/ui/migrations/new?source={{ model.id }}">Run migration <span class="material-symbols-outlined text-sm" aria-hidden="true">arrow_forward</span></a>
         </div>
         {% endif %}
         {% endfor %}
@@ -87,7 +87,7 @@
         <!-- Add Model Card -->
         <button class="bg-transparent border-2 border-dashed border-outline-variant/30 rounded-xl flex flex-col items-center justify-center p-8 hover:bg-surface-container-low hover:border-primary/40 transition-all min-h-[220px] group">
             <div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <span class="material-symbols-outlined text-primary">add</span>
+                <span class="material-symbols-outlined text-primary" aria-hidden="true">add</span>
             </div>
             <span class="text-on-surface font-bold">Add model</span>
             <span class="text-outline text-xs mt-1">Deploy new intelligence</span>
@@ -101,15 +101,15 @@
     <!-- Filters -->
     <div class="flex flex-col md:flex-row gap-4 items-center">
         <div class="relative flex-grow w-full">
-            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline">search</span>
+            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline" aria-hidden="true">search</span>
             <input class="w-full bg-[#2C2C2C] border-none rounded-lg pl-12 pr-4 py-3 text-sm focus:ring-1 focus:ring-primary/50 text-on-surface placeholder-outline/50" placeholder="Search 2,450+ models..." type="text"/>
         </div>
         <div class="flex gap-4 w-full md:w-auto">
             <button class="flex items-center justify-between gap-4 px-4 py-3 bg-[#2C2C2C] rounded-lg text-sm text-on-surface min-w-[140px] hover:bg-surface-container-highest transition-colors">
-                Provider <span class="material-symbols-outlined text-xs">expand_more</span>
+                Provider <span class="material-symbols-outlined text-xs" aria-hidden="true">expand_more</span>
             </button>
             <button class="flex items-center justify-between gap-4 px-4 py-3 bg-[#2C2C2C] rounded-lg text-sm text-on-surface min-w-[140px] hover:bg-surface-container-highest transition-colors">
-                Capability <span class="material-symbols-outlined text-xs">expand_more</span>
+                Capability <span class="material-symbols-outlined text-xs" aria-hidden="true">expand_more</span>
             </button>
         </div>
     </div>

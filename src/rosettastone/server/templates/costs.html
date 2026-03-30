@@ -10,7 +10,7 @@
     <div class="relative group">
         <button class="bg-[#2a2a2a] hover:bg-[#393939] text-[#E5E2E1] px-5 py-2.5 rounded-lg flex items-center gap-3 transition-all">
             <span class="text-sm font-medium">This month</span>
-            <span class="material-symbols-outlined text-sm">expand_more</span>
+            <span class="material-symbols-outlined text-sm" aria-hidden="true">expand_more</span>
         </button>
     </div>
 </header>
@@ -24,7 +24,7 @@
             <span class="text-[#BDBDBD] text-sm font-medium">Estimated this month</span>
         </div>
         <div class="mt-4 pt-4 border-t border-[#393939] flex items-center gap-2">
-            <span class="material-symbols-outlined text-primary text-sm">trending_up</span>
+            <span class="material-symbols-outlined text-primary text-sm" aria-hidden="true">trending_up</span>
             <span class="text-xs text-[#BDBDBD] font-['JetBrains_Mono']">+12.4% vs last month</span>
         </div>
     </div>
@@ -35,7 +35,7 @@
             <span class="text-[#BDBDBD] text-sm font-medium">Potential savings</span>
         </div>
         <div class="mt-4 pt-4 border-t border-[#393939] flex items-center gap-2">
-            <span class="material-symbols-outlined text-[#8B9D83] text-sm">auto_awesome</span>
+            <span class="material-symbols-outlined text-[#8B9D83] text-sm" aria-hidden="true">auto_awesome</span>
             <span class="text-xs text-[#BDBDBD] font-['JetBrains_Mono']">{{ costs.opportunities|length }} actionable optimizations</span>
         </div>
     </div>
@@ -46,7 +46,7 @@
             <span class="text-[#BDBDBD] text-sm font-medium">After optimization</span>
         </div>
         <div class="mt-4 pt-4 border-t border-[#393939] flex items-center gap-2">
-            <span class="material-symbols-outlined text-secondary text-sm">check_circle</span>
+            <span class="material-symbols-outlined text-secondary text-sm" aria-hidden="true">check_circle</span>
             <span class="text-xs text-[#BDBDBD] font-['JetBrains_Mono']">Target budget reached</span>
         </div>
     </div>
@@ -78,7 +78,7 @@
         {% for opp in costs.opportunities %}
         <div class="bg-[#8B9D83]/5 border-l-4 border-[#8B9D83] p-8 flex gap-6 items-start">
             <div class="bg-[#D4A574]/10 p-3 rounded-lg">
-                <span class="material-symbols-outlined text-[#D4A574] text-3xl">{% if loop.index0 == 0 %}lightbulb{% else %}bolt{% endif %}</span>
+                <span class="material-symbols-outlined text-[#D4A574] text-3xl" aria-hidden="true">{% if loop.index0 == 0 %}lightbulb{% else %}bolt{% endif %}</span>
             </div>
             <div class="flex-1">
                 <h3 class="text-[#E5E2E1] font-bold text-lg mb-2">{{ opp.title }}</h3>

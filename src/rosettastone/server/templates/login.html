@@ -15,8 +15,8 @@
         <div class="bg-surface-container-low rounded-xl p-8 shadow-2xl shadow-black/40 border border-outline-variant/10">
 
             {% if error %}
-            <div class="mb-6 bg-error/10 border border-error/30 rounded-xl p-4 flex items-start gap-3">
-                <span class="material-symbols-outlined text-error mt-0.5">error</span>
+            <div class="mb-6 bg-error/10 border border-error/30 rounded-xl p-4 flex items-start gap-3" role="alert">
+                <span class="material-symbols-outlined text-error mt-0.5" aria-hidden="true">error</span>
                 <p class="text-sm text-error">{{ error }}</p>
             </div>
             {% endif %}
@@ -42,7 +42,7 @@
                     type="submit"
                     class="w-full py-3 bg-[#D4745E] text-white font-bold rounded-lg hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-[#D4745E]/20 flex items-center justify-center gap-2"
                 >
-                    <span class="material-symbols-outlined text-sm">login</span>
+                    <span class="material-symbols-outlined text-sm" aria-hidden="true">login</span>
                     Sign In
                 </button>
 
