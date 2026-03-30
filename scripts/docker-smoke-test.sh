@@ -48,6 +48,9 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   fi
 done
 
-# Step 4: Failure case
+# Step 4: Failure case — dump logs for debugging
 echo "FAILURE: Health check did not pass after ${MAX_ATTEMPTS} attempts"
+echo ""
+echo "=== Container logs ==="
+docker compose logs app 2>&1 | tail -50
 exit 1

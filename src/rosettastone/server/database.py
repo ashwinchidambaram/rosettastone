@@ -35,7 +35,7 @@ def get_engine():
     global _engine
     if _engine is None:
         database_url = os.environ.get("DATABASE_URL", "")
-        if database_url.startswith("postgresql://"):
+        if database_url.startswith(("postgresql://", "postgresql+")):
             _engine = create_engine(database_url, echo=False)
         else:
             db_path = _get_db_path()

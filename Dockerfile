@@ -16,12 +16,15 @@ RUN pip install --no-cache-dir uv
 
 WORKDIR /build
 
-# Copy only the files needed for dependency installation first (layer caching)
-COPY pyproject.toml .
-COPY src/ src/
-
-# Install all dependencies (including the [all] extras) into the system Python
+# Copy dependency spec first for layer caching — a stub package satisfies hatchling
+# so dependency install only reruns when pyproject.toml changes, not on every src edit
+COPY pyproject.toml uv.lock ./
+RUN mkdir -p src/rosettastone && touch src/rosettastone/__init__.py
 RUN uv pip install --system ".[all]"
+
+# Now copy the real source (this layer changes on every code edit, but deps are cached)
+COPY src/ src/
+RUN uv pip install --system --no-deps "."
 
 # ──────────────────────────────────────────────
 # Runtime stage
@@ -41,7 +44,7 @@ RUN apt-get update \
 
 # Create a non-root user
 RUN groupadd --system rosettastone \
-    && useradd --system --gid rosettastone --no-create-home rosettastone
+    && useradd --system --gid rosettastone --create-home rosettastone
 
 # Copy installed Python packages from the builder stage
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
@@ -58,7 +61,7 @@ USER rosettastone
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
 CMD ["uvicorn", "rosettastone.server.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
