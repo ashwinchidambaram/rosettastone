@@ -531,5 +531,21 @@
 
 {% endif %}
 
+<!-- Version History -->
+{% if migration.status == 'complete' %}
+<div class="mt-12">
+  <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+    <span class="material-symbols-outlined text-[20px]" aria-hidden="true">history</span>
+    Version History
+  </h3>
+  <div id="version-timeline"
+       hx-get="/ui/migrations/{{ migration.id }}/versions"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <p class="text-sm text-gray-500">Loading versions...</p>
+  </div>
+</div>
+{% endif %}
+
 </div>
 {% endblock %}

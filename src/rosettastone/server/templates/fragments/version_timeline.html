@@ -1,0 +1,33 @@
+{% if versions %}
+<div class="flex flex-col gap-2">
+  {% for v in versions %}
+  <div class="flex items-center gap-4 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+    <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-sm font-bold text-blue-700 dark:text-blue-400">
+      v{{ v.version_number }}
+    </div>
+    <div class="flex-1 min-w-0">
+      <div class="text-sm font-medium">Version {{ v.version_number }}</div>
+      <div class="text-xs text-gray-500 dark:text-gray-400">
+        {{ v.created_at.strftime('%Y-%m-%d %H:%M') }}
+        {% if v.created_by %} by {{ v.created_by }}{% endif %}
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      {% if v.confidence_score is not none %}
+      <span class="text-sm font-mono {% if v.confidence_score >= 0.8 %}text-green-600 dark:text-green-400{% elif v.confidence_score >= 0.6 %}text-yellow-600 dark:text-yellow-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+        {{ '%.0f' | format(v.confidence_score * 100) }}%
+      </span>
+      {% endif %}
+      <form method="post" action="/api/v1/migrations/{{ migration_id }}/versions/{{ v.id }}/rollback"
+            onsubmit="return confirm('Rollback to version {{ v.version_number }}?')">
+        <button type="submit" class="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+          Rollback
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="text-sm text-gray-500 dark:text-gray-400">No versions recorded yet.</p>
+{% endif %}

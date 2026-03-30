@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
 from sqlmodel import Session, func, select
 
 from rosettastone.server.api.audit import log_audit
@@ -71,6 +72,27 @@ def create_version(migration_id: int, session: Session) -> MigrationVersion:
 # ---------------------------------------------------------------------------
 # API endpoints
 # ---------------------------------------------------------------------------
+
+
+@router.get("/ui/migrations/{migration_id}/versions", response_class=HTMLResponse)
+async def migration_versions_fragment(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """HTMX fragment: list versions for a migration."""
+    stmt = (
+        select(MigrationVersion)
+        .where(MigrationVersion.migration_id == migration_id)
+        .order_by(MigrationVersion.version_number.desc())  # type: ignore[union-attr]
+    )
+    versions = list(session.exec(stmt).all())
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "fragments/version_timeline.html",
+        {"versions": versions, "migration_id": migration_id},
+    )
 
 
 @router.get(
