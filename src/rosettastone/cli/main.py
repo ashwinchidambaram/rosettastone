@@ -9,7 +9,9 @@ console = Console()
 
 @app.command()
 def migrate(
-    data: Path = typer.Option(..., "--data", "-d", help="Path to JSONL file"),
+    data: Path | None = typer.Option(  # noqa: UP007
+        None, "--data", "-d", help="Path to data file (JSONL/CSV/OTel)"
+    ),
     source: str = typer.Option(..., "--from", help="Source model (e.g. openai/gpt-4o)"),
     target: str = typer.Option(..., "--to", help="Target model (e.g. anthropic/claude-sonnet-4)"),
     output: Path = typer.Option("./migration_output", "--output", "-o"),
@@ -31,6 +33,39 @@ def migrate(
     mipro_auto: str | None = typer.Option(  # noqa: UP007
         None, "--mipro-auto", help="MIPROv2 auto preset: light/medium/heavy"
     ),
+    # Phase 4 flags
+    adapter: str = typer.Option(
+        "jsonl", "--adapter", help="Data adapter: jsonl, redis, csv, braintrust, langsmith, otel"
+    ),
+    pii_engine: str = typer.Option("regex", "--pii-engine", help="PII scanner: regex or presidio"),
+    cluster_prompts: bool = typer.Option(
+        False, "--cluster-prompts", help="Cluster prompts before optimization"
+    ),
+    # Adapter-specific options
+    csv_delimiter: str | None = typer.Option(  # noqa: UP007
+        None, "--csv-delimiter", help="CSV delimiter"
+    ),
+    csv_prompt_col: str | None = typer.Option(  # noqa: UP007
+        None, "--csv-prompt-col", help="CSV prompt column name"
+    ),
+    csv_response_col: str | None = typer.Option(  # noqa: UP007
+        None, "--csv-response-col", help="CSV response column name"
+    ),
+    braintrust_project: str | None = typer.Option(  # noqa: UP007
+        None, "--braintrust-project", help="Braintrust project name"
+    ),
+    langsmith_project: str | None = typer.Option(  # noqa: UP007
+        None, "--langsmith-project", help="LangSmith project name"
+    ),
+    langsmith_start: str | None = typer.Option(  # noqa: UP007
+        None, "--langsmith-start", help="LangSmith start date (ISO-8601)"
+    ),
+    langsmith_end: str | None = typer.Option(  # noqa: UP007
+        None, "--langsmith-end", help="LangSmith end date (ISO-8601)"
+    ),
+    otel_path: Path | None = typer.Option(  # noqa: UP007
+        None, "--otel-path", help="Path to OTel JSON export"
+    ),
 ) -> None:
     """Run a full migration: preflight -> optimize -> evaluate -> report."""
     from rosettastone.config import MigrationConfig
@@ -49,6 +84,18 @@ def migrate(
         pii_scan=not no_pii_scan,
         prompt_audit=not no_prompt_audit,
         mipro_auto=mipro_auto if optimizer == "mipro" else None,  # type: ignore[arg-type]
+        # Phase 4
+        adapter=adapter,  # type: ignore[arg-type]
+        pii_engine=pii_engine,  # type: ignore[arg-type]
+        cluster_prompts=cluster_prompts,
+        csv_delimiter=csv_delimiter,
+        csv_prompt_column=csv_prompt_col,
+        csv_response_column=csv_response_col,
+        braintrust_project=braintrust_project,
+        langsmith_project=langsmith_project,
+        langsmith_start_date=langsmith_start,
+        langsmith_end_date=langsmith_end,
+        otel_path=otel_path,
     )
     migrator = Migrator(config)
     result = migrator.run()
