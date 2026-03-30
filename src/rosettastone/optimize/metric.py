@@ -22,6 +22,9 @@ def build_migration_metric(
 
     If train_set is provided and contains pairs with feedback, known issues are
     prepended to the metric feedback for pairs that match.
+
+    If config.improvement_objectives is set, the metric blends equivalence scoring
+    with LLM-as-judge improvement scoring using compute_blended_score.
     """
     # Build feedback map if train_set provided
     feedback_map: dict[str, str] = {}
@@ -29,6 +32,18 @@ def build_migration_metric(
         from rosettastone.optimize.feedback import build_feedback_map
 
         feedback_map = build_feedback_map(train_set)
+
+    # Build improvement scorer if objectives are specified
+    improvement_scorer = None
+    if config.improvement_objectives:
+        from rosettastone.optimize.improvement import build_improvement_scorer
+
+        objective_descriptions = [
+            str(obj["description"]) for obj in config.improvement_objectives
+        ]
+        improvement_scorer = build_improvement_scorer(
+            objective_descriptions, config.judge_model
+        )
 
     def migration_metric(
         gold: Any,
@@ -72,6 +87,17 @@ def build_migration_metric(
             feedback_parts.append(f"Good match (similarity: {sem_score:.2f})")
 
         feedback = "\n".join(feedback_parts) if feedback_parts else ""
+
+        # Blend with improvement scores and merge feedback if objectives are specified
+        if improvement_scorer is not None:
+            from rosettastone.optimize.improvement import (
+                build_improvement_feedback,
+                compute_blended_score,
+            )
+
+            improvement_scores = improvement_scorer(gold.prompt, gold.expected_response, actual)
+            score = compute_blended_score(sem_score, improvement_scores)
+            feedback = build_improvement_feedback(feedback, improvement_scores)
 
         # Prepend known-issue feedback if available
         if feedback_map:
