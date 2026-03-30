@@ -146,5 +146,77 @@ def batch(
     console.print(summary)
 
 
+@app.command(name="ci-report")
+def ci_report(
+    result_path: Path = typer.Option(
+        ..., "--result", "-r", help="Path to migration result JSON file"
+    ),
+    format: str = typer.Option(
+        "json", "--format", "-f", help="Output format: json, pr-comment, or quality-diff"
+    ),
+    source: str | None = typer.Option(  # noqa: UP007
+        None, "--from", help="Source model (required for pr-comment format)"
+    ),
+    target: str | None = typer.Option(  # noqa: UP007
+        None, "--to", help="Target model (required for pr-comment format)"
+    ),
+    output: Path | None = typer.Option(  # noqa: UP007
+        None, "--output", "-o", help="Write output to file (default: stdout)"
+    ),
+) -> None:
+    """Generate CI/CD-friendly output from a migration result."""
+    import json
+
+    from rosettastone.core.types import MigrationResult
+
+    # Load result from JSON file
+    try:
+        raw = json.loads(result_path.read_text())
+        result = MigrationResult(**raw)
+    except FileNotFoundError:
+        console.print(f"[red]Error: Result file not found: {result_path}[/red]")
+        raise typer.Exit(code=1)
+    except json.JSONDecodeError:
+        console.print(f"[red]Error: Invalid JSON in {result_path}[/red]")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"[red]Error loading result: {e}[/red]")
+        raise typer.Exit(code=1)
+
+    from rosettastone.cli.ci_output import (
+        format_ci_json,
+        format_pr_comment,
+        format_quality_diff,
+    )
+
+    try:
+        if format == "json":
+            formatted = format_ci_json(result)
+        elif format == "pr-comment":
+            if not source or not target:
+                console.print(
+                    "[red]Error: pr-comment format requires --from and --to flags[/red]"
+                )
+                raise typer.Exit(code=1)
+            formatted = format_pr_comment(result, source, target)
+        elif format == "quality-diff":
+            formatted = format_quality_diff(result)
+        else:
+            console.print(
+                "[red]Unknown format: "
+                f"{format}. Use: json, pr-comment, or quality-diff[/red]"
+            )
+            raise typer.Exit(code=1)
+
+        if output:
+            output.write_text(formatted)
+            console.print(f"[green]Written to {output}[/green]")
+        else:
+            console.print(formatted, highlight=False)
+    except Exception as e:
+        console.print(f"[red]Error formatting output: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()
