@@ -83,9 +83,7 @@ def _migrate_add_columns(engine) -> None:
             # SQLite does not support IF NOT EXISTS for columns; use try/except
             for table, column, col_type in new_columns:
                 try:
-                    conn.exec_driver_sql(
-                        f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"
-                    )
+                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
                 except Exception:
                     pass  # Column already exists
         conn.commit()
