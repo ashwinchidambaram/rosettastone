@@ -1,25 +1,95 @@
 {% extends "base.html" %}
-{% block title %}RosettaStone | Pipelines{% endblock %}
+{% block title %}RosettaStone | Pipeline Migrations{% endblock %}
+
+{% block head_extra %}
+<style>
+    .card-glow-pipeline:hover {
+        box-shadow: 0 0 15px -3px rgba(212, 116, 94, 0.15);
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto">
-  <div class="flex items-center justify-between mb-6">
-    <h2 class="text-2xl font-bold">Pipelines</h2>
-  </div>
-  <p class="text-gray-500">Pipeline list — full UI coming in 5.4.8.</p>
-  {% if pipelines %}
-  <ul class="mt-4 space-y-2">
+<div class="min-h-screen pb-20 px-8 max-w-6xl mx-auto pt-16">
+
+<!-- Header Section -->
+<header class="flex justify-between items-end mb-12">
+    <div>
+        <h1 class="font-headline font-semibold text-[28px] text-[#E8DCC4] tracking-tight">Pipeline Migrations</h1>
+        <p class="text-on-surface-variant text-sm mt-2 opacity-70">Multi-step LLM pipeline optimization</p>
+    </div>
+    <a href="#" class="bg-[#D4745E] text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-[#D4745E]/20">
+        <span class="material-symbols-outlined text-sm" aria-hidden="true">add</span>
+        Create New Pipeline
+    </a>
+</header>
+
+<!-- Pipeline List -->
+<div class="flex flex-col gap-4">
+    {% if pipelines %}
     {% for pipeline in pipelines %}
-    <li>
-      <a href="/ui/pipelines/{{ pipeline.id }}" class="hover:underline font-medium">
-        {{ pipeline.name }}
-      </a>
-      <span class="ml-2 text-sm text-gray-500">{{ pipeline.status }}</span>
-    </li>
+    <a href="/ui/pipelines/{{ pipeline.id }}" class="block">
+    <div class="group relative bg-[#3D3D3D] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 card-glow-pipeline active:scale-[0.99]">
+        <div class="absolute left-0 top-0 bottom-0 w-1
+            {% if pipeline.status == 'complete' %}bg-[#8B9D83]
+            {% elif pipeline.status == 'failed' %}bg-[#D85650]
+            {% elif pipeline.status == 'running' %}bg-[#D4A373]
+            {% else %}bg-[#55433e]{% endif %}"></div>
+        <div class="p-6 pl-8">
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-on-surface-variant text-xl" aria-hidden="true">account_tree</span>
+                    <h3 class="font-headline font-medium text-[18px] text-on-surface">{{ pipeline.name }}</h3>
+                </div>
+                <span class="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider
+                    {% if pipeline.status == 'complete' %}bg-[#8B9D83] text-[#131313]
+                    {% elif pipeline.status == 'failed' %}bg-[#D85650] text-white
+                    {% elif pipeline.status == 'running' %}bg-[#D4A373] text-[#131313]
+                    {% else %}bg-[#55433e] text-[#dbc1bb]{% endif %}">
+                    {{ pipeline.status }}
+                </span>
+            </div>
+            <div class="flex items-center gap-4 text-[#BDBDBD] font-label text-[13px]">
+                <div class="flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[16px] text-on-surface-variant" aria-hidden="true">smart_toy</span>
+                    <span class="font-mono text-xs">{{ pipeline.source_model }}</span>
+                </div>
+                <span class="material-symbols-outlined text-[16px] text-on-surface-variant/40" aria-hidden="true">arrow_forward</span>
+                <div class="flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[16px] text-[#D4745E]" aria-hidden="true">smart_toy</span>
+                    <span class="font-mono text-xs">{{ pipeline.target_model }}</span>
+                </div>
+                <span class="text-white/10">&bull;</span>
+                <div class="flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]" aria-hidden="true">schedule</span>
+                    {{ pipeline.created_at.strftime('%Y-%m-%d %H:%M') }}
+                </div>
+            </div>
+        </div>
+    </div>
+    </a>
     {% endfor %}
-  </ul>
-  {% else %}
-  <p class="mt-4 text-gray-400">No pipelines yet.</p>
-  {% endif %}
+    {% else %}
+    <div class="flex flex-col items-center justify-center py-24 text-center text-on-surface-variant/50">
+        <span class="material-symbols-outlined text-5xl mb-4 opacity-30" aria-hidden="true">account_tree</span>
+        <p class="text-lg font-medium">No pipeline migrations yet</p>
+        <p class="text-sm mt-2 opacity-70">Submit a YAML pipeline config via the API to get started.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Count Footer -->
+<div class="mt-12 flex justify-between items-center px-4">
+    <span class="font-['JetBrains_Mono'] text-[12px] uppercase tracking-widest text-[#BDBDBD]">Showing {{ pipelines|length }} pipeline{{ 's' if pipelines|length != 1 else '' }}</span>
+    <div class="flex gap-2">
+        <button class="p-2 bg-surface-container-high rounded-lg text-on-surface-variant hover:text-on-surface disabled:opacity-30" disabled>
+            <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+        </button>
+        <button class="p-2 bg-surface-container-high rounded-lg text-on-surface-variant hover:text-on-surface disabled:opacity-30" disabled>
+            <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+        </button>
+    </div>
+</div>
+
 </div>
 {% endblock %}

@@ -241,3 +241,30 @@ async def pipeline_detail_page(
         "pipeline_detail.html",
         {"active_nav": "pipelines", "pipeline": pipeline, "stages": stages},
     )
+
+
+@router.get("/ui/pipelines/{pipeline_id}/stages-fragment", response_class=HTMLResponse)
+async def pipeline_stages_fragment(
+    pipeline_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    """HTMX fragment: returns the pipeline stages table for polling updates."""
+    pipeline = session.get(PipelineRecord, pipeline_id)
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    stages = list(
+        session.exec(
+            select(PipelineStageRecord).where(
+                PipelineStageRecord.pipeline_id == pipeline_id  # type: ignore[arg-type]
+            )
+        ).all()
+    )
+
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "fragments/pipeline_stages.html",
+        {"stages": stages},
+    )
