@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import HTMLResponse
 from sqlmodel import Session, func, select
 
 from rosettastone.server.database import get_session
@@ -98,3 +99,35 @@ def list_audit_log(
     ]
 
     return PaginatedResponse(items=items, total=total, page=page, per_page=per_page)
+
+
+# ---------------------------------------------------------------------------
+# UI routes
+# ---------------------------------------------------------------------------
+
+
+@router.get("/ui/audit-log", response_class=HTMLResponse)
+async def audit_log_page(
+    request: Request,
+    resource_type: str | None = Query(None),
+    action: str | None = Query(None),
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Render the audit log UI page with optional filters."""
+    conditions = []
+    if resource_type:
+        conditions.append(AuditLog.resource_type == resource_type)
+    if action:
+        conditions.append(AuditLog.action == action)
+
+    stmt = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(200)  # type: ignore[union-attr]
+    if conditions:
+        stmt = stmt.where(*conditions)
+    entries = list(session.exec(stmt).all())
+
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "audit_log.html",
+        {"active_nav": "audit", "entries": entries},
+    )

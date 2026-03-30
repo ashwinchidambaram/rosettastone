@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}RosettaStone | Audit Log{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <h2 class="text-2xl font-bold mb-6">Audit Log</h2>
+
+  <!-- Filters -->
+  <form method="get" action="/ui/audit-log" class="flex flex-wrap gap-4 mb-6">
+    <select name="resource_type" class="border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600">
+      <option value="">All Resources</option>
+      <option value="migration" {% if request.query_params.get('resource_type') == 'migration' %}selected{% endif %}>Migration</option>
+      <option value="model" {% if request.query_params.get('resource_type') == 'model' %}selected{% endif %}>Model</option>
+    </select>
+    <select name="action" class="border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600">
+      <option value="">All Actions</option>
+      <option value="create" {% if request.query_params.get('action') == 'create' %}selected{% endif %}>Create</option>
+      <option value="complete" {% if request.query_params.get('action') == 'complete' %}selected{% endif %}>Complete</option>
+      <option value="rollback" {% if request.query_params.get('action') == 'rollback' %}selected{% endif %}>Rollback</option>
+      <option value="failed" {% if request.query_params.get('action') == 'failed' %}selected{% endif %}>Failed</option>
+      <option value="blocked" {% if request.query_params.get('action') == 'blocked' %}selected{% endif %}>Blocked</option>
+    </select>
+    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Filter</button>
+  </form>
+
+  <!-- Table -->
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-100 dark:bg-gray-800">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium">Time</th>
+          <th class="px-4 py-3 text-left font-medium">Resource</th>
+          <th class="px-4 py-3 text-left font-medium">Action</th>
+          <th class="px-4 py-3 text-left font-medium">Details</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+        {% for entry in entries %}
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+          <td class="px-4 py-3 whitespace-nowrap">{{ entry.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="px-4 py-3">{{ entry.resource_type }}{% if entry.resource_id %} #{{ entry.resource_id }}{% endif %}</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded text-xs font-medium
+              {% if entry.action == 'complete' %}bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400
+              {% elif entry.action == 'failed' %}bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400
+              {% elif entry.action == 'rollback' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400
+              {% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300{% endif %}">
+              {{ entry.action }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{{ entry.details_json if entry.details_json != '{}' else '' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not entries %}
+        <tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No audit log entries found.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
