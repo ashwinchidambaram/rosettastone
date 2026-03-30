@@ -191,3 +191,75 @@ class PipelineStageRecord(SQLModel, table=True):
     optimized_prompt: str | None = None
     score: float | None = None
     duration_seconds: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Task 5.5.1 — User, Team, TeamMembership
+# ---------------------------------------------------------------------------
+
+
+class User(SQLModel, table=True):
+    __tablename__ = "users"
+
+    id: int | None = Field(default=None, primary_key=True)
+    username: str = Field(unique=True, index=True)
+    email: str | None = None
+    hashed_password: str | None = None
+    role: str = Field(default="viewer")  # viewer / editor / approver / admin
+    api_key: str | None = Field(default=None, unique=True, index=True)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class Team(SQLModel, table=True):
+    __tablename__ = "teams"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(unique=True, index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class TeamMembership(SQLModel, table=True):
+    __tablename__ = "team_memberships"
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    team_id: int = Field(foreign_key="teams.id", index=True)
+    role: str = Field(default="member")  # member / lead
+
+
+# ---------------------------------------------------------------------------
+# Task 5.5.2 — Annotation, ApprovalWorkflow, Approval
+# ---------------------------------------------------------------------------
+
+
+class Annotation(SQLModel, table=True):
+    __tablename__ = "annotations"
+
+    id: int | None = Field(default=None, primary_key=True)
+    migration_id: int = Field(foreign_key="migrations.id", index=True)
+    test_case_id: int | None = Field(default=None, foreign_key="test_cases.id")
+    annotator_id: int | None = Field(default=None, foreign_key="users.id")
+    annotation_type: str  # "regression" / "improvement" / "edge_case"
+    text: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class ApprovalWorkflow(SQLModel, table=True):
+    __tablename__ = "approval_workflows"
+
+    id: int | None = Field(default=None, primary_key=True)
+    migration_id: int = Field(foreign_key="migrations.id", unique=True, index=True)
+    required_approvals: int = Field(default=1)
+    status: str = Field(default="pending")  # pending / approved / rejected
+
+
+class Approval(SQLModel, table=True):
+    __tablename__ = "approvals"
+
+    id: int | None = Field(default=None, primary_key=True)
+    workflow_id: int = Field(foreign_key="approval_workflows.id", index=True)
+    user_id: int | None = Field(default=None, foreign_key="users.id")
+    decision: str  # "approve" / "reject"
+    comment: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
