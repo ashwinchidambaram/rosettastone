@@ -138,14 +138,14 @@ def page(server, browser_instance):
 @pytest.mark.playwright
 class TestModelsDashboard:
     def test_models_dashboard_loads(self, page: Page, server: str):
-        """GET /ui/ returns 200 and shows 'Your models' heading."""
-        page.goto(f"{server}/ui/")
+        """GET /ui/?empty=false returns 200 and shows 'Your models' heading."""
+        page.goto(f"{server}/ui/?empty=false")
         expect(page).to_have_title(re.compile(r"Model Intelligence", re.IGNORECASE))
         expect(page.locator("h2").filter(has_text="Your models")).to_be_visible()
 
     def test_models_dashboard_shows_all_models(self, page: Page, server: str):
         """All 4 DUMMY_MODELS are rendered on the page."""
-        page.goto(f"{server}/ui/")
+        page.goto(f"{server}/ui/?empty=false")
         expect(page.locator("text=openai/gpt-4o").first).to_be_visible()
         expect(page.locator("text=anthropic/claude-sonnet-4").first).to_be_visible()
         expect(page.locator("text=openai/gpt-4o-mini").first).to_be_visible()
@@ -153,12 +153,12 @@ class TestModelsDashboard:
 
     def test_models_dashboard_active_count(self, page: Page, server: str):
         """Shows '3 ACTIVE INSTANCES' text for the 3 active models."""
-        page.goto(f"{server}/ui/")
+        page.goto(f"{server}/ui/?empty=false")
         expect(page.locator("text=3 ACTIVE INSTANCES")).to_be_visible()
 
     def test_models_dashboard_deprecated_card(self, page: Page, server: str):
         """Deprecated model card shows retirement date, replacement, and start migration link."""
-        page.goto(f"{server}/ui/")
+        page.goto(f"{server}/ui/?empty=false")
         expect(page.locator("text=Deprecated").first).to_be_visible()
         expect(page.locator("text=Retiring Apr 15, 2026")).to_be_visible()
         expect(page.locator("text=openai/gpt-4o (latest)")).to_be_visible()
@@ -166,7 +166,7 @@ class TestModelsDashboard:
 
     def test_models_dashboard_alerts_banner(self, page: Page, server: str):
         """Alerts banner shows '3 things need your attention' and all 3 alert messages."""
-        page.goto(f"{server}/ui/")
+        page.goto(f"{server}/ui/?empty=false")
         expect(page.locator("text=3 things need your attention")).to_be_visible()
         expect(page.locator("text=Model retiring in 26 days")).to_be_visible()
         expect(page.locator("text=Price decreased 17%")).to_be_visible()
@@ -174,12 +174,12 @@ class TestModelsDashboard:
 
     def test_models_dashboard_add_model_button(self, page: Page, server: str):
         """'Add model' card is present."""
-        page.goto(f"{server}/ui/")
+        page.goto(f"{server}/ui/?empty=false")
         expect(page.locator("text=Add model")).to_be_visible()
 
     def test_models_dashboard_explore_table(self, page: Page, server: str):
         """Explore models table has 5 rows with correct model names."""
-        page.goto(f"{server}/ui/")
+        page.goto(f"{server}/ui/?empty=false")
         expect(page.locator("h2").filter(has_text="Explore models")).to_be_visible()
         expect(page.locator("input[placeholder*='Search 2,450+']")).to_be_visible()
         expect(page.locator("table")).to_be_visible()
@@ -196,7 +196,7 @@ class TestModelsDashboard:
 
     def test_models_dashboard_model_costs_and_context(self, page: Page, server: str):
         """Model cards display context and cost/M values."""
-        page.goto(f"{server}/ui/")
+        page.goto(f"{server}/ui/?empty=false")
         expect(page.locator("text=$2.50").first).to_be_visible()
         expect(page.locator("text=$3.00").first).to_be_visible()
         expect(page.locator("text=OpenAI").first).to_be_visible()
@@ -204,13 +204,13 @@ class TestModelsDashboard:
 
     def test_models_dashboard_run_migration_links(self, page: Page, server: str):
         """Active model cards have 'Run migration' links."""
-        page.goto(f"{server}/ui/")
+        page.goto(f"{server}/ui/?empty=false")
         expect(page.locator("text=Run migration").first).to_be_visible()
 
     def test_nav_active_state_models(self, page: Page, server: str):
         """'Models' nav link has terracotta styling on /ui/."""
-        page.goto(f"{server}/ui/")
-        models_link = page.locator('a[href="/ui/"]')
+        page.goto(f"{server}/ui/?empty=false")
+        models_link = page.locator('a[href="/ui/"]').first
         expect(models_link).to_have_css("color", "rgb(212, 116, 94)")
 
 
@@ -268,7 +268,7 @@ class TestMigrationsList:
         expect(page).to_have_title(re.compile(r"Migrations", re.IGNORECASE))
         expect(page.locator("h1").filter(has_text="Migrations")).to_be_visible()
         expect(page.locator("p").filter(has_text="Evaluate and deploy")).to_be_visible()
-        expect(page.locator("button:has-text('+ New migration')")).to_be_visible()
+        expect(page.locator("text=+ New migration").first).to_be_visible()
 
     def test_migrations_list_card_data(self, page: Page, server: str):
         """All 3 migration cards show correct source/target, recommendation, and stats."""
@@ -321,7 +321,7 @@ class TestMigrationsList:
     def test_nav_active_state_migrations(self, page: Page, server: str):
         """'Migrations' nav link has terracotta styling on /ui/migrations."""
         page.goto(f"{server}/ui/migrations")
-        migrations_link = page.locator('a[href="/ui/migrations"]')
+        migrations_link = page.locator('a[href="/ui/migrations"]').first
         expect(migrations_link).to_have_css("color", "rgb(212, 116, 94)")
 
     def test_safe_to_ship_badge_color(self, page: Page, server: str):
@@ -621,7 +621,7 @@ class TestCostsPage:
     def test_nav_active_state_costs(self, page: Page, server: str):
         """'Costs' nav link has terracotta styling on /ui/costs."""
         page.goto(f"{server}/ui/costs")
-        costs_link = page.locator('a[href="/ui/costs"]')
+        costs_link = page.locator('a[href="/ui/costs"]').first
         expect(costs_link).to_have_css("color", "rgb(212, 116, 94)")
 
 
@@ -702,7 +702,7 @@ class TestAlertsPage:
     def test_nav_active_state_alerts(self, page: Page, server: str):
         """'Alerts' nav link has terracotta styling on /ui/alerts."""
         page.goto(f"{server}/ui/alerts")
-        alerts_link = page.locator('a[href="/ui/alerts"]')
+        alerts_link = page.locator('a[href="/ui/alerts"]').first
         expect(alerts_link).to_have_css("color", "rgb(212, 116, 94)")
 
 
@@ -876,7 +876,7 @@ class TestNavigationBar:
         ]
         for path in pages:
             page.goto(f"{server}{path}")
-            expect(page.locator("nav")).to_be_visible()
+            expect(page.locator("nav").first).to_be_visible()
             expect(page.locator("text=RosettaStone").first).to_be_visible()
             expect(page.locator('a[href="/ui/"]').first).to_be_visible()
             expect(page.locator('a[href="/ui/migrations"]').first).to_be_visible()
@@ -886,7 +886,7 @@ class TestNavigationBar:
     def test_nav_active_state_migration_detail(self, page: Page, server: str):
         """'Migrations' nav link has terracotta styling on migration detail pages."""
         page.goto(f"{server}/ui/migrations/1")
-        migrations_link = page.locator('nav a[href="/ui/migrations"]')
+        migrations_link = page.locator('nav a[href="/ui/migrations"]').first
         expect(migrations_link).to_have_css("color", "rgb(212, 116, 94)")
 
     def test_nav_alerts_notification_dot(self, page: Page, server: str):
