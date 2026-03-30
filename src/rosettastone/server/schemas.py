@@ -126,3 +126,33 @@ class PaginatedResponse(BaseModel, Generic[T]):
     total: int
     page: int
     per_page: int
+
+
+class MigrationVersionSummary(BaseModel):
+    id: int
+    migration_id: int
+    version_number: int
+    confidence_score: float | None
+    created_at: datetime
+    created_by: str | None
+
+
+class MigrationVersionDetail(BaseModel):
+    id: int
+    migration_id: int
+    version_number: int
+    snapshot: dict[str, object]
+    optimized_prompt: str | None
+    confidence_score: float | None
+    created_at: datetime
+    created_by: str | None
+
+
+class AuditLogEntry(BaseModel):
+    id: int
+    resource_type: str
+    resource_id: int | None
+    action: str
+    user_id: int | None
+    details: dict[str, object]
+    created_at: datetime
