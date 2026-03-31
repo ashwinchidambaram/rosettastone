@@ -142,6 +142,9 @@ def load_and_split_data(
                     len(cluster_result.clusters),
                     cluster_result.silhouette_score or 0.0,
                 )
+                # Replace pairs with one representative per cluster + noise pairs
+                representative_pairs = [c.pairs[0] for c in cluster_result.clusters if c.pairs]
+                pairs = representative_pairs + cluster_result.noise_pairs
         except ImportError:
             import logging
 

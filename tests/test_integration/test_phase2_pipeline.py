@@ -80,6 +80,76 @@ class TestDataSourceRouting:
         train, val, test = load_and_split_data(config)
         assert len(train) + len(val) + len(test) == 5
 
+    def test_cluster_prompts_deduplicates_to_one_representative_per_cluster(self, tmp_path):
+        """When cluster_prompts=True, pairs is replaced with one representative per cluster plus noise."""
+        from unittest.mock import MagicMock
+
+        from rosettastone.cluster.types import ClusterResult, PromptCluster
+        from rosettastone.core.pipeline import load_and_split_data
+
+        pairs = [
+            PromptPair(prompt=f"q{i}", response=f"a{i}", source_model="openai/gpt-4o")
+            for i in range(6)
+        ]
+
+        noise_pair = PromptPair(prompt="noise", response="noise_resp", source_model="openai/gpt-4o")
+
+        cluster_result = ClusterResult(
+            clusters=[
+                PromptCluster(cluster_id=0, label="group-a", pairs=pairs[0:3]),
+                PromptCluster(cluster_id=1, label="group-b", pairs=pairs[3:6]),
+            ],
+            noise_pairs=[noise_pair],
+            n_clusters=2,
+            silhouette_score=0.75,
+        )
+
+        mock_clusterer = MagicMock()
+        mock_clusterer.cluster.return_value = cluster_result
+
+        config = _make_config(tmp_path, cluster_prompts=True)
+        with patch("rosettastone.cluster.embedder.PromptClusterer", return_value=mock_clusterer):
+            train, val, test = load_and_split_data(config)
+
+        all_pairs = train + val + test
+        # 2 clusters → 2 representatives + 1 noise = 3 total
+        assert len(all_pairs) == 3
+        # Representatives are the first pair from each cluster
+        assert pairs[0] in all_pairs
+        assert pairs[3] in all_pairs
+        assert noise_pair in all_pairs
+        # Non-representative cluster members must NOT be present
+        for dropped in pairs[1:3] + pairs[4:6]:
+            assert dropped not in all_pairs
+
+    def test_cluster_prompts_import_error_falls_back_gracefully(self, tmp_path):
+        """When clustering deps are missing, load_and_split_data proceeds without clustering."""
+        import sys
+
+        from rosettastone.core.pipeline import load_and_split_data
+
+        config = _make_config(tmp_path, cluster_prompts=True)
+        # Remove the embedder module so the lazy import inside load_and_split_data raises ImportError
+        saved = sys.modules.pop("rosettastone.cluster.embedder", None)
+        try:
+            import builtins
+
+            real_import = builtins.__import__
+
+            def _block_embedder(name, *args, **kwargs):
+                if name == "rosettastone.cluster.embedder":
+                    raise ImportError("no module")
+                return real_import(name, *args, **kwargs)
+
+            with patch.object(builtins, "__import__", side_effect=_block_embedder):
+                train, val, test = load_and_split_data(config)
+        finally:
+            if saved is not None:
+                sys.modules["rosettastone.cluster.embedder"] = saved
+
+        # Should still return all 5 original pairs unmodified
+        assert len(train) + len(val) + len(test) == 5
+
 
 class TestOptimizerRouting:
     def test_mipro_auto_selects_mipro_optimizer(self, tmp_path):
