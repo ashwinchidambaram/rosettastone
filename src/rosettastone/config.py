@@ -103,3 +103,8 @@ class MigrationConfig(BaseModel):
 
     # Phase 4: Improvement mode
     improvement_objectives: list[dict[str, str | float]] | None = None
+
+    # Phase 5: Known-issue weighting
+    known_issue_weight: float = Field(
+        default=2.0, gt=0.0, description="Score divisor applied to known-issue pairs in GEPA metric"
+    )

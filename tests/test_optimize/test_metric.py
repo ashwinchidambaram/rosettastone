@@ -16,8 +16,10 @@ from unittest.mock import patch
 
 import dspy
 import pytest
+from pydantic import ValidationError
 
 from rosettastone.config import MigrationConfig
+from rosettastone.core.types import PromptPair
 from rosettastone.optimize.metric import build_migration_metric
 
 # ---------------------------------------------------------------------------
@@ -293,3 +295,119 @@ class TestMetricImportFallbacks:
             f"String similarity fallback score out of range: {result.score}"
         )
         assert len(result.feedback) > 0
+
+
+# ---------------------------------------------------------------------------
+# Known-issue weighting tests
+# ---------------------------------------------------------------------------
+
+
+class TestKnownIssueWeight:
+    """known_issue_weight divides the score for pairs that are flagged as known issues."""
+
+    def test_known_issue_weight_applied(self, tmp_path) -> None:
+        """Score is halved (divided by 2.0) for a pair with non-None feedback."""
+        data_file = tmp_path / "data.jsonl"
+        data_file.touch()
+        config = MigrationConfig(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            data_path=data_file,
+            known_issue_weight=2.0,
+        )
+        known_prompt = "What is the capital of France?"
+        train_set = [
+            PromptPair(
+                prompt=known_prompt,
+                response="Paris",
+                source_model="openai/gpt-4o",
+                feedback="known regression",
+            )
+        ]
+        metric = build_migration_metric(config, train_set=train_set)
+        gold = dspy.Example(
+            prompt=known_prompt, expected_response="Paris"
+        ).with_inputs("prompt")
+        pred = dspy.Prediction(response="Paris")
+
+        sem_score = 0.8
+        with patch("rosettastone.evaluate.bertscore.compute_bertscore", return_value=sem_score):
+            result = metric(gold, pred)
+
+        expected = sem_score / 2.0
+        assert result.score == pytest.approx(expected, abs=0.001), (
+            f"Expected score {expected}, got {result.score}"
+        )
+
+    def test_known_issue_weight_clamps_at_zero(self, tmp_path) -> None:
+        """A very large weight still clamps score at 0.0 — score never goes negative."""
+        data_file = tmp_path / "data.jsonl"
+        data_file.touch()
+        config = MigrationConfig(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            data_path=data_file,
+            known_issue_weight=1000.0,
+        )
+        known_prompt = "What is 2 + 2?"
+        train_set = [
+            PromptPair(
+                prompt=known_prompt,
+                response="4",
+                source_model="openai/gpt-4o",
+                feedback="edge case",
+            )
+        ]
+        metric = build_migration_metric(config, train_set=train_set)
+        gold = dspy.Example(
+            prompt=known_prompt, expected_response="4"
+        ).with_inputs("prompt")
+        pred = dspy.Prediction(response="4")
+
+        with patch("rosettastone.evaluate.bertscore.compute_bertscore", return_value=0.9):
+            result = metric(gold, pred)
+
+        assert result.score >= 0.0, f"Score {result.score} went below 0.0"
+
+    def test_known_issue_weight_no_effect_on_non_issue(self, tmp_path) -> None:
+        """Pairs without feedback are unaffected — no divisor is applied."""
+        data_file = tmp_path / "data.jsonl"
+        data_file.touch()
+        config = MigrationConfig(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            data_path=data_file,
+            known_issue_weight=2.0,
+        )
+        # train_set has a known-issue pair for a *different* prompt
+        train_set = [
+            PromptPair(
+                prompt="some other prompt",
+                response="answer",
+                source_model="openai/gpt-4o",
+                feedback="known bug",
+            )
+        ]
+        metric = build_migration_metric(config, train_set=train_set)
+        # The gold prompt does NOT match any key in the feedback map
+        gold = dspy.Example(
+            prompt="unrelated prompt", expected_response="result"
+        ).with_inputs("prompt")
+        pred = dspy.Prediction(response="result")
+
+        sem_score = 0.9
+        with patch("rosettastone.evaluate.bertscore.compute_bertscore", return_value=sem_score):
+            result = metric(gold, pred)
+
+        assert result.score == pytest.approx(sem_score, abs=0.001), (
+            f"Non-issue pair score should be {sem_score}, got {result.score}"
+        )
+
+    def test_known_issue_weight_config_field_validation(self) -> None:
+        """known_issue_weight must be > 0; passing 0.0 must raise a ValidationError."""
+        with pytest.raises(ValidationError):
+            MigrationConfig(
+                source_model="a",
+                target_model="b",
+                known_issue_weight=0.0,
+            )

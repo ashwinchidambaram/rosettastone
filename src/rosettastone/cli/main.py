@@ -42,6 +42,9 @@ def migrate(
     cluster_prompts: bool = typer.Option(
         False, "--cluster-prompts", help="Cluster prompts before optimization"
     ),
+    known_issue_weight: float = typer.Option(
+        2.0, "--known-issue-weight", help="Score divisor for known-issue pairs in GEPA metric"
+    ),
     # Adapter-specific options
     csv_delimiter: str | None = typer.Option(  # noqa: UP007
         None, "--csv-delimiter", help="CSV delimiter"
@@ -133,6 +136,7 @@ def migrate(
         langsmith_end_date=langsmith_end,
         otel_path=otel_path,
         improvement_objectives=parsed_objectives,
+        known_issue_weight=known_issue_weight,
     )
     migrator = Migrator(config)
     result = migrator.run()

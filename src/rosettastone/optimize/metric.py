@@ -110,7 +110,9 @@ def build_migration_metric(
                 key = json.dumps(prompt, sort_keys=True)
             known_issue = feedback_map.get(key)
             feedback = prepend_feedback(feedback, known_issue)
+            if known_issue is not None:
+                score = score / config.known_issue_weight
 
-        return dspy.Prediction(score=min(score, 1.0), feedback=feedback)
+        return dspy.Prediction(score=max(0.0, min(score, 1.0)), feedback=feedback)
 
     return migration_metric
