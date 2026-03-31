@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
 sqlmodel = pytest.importorskip("sqlmodel")
 
 from fastapi.testclient import TestClient  # noqa: E402
-from sqlmodel import Session  # noqa: E402
+from sqlmodel import Session, select  # noqa: E402
 
 from rosettastone.server.app import create_app  # noqa: E402
 from rosettastone.server.models import MigrationRecord  # noqa: E402
@@ -129,6 +131,36 @@ class TestCreateMigration:
         assert data["target_model"] == "anthropic/claude-sonnet-4"
         assert data["status"] == "pending"
         assert data["id"] is not None
+
+    def test_create_migration_with_cluster_prompts_and_objectives(self, client, engine):
+        """Test that cluster_prompts and improvement_objectives are captured in config."""
+        payload = {
+            "source_model": "openai/gpt-4o",
+            "target_model": "anthropic/claude-sonnet-4",
+            "data_path": "/tmp/data.jsonl",
+            "cluster_prompts": True,
+            "improvement_objectives": [
+                {"name": "latency", "weight": 0.5},
+                {"name": "accuracy", "weight": 0.5},
+            ],
+        }
+        response = client.post("/api/v1/migrations", json=payload)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["id"] is not None
+
+        # Verify the record was created with the config fields
+        migration_id = data["id"]
+        with Session(engine) as session:
+            stmt = select(MigrationRecord).where(MigrationRecord.id == migration_id)
+            migration = session.exec(stmt).first()
+            assert migration is not None
+            config = json.loads(migration.config_json)
+            assert config["cluster_prompts"] is True
+            assert config["improvement_objectives"] == [
+                {"name": "latency", "weight": 0.5},
+                {"name": "accuracy", "weight": 0.5},
+            ]
 
     def test_create_missing_fields(self, client):
         payload = {"source_model": "openai/gpt-4o"}

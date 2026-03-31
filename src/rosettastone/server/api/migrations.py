@@ -581,6 +581,18 @@ def _migration_to_detail(record: MigrationRecord, session: Session) -> Migration
     test_cases = list(session.exec(tc_stmt).all())
     test_case_summaries = [_test_case_to_summary(tc) for tc in test_cases]
 
+    # Extract cluster summary if clustering was enabled
+    cluster_summary = None
+    if config.get("cluster_prompts"):
+        cluster_info = config.get("cluster_summary")
+        if cluster_info:
+            cluster_summary = {
+                "n_clusters": cluster_info.get("n_clusters"),
+                "silhouette_score": cluster_info.get("silhouette_score"),
+                "original_pairs": cluster_info.get("original_pairs"),
+                "representative_pairs": cluster_info.get("representative_pairs"),
+            }
+
     return MigrationDetail(
         id=record.id,  # type: ignore[arg-type]
         source_model=record.source_model,
@@ -605,6 +617,7 @@ def _migration_to_detail(record: MigrationRecord, session: Session) -> Migration
         per_type_scores=per_type_scores,
         warnings=warnings,
         safety_warnings=safety_warnings,
+        cluster_summary=cluster_summary,
         test_cases=test_case_summaries,
     )
 
@@ -666,6 +679,8 @@ async def create_migration(
     source_model = body.get("source_model")
     target_model = body.get("target_model")
     data_path = body.get("data_path")
+    cluster_prompts = body.get("cluster_prompts", False)
+    improvement_objectives = body.get("improvement_objectives")
 
     if not source_model or not target_model:
         raise HTTPException(status_code=422, detail="source_model and target_model are required")
@@ -676,6 +691,10 @@ async def create_migration(
     }
     if data_path:
         config["data_path"] = data_path
+    if cluster_prompts:
+        config["cluster_prompts"] = cluster_prompts
+    if improvement_objectives is not None:
+        config["improvement_objectives"] = improvement_objectives
 
     record = MigrationRecord(
         source_model=source_model,
