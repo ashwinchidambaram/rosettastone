@@ -342,6 +342,28 @@ class TestUIEndpoints:
         assert "0.72" in body
         assert "BERTScore" in body
 
+    def test_case_fragment_dummy_fallback(self, ui_client: TestClient) -> None:
+        """Returns 200 with dummy fallback when TC is not in the DB."""
+        resp = ui_client.get("/ui/fragments/test-case/1/9999")
+        assert resp.status_code == 200
+        body = resp.text
+        # Falls back to DUMMY_TEST_CASES[42] — composite score and output type present
+        assert "0.31" in body
+        assert "Classification" in body
+
+    def test_case_fragment_html_elements(self, ui_client: TestClient) -> None:
+        """Response contains expected score bars and metadata sections."""
+        resp = ui_client.get("/ui/fragments/test-case/1/42")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "BERTScore" in body
+        assert "Embedding similarity" in body
+        assert "Composite" in body
+        assert "Test Case Metadata" in body
+        # Dummy tc_id 42 has composite_score 0.31 and output_type Classification
+        assert "0.31" in body
+        assert "Classification" in body
+
     def test_nav_links_present(self, client: TestClient) -> None:
         # Nav links are in base.html, present on both empty state and models page.
         resp = client.get("/ui/")

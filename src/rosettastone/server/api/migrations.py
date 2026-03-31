@@ -472,10 +472,15 @@ def _test_case_to_diff_dict(tc: TestCaseRecord, migration: MigrationRecord) -> d
         "output_type": tc.output_type.replace("_", " ").title(),
         "scores": {
             "bertscore": round(
-                scores.get("bertscore", scores.get("bert_score", 0)), 2
+                scores.get("bertscore_f1", scores.get("bertscore", scores.get("bert_score", 0))),
+                2,
             ),
             "embedding": round(
-                scores.get("embedding_similarity", scores.get("embedding", 0)), 2
+                scores.get(
+                    "embedding_sim",
+                    scores.get("embedding_similarity", scores.get("embedding", 0)),
+                ),
+                2,
             ),
             "composite": round(tc.composite_score, 2),
         },
@@ -1146,10 +1151,17 @@ async def test_case_fragment(
             "phase": db_tc.phase,
             "scores": {
                 "bertscore": round(
-                    scores.get("bertscore", scores.get("bert_score", 0)), 2
+                    scores.get(
+                        "bertscore_f1", scores.get("bertscore", scores.get("bert_score", 0))
+                    ),
+                    2,
                 ),
                 "embedding": round(
-                    scores.get("embedding_similarity", scores.get("embedding", 0)), 2
+                    scores.get(
+                        "embedding_sim",
+                        scores.get("embedding_similarity", scores.get("embedding", 0)),
+                    ),
+                    2,
                 ),
                 "composite": round(db_tc.composite_score, 2),
             },
