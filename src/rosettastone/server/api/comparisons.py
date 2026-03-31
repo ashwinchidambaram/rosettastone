@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import difflib
 import html
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -26,44 +27,51 @@ router = APIRouter()
 def _word_diff_html(expected: str, actual: str) -> tuple[str, str]:
     """Return (expected_html, actual_html) with changed words wrapped in diff spans.
 
-    Uses difflib.SequenceMatcher on whitespace-split tokens.  Unchanged tokens are
-    HTML-escaped and emitted as-is; deleted tokens (in expected but not actual) are
-    wrapped in ``<span class="diff-del">``, and inserted tokens (in actual but not
-    expected) are wrapped in ``<span class="diff-add">``.  Whitespace between tokens
-    is preserved with a single space so the rendered output remains readable.
+    Uses difflib.SequenceMatcher on content tokens only (non-whitespace), while
+    preserving the original whitespace separators (including newlines, indentation)
+    between tokens.  This means multi-line content (JSON, code) renders correctly
+    when the container uses ``white-space: pre-wrap``.
+
+    Unchanged tokens are HTML-escaped and emitted as-is; deleted tokens (in expected
+    but not actual) are wrapped in ``<span class="diff-del">``; inserted tokens (in
+    actual but not expected) are wrapped in ``<span class="diff-add">``.
     """
-    exp_tokens = expected.split()
-    act_tokens = actual.split()
+    # re.split with a capturing group keeps the separators in the result list:
+    # "a\n b" -> ["a", "\n ", "b"]
+    # Empty strings can appear at the start/end; we handle them harmlessly below.
+    exp_parts = re.split(r"(\s+)", expected)  # [word, ws, word, ws, ...]
+    act_parts = re.split(r"(\s+)", actual)
 
-    matcher = difflib.SequenceMatcher(None, exp_tokens, act_tokens, autojunk=False)
+    # Even indices → content tokens; odd indices → whitespace separators.
+    exp_words: list[str] = exp_parts[0::2]
+    act_words: list[str] = act_parts[0::2]
+    exp_ws: list[str] = exp_parts[1::2]
+    act_ws: list[str] = act_parts[1::2]
 
-    exp_parts: list[str] = []
-    act_parts: list[str] = []
+    matcher = difflib.SequenceMatcher(None, exp_words, act_words, autojunk=False)
+    opcodes = matcher.get_opcodes()
 
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        exp_chunk = exp_tokens[i1:i2]
-        act_chunk = act_tokens[j1:j2]
+    def _build(words: list[str], ws_list: list[str], side: str) -> str:
+        parts: list[str] = []
+        for tag, i1, i2, j1, j2 in opcodes:
+            rng = range(i1, i2) if side == "exp" else range(j1, j2)
+            for i in rng:
+                word = words[i]
+                esc = html.escape(word)
+                if word:  # skip empty strings produced by leading/trailing split
+                    if (side == "exp" and tag in ("replace", "delete")) or (
+                        side == "act" and tag in ("replace", "insert")
+                    ):
+                        cls = "diff-del" if side == "exp" else "diff-add"
+                        parts.append(f'<span class="{cls}">{esc}</span>')
+                    else:
+                        parts.append(esc)
+                # Restore the original whitespace that followed this word
+                if i < len(ws_list):
+                    parts.append(html.escape(ws_list[i]))
+        return "".join(parts)
 
-        if tag == "equal":
-            exp_parts.extend(html.escape(t) for t in exp_chunk)
-            act_parts.extend(html.escape(t) for t in act_chunk)
-        elif tag == "replace":
-            exp_parts.extend(
-                f'<span class="diff-del">{html.escape(t)}</span>' for t in exp_chunk
-            )
-            act_parts.extend(
-                f'<span class="diff-add">{html.escape(t)}</span>' for t in act_chunk
-            )
-        elif tag == "delete":
-            exp_parts.extend(
-                f'<span class="diff-del">{html.escape(t)}</span>' for t in exp_chunk
-            )
-        elif tag == "insert":
-            act_parts.extend(
-                f'<span class="diff-add">{html.escape(t)}</span>' for t in act_chunk
-            )
-
-    return " ".join(exp_parts), " ".join(act_parts)
+    return _build(exp_words, exp_ws, "exp"), _build(act_words, act_ws, "act")
 
 
 # ---------------------------------------------------------------------------
@@ -232,10 +240,11 @@ async def diff_fragment(
 
     if tc and tc.migration_id == migration_id:
         diff = _test_case_to_diff_dict(tc, migration)  # type: ignore[arg-type]
-        # Augment with word-level diff HTML when actual content is available
+        # Augment with word-level diff HTML when actual content is stored in the DB.
+        # Check the ORM field directly rather than inspecting the rendered placeholder text.
+        content_stored = tc.response_text is not None
         expected_text: str = diff.get("expected", "") or ""
         actual_text: str = diff.get("actual", "") or ""
-        content_stored = "Content not stored" not in expected_text
         if content_stored and expected_text and actual_text:
             diff["expected_html"], diff["actual_html"] = _word_diff_html(
                 expected_text, actual_text
