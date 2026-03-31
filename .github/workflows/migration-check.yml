@@ -1,0 +1,43 @@
+name: Migration Check
+
+# This workflow template auto-runs model migration checks on pull requests.
+# Customize the source_model, target_model, and data_path inputs to match your use case.
+# For manual runs, use the "Run workflow" button on the Actions tab and provide input values.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.jsonl'
+      - 'prompts/**'
+  workflow_dispatch:
+    inputs:
+      source_model:
+        description: 'Source model identifier'
+        required: true
+        default: 'openai/gpt-4o'
+      target_model:
+        description: 'Target model identifier'
+        required: true
+        default: 'anthropic/claude-sonnet-4'
+      data_path:
+        description: 'Path to JSONL data file'
+        required: true
+        default: 'examples/sample_data.jsonl'
+
+jobs:
+  migration-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run migration check
+        uses: ./.github/actions/rosettastone-migrate
+        with:
+          source_model: ${{ github.event.inputs.source_model || 'openai/gpt-4o' }}
+          target_model: ${{ github.event.inputs.target_model || 'anthropic/claude-sonnet-4' }}
+          data_path: ${{ github.event.inputs.data_path || 'examples/sample_data.jsonl' }}
+          fail_on_nogo: 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
