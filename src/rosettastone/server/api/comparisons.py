@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import difflib
+import html
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
@@ -16,8 +19,62 @@ router = APIRouter()
 
 
 # ---------------------------------------------------------------------------
+# Word-level diff helper
+# ---------------------------------------------------------------------------
+
+
+def _word_diff_html(expected: str, actual: str) -> tuple[str, str]:
+    """Return (expected_html, actual_html) with changed words wrapped in diff spans.
+
+    Uses difflib.SequenceMatcher on whitespace-split tokens.  Unchanged tokens are
+    HTML-escaped and emitted as-is; deleted tokens (in expected but not actual) are
+    wrapped in ``<span class="diff-del">``, and inserted tokens (in actual but not
+    expected) are wrapped in ``<span class="diff-add">``.  Whitespace between tokens
+    is preserved with a single space so the rendered output remains readable.
+    """
+    exp_tokens = expected.split()
+    act_tokens = actual.split()
+
+    matcher = difflib.SequenceMatcher(None, exp_tokens, act_tokens, autojunk=False)
+
+    exp_parts: list[str] = []
+    act_parts: list[str] = []
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        exp_chunk = exp_tokens[i1:i2]
+        act_chunk = act_tokens[j1:j2]
+
+        if tag == "equal":
+            exp_parts.extend(html.escape(t) for t in exp_chunk)
+            act_parts.extend(html.escape(t) for t in act_chunk)
+        elif tag == "replace":
+            exp_parts.extend(
+                f'<span class="diff-del">{html.escape(t)}</span>' for t in exp_chunk
+            )
+            act_parts.extend(
+                f'<span class="diff-add">{html.escape(t)}</span>' for t in act_chunk
+            )
+        elif tag == "delete":
+            exp_parts.extend(
+                f'<span class="diff-del">{html.escape(t)}</span>' for t in exp_chunk
+            )
+        elif tag == "insert":
+            act_parts.extend(
+                f'<span class="diff-add">{html.escape(t)}</span>' for t in act_chunk
+            )
+
+    return " ".join(exp_parts), " ".join(act_parts)
+
+
+# ---------------------------------------------------------------------------
 # Dummy data for UI diff fragment
 # ---------------------------------------------------------------------------
+
+_DUMMY_EXPECTED = '{\n  "priority": "urgent",\n  "category": "billing",\n  "confidence": 0.94\n}'
+_DUMMY_ACTUAL = (
+    '{\n  "priority": "high_priority",\n  "category": "billing",\n  "confidence": 0.91\n}'
+)
+_dummy_expected_html, _dummy_actual_html = _word_diff_html(_DUMMY_EXPECTED, _DUMMY_ACTUAL)
 
 DUMMY_DIFF = {
     "tc_id": 42,
@@ -27,10 +84,10 @@ DUMMY_DIFF = {
     "scores": {"bertscore": 0.85, "embedding": 0.79, "composite": 0.72},
     "source_model": "gpt-4o",
     "target_model": "claude-sonnet-4",
-    "expected": ('{\n  "priority": "urgent",\n  "category": "billing",\n  "confidence": 0.94\n}'),
-    "actual": (
-        '{\n  "priority": "high_priority",\n  "category": "billing",\n  "confidence": 0.91\n}'
-    ),
+    "expected": _DUMMY_EXPECTED,
+    "actual": _DUMMY_ACTUAL,
+    "expected_html": _dummy_expected_html,
+    "actual_html": _dummy_actual_html,
 }
 
 
@@ -175,6 +232,14 @@ async def diff_fragment(
 
     if tc and tc.migration_id == migration_id:
         diff = _test_case_to_diff_dict(tc, migration)  # type: ignore[arg-type]
+        # Augment with word-level diff HTML when actual content is available
+        expected_text: str = diff.get("expected", "") or ""
+        actual_text: str = diff.get("actual", "") or ""
+        content_stored = "Content not stored" not in expected_text
+        if content_stored and expected_text and actual_text:
+            diff["expected_html"], diff["actual_html"] = _word_diff_html(
+                expected_text, actual_text
+            )
     else:
         diff = DUMMY_DIFF  # fallback
 

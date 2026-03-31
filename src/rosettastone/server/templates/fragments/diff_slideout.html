@@ -72,11 +72,15 @@
                 <span class="text-[12px] font-mono text-[#9E9E9E] uppercase tracking-tighter">Actual ({{ diff.target_model|default('') }})</span>
             </div>
         </div>
+        <style>
+            .diff-del { background-color: rgba(216,86,80,0.20); color: #D85650; border-radius: 2px; padding: 0 2px; }
+            .diff-add { background-color: rgba(139,157,131,0.20); color: #8B9D83; border-radius: 2px; padding: 0 2px; }
+        </style>
         <div class="grid grid-cols-2 font-mono text-[14px] leading-relaxed">
             <!-- Left Column (Expected) -->
-            <div class="p-5 border-r border-white/5 text-[#E8DCC4] whitespace-pre-wrap">{{ diff.expected }}</div>
+            <div class="p-5 border-r border-white/5 text-[#E8DCC4] whitespace-pre-wrap">{% if diff.expected_html %}{{ diff.expected_html | safe }}{% else %}{{ diff.expected }}{% endif %}</div>
             <!-- Right Column (Actual) -->
-            <div class="p-5 text-[#E8DCC4] whitespace-pre-wrap">{{ diff.actual|default('') }}</div>
+            <div class="p-5 text-[#E8DCC4] whitespace-pre-wrap">{% if diff.actual_html %}{{ diff.actual_html | safe }}{% else %}{{ diff.actual|default('') }}{% endif %}</div>
         </div>
     </div>
     {% else %}
