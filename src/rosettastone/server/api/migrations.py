@@ -1204,11 +1204,11 @@ async def test_case_fragment(
 @router.get("/ui/migrations/{migration_id}/test-cases-table", response_class=HTMLResponse)
 async def test_cases_table_fragment(
     migration_id: int,
+    request: Request,
     outcome: str = Query("all"),  # "win" | "loss" | "all"
     search: str = Query(""),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    request: Request = ...,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """HTMX partial for filterable test case grid."""
