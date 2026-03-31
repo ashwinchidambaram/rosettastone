@@ -569,5 +569,21 @@
 </div>
 {% endif %}
 
+<!-- Test Case Grid (P2.1) -->
+<div class="mt-12">
+  <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+    <span class="material-symbols-outlined text-[20px]" aria-hidden="true">grid_view</span>
+    All Test Cases
+  </h3>
+  <div id="test-cases-grid"
+       hx-get="/ui/migrations/{{ migration.id }}/test-cases-table"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <p class="text-sm text-on-surface-variant/60">Loading test cases...</p>
+  </div>
+  <!-- Detail panel: test case detail fragment loads here -->
+  <div id="detail-panel" class="mt-4"></div>
+</div>
+
 </div>
 {% endblock %}

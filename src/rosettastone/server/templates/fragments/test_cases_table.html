@@ -1,0 +1,123 @@
+{# HTMX fragment — no base.html. Loaded into #test-cases-grid via hx-trigger="load". #}
+
+<!-- Filter Bar -->
+<form id="tc-filter-form" class="flex flex-wrap items-center gap-3 mb-4">
+  <div class="flex items-center gap-2">
+    <label for="tc-outcome" class="text-[11px] text-on-surface-variant/60 uppercase tracking-widest font-mono">Outcome</label>
+    <select
+      id="tc-outcome"
+      name="outcome"
+      class="bg-surface-container border border-outline-variant/20 text-[#E8DCC4] text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#D4A574]/40"
+      hx-get="/ui/migrations/{{ migration_id }}/test-cases-table"
+      hx-target="#test-cases-grid"
+      hx-swap="innerHTML"
+      hx-trigger="change"
+      hx-include="#tc-filter-form"
+    >
+      <option value="all" {% if outcome == "all" %}selected{% endif %}>All</option>
+      <option value="win" {% if outcome == "win" %}selected{% endif %}>Wins</option>
+      <option value="loss" {% if outcome == "loss" %}selected{% endif %}>Losses</option>
+    </select>
+  </div>
+  <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+    <label for="tc-search" class="text-[11px] text-on-surface-variant/60 uppercase tracking-widest font-mono">Search</label>
+    <input
+      id="tc-search"
+      name="search"
+      type="text"
+      value="{{ search }}"
+      placeholder="Filter by prompt text…"
+      class="flex-1 bg-surface-container border border-outline-variant/20 text-[#E8DCC4] text-sm rounded-lg px-3 py-1.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-1 focus:ring-[#D4A574]/40"
+      hx-get="/ui/migrations/{{ migration_id }}/test-cases-table"
+      hx-target="#test-cases-grid"
+      hx-swap="innerHTML"
+      hx-trigger="keyup changed delay:300ms"
+      hx-include="#tc-filter-form"
+    />
+  </div>
+  <span class="text-[11px] text-on-surface-variant/40 font-mono ml-auto">{{ total }} result{% if total != 1 %}s{% endif %}</span>
+</form>
+
+<!-- Test Cases Table -->
+{% if test_cases %}
+<div class="overflow-x-auto rounded-xl border border-outline-variant/20">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="bg-surface-container border-b border-outline-variant/20">
+        <th class="px-4 py-3 text-left text-[11px] font-mono text-on-surface-variant/60 uppercase tracking-widest">Prompt</th>
+        <th class="px-4 py-3 text-left text-[11px] font-mono text-on-surface-variant/60 uppercase tracking-widest">Type</th>
+        <th class="px-4 py-3 text-right text-[11px] font-mono text-on-surface-variant/60 uppercase tracking-widest">Score</th>
+        <th class="px-4 py-3 text-center text-[11px] font-mono text-on-surface-variant/60 uppercase tracking-widest">Outcome</th>
+        <th class="px-4 py-3 text-center text-[11px] font-mono text-on-surface-variant/60 uppercase tracking-widest">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-outline-variant/10">
+      {% for tc in test_cases %}
+      <tr class="bg-surface-container-low hover:bg-surface-container transition-colors">
+        <td class="px-4 py-3 text-[#E8DCC4] font-mono text-xs max-w-xs truncate">
+          {% if tc.prompt_preview %}
+            {{ tc.prompt_preview }}
+          {% else %}
+            <span class="text-on-surface-variant/40 italic">Content not stored</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3">
+          <span class="px-2 py-0.5 rounded bg-[#7A9FB5]/20 text-[#7A9FB5] text-[10px] font-bold tracking-wider uppercase">{{ tc.output_type }}</span>
+        </td>
+        <td class="px-4 py-3 text-right font-mono text-[#D4A574] font-semibold">{{ tc.composite_score }}</td>
+        <td class="px-4 py-3 text-center">
+          {% if tc.is_win %}
+            <span class="px-2 py-0.5 rounded bg-[#8B9D83] text-white text-[10px] font-black uppercase">WIN</span>
+          {% else %}
+            <span class="px-2 py-0.5 rounded bg-[#D85650] text-white text-[10px] font-black uppercase">LOSS</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-center">
+          <button
+            class="text-[11px] text-[#D4A574] hover:text-[#E8DCC4] font-mono underline underline-offset-2 transition-colors"
+            hx-get="/ui/fragments/test-case/{{ migration_id }}/{{ tc.id }}"
+            hx-target="#detail-panel"
+            hx-swap="innerHTML"
+          >View</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-sm text-on-surface-variant/60 py-8 text-center">No test cases match your filters.</p>
+{% endif %}
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div class="flex items-center justify-between mt-4 text-sm">
+  <div class="flex items-center gap-1">
+    {% if page > 1 %}
+    <button
+      class="px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant/20 text-[#E8DCC4] text-[12px] font-mono hover:bg-surface-container-high transition-colors"
+      hx-get="/ui/migrations/{{ migration_id }}/test-cases-table?page={{ page - 1 }}"
+      hx-target="#test-cases-grid"
+      hx-swap="innerHTML"
+      hx-include="#tc-filter-form"
+    >← Prev</button>
+    {% else %}
+    <button class="px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant/20 text-on-surface-variant/30 text-[12px] font-mono cursor-not-allowed" disabled>← Prev</button>
+    {% endif %}
+  </div>
+  <span class="text-[11px] text-on-surface-variant/50 font-mono">Page {{ page }} of {{ total_pages }}</span>
+  <div class="flex items-center gap-1">
+    {% if page < total_pages %}
+    <button
+      class="px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant/20 text-[#E8DCC4] text-[12px] font-mono hover:bg-surface-container-high transition-colors"
+      hx-get="/ui/migrations/{{ migration_id }}/test-cases-table?page={{ page + 1 }}"
+      hx-target="#test-cases-grid"
+      hx-swap="innerHTML"
+      hx-include="#tc-filter-form"
+    >Next →</button>
+    {% else %}
+    <button class="px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant/20 text-on-surface-variant/30 text-[12px] font-mono cursor-not-allowed" disabled>Next →</button>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

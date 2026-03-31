@@ -467,3 +467,137 @@ class TestUIWithData:
         """Should return 404 when migration is not in DB or dummy data."""
         resp = client.get("/ui/migrations/9999")
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# P2.1: Filterable test case grid (HTMX fragment endpoint)
+# ---------------------------------------------------------------------------
+
+
+class TestTestCasesTableFragment:
+    """Tests for GET /ui/migrations/{id}/test-cases-table HTMX fragment."""
+
+    def test_test_cases_table_loads(
+        self, client: TestClient, engine, sample_migration: MigrationRecord, sample_test_cases
+    ) -> None:
+        """Fragment endpoint returns 200 with table HTML containing test case rows."""
+        resp = client.get(f"/ui/migrations/{sample_migration.id}/test-cases-table")
+        assert resp.status_code == 200
+        body = resp.text
+        # Table structure present
+        assert "<table" in body
+        assert "<tbody" in body
+        # Filter form present
+        assert "tc-filter-form" in body
+        # At least one row for the 5 sample test cases
+        assert "WIN" in body
+
+    def test_test_cases_table_filter_win(
+        self, client: TestClient, engine, session, sample_migration: MigrationRecord
+    ) -> None:
+        """?outcome=win returns only WIN rows; no LOSS badges visible."""
+        import json as _json
+
+        from rosettastone.server.models import TestCaseRecord
+
+        # Insert mixed win/loss test cases
+        win_tc = TestCaseRecord(
+            migration_id=sample_migration.id,
+            phase="validation",
+            output_type="json",
+            composite_score=0.9,
+            is_win=True,
+            scores_json=_json.dumps({"bertscore": 0.9}),
+            details_json=_json.dumps({}),
+            prompt_text="win prompt",
+        )
+        loss_tc = TestCaseRecord(
+            migration_id=sample_migration.id,
+            phase="validation",
+            output_type="json",
+            composite_score=0.3,
+            is_win=False,
+            scores_json=_json.dumps({"bertscore": 0.3}),
+            details_json=_json.dumps({}),
+            prompt_text="loss prompt",
+        )
+        session.add(win_tc)
+        session.add(loss_tc)
+        session.commit()
+
+        resp = client.get(f"/ui/migrations/{sample_migration.id}/test-cases-table?outcome=win")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "WIN" in body
+        assert "LOSS" not in body
+
+    def test_test_cases_table_filter_loss(
+        self, client: TestClient, engine, session, sample_migration: MigrationRecord
+    ) -> None:
+        """?outcome=loss returns only LOSS rows; no WIN badges visible."""
+        import json as _json
+
+        from rosettastone.server.models import TestCaseRecord
+
+        # Clear any existing test cases for this migration and insert fresh ones
+        win_tc = TestCaseRecord(
+            migration_id=sample_migration.id,
+            phase="validation",
+            output_type="json",
+            composite_score=0.9,
+            is_win=True,
+            scores_json=_json.dumps({"bertscore": 0.9}),
+            details_json=_json.dumps({}),
+            prompt_text="win only",
+        )
+        loss_tc = TestCaseRecord(
+            migration_id=sample_migration.id,
+            phase="validation",
+            output_type="json",
+            composite_score=0.2,
+            is_win=False,
+            scores_json=_json.dumps({"bertscore": 0.2}),
+            details_json=_json.dumps({}),
+            prompt_text="loss only",
+        )
+        session.add(win_tc)
+        session.add(loss_tc)
+        session.commit()
+
+        resp = client.get(f"/ui/migrations/{sample_migration.id}/test-cases-table?outcome=loss")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "LOSS" in body
+        assert "WIN" not in body
+
+    def test_test_cases_table_pagination(
+        self, client: TestClient, engine, sample_migration: MigrationRecord, sample_test_cases
+    ) -> None:
+        """page_size=1 returns exactly 1 row; page=2 returns the next row."""
+        resp_p1 = client.get(
+            f"/ui/migrations/{sample_migration.id}/test-cases-table?page_size=1&page=1"
+        )
+        assert resp_p1.status_code == 200
+        body_p1 = resp_p1.text
+        # Only one data row — pagination controls present
+        assert "Next" in body_p1
+        # Page indicator
+        assert "Page 1 of" in body_p1
+
+        resp_p2 = client.get(
+            f"/ui/migrations/{sample_migration.id}/test-cases-table?page_size=1&page=2"
+        )
+        assert resp_p2.status_code == 200
+        body_p2 = resp_p2.text
+        assert "Page 2 of" in body_p2
+        assert "Prev" in body_p2
+
+    def test_test_cases_table_empty(
+        self, client: TestClient, engine, sample_migration: MigrationRecord
+    ) -> None:
+        """Migration with no test cases returns the empty-state message."""
+        # sample_migration has no test cases (sample_test_cases fixture not requested)
+        resp = client.get(f"/ui/migrations/{sample_migration.id}/test-cases-table")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "No test cases match your filters." in body

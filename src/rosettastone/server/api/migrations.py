@@ -392,8 +392,10 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
     result["projected_target_cost_per_call"] = record.projected_target_cost_per_call
 
     # Test case count
-    count_stmt = select(func.count()).select_from(TestCaseRecord).where(
-        TestCaseRecord.migration_id == record.id
+    count_stmt = (
+        select(func.count())
+        .select_from(TestCaseRecord)
+        .where(TestCaseRecord.migration_id == record.id)
     )
     result["test_cases"] = session.exec(count_stmt).one()
 
@@ -494,12 +496,8 @@ def _test_case_to_diff_dict(tc: TestCaseRecord, migration: MigrationRecord) -> d
             if "/" in migration.target_model
             else migration.target_model
         ),
-        "expected": (
-            tc.response_text or "Content not stored (run with --store-prompt-content)"
-        ),
-        "actual": (
-            tc.new_response_text or "Content not stored (run with --store-prompt-content)"
-        ),
+        "expected": (tc.response_text or "Content not stored (run with --store-prompt-content)"),
+        "actual": (tc.new_response_text or "Content not stored (run with --store-prompt-content)"),
     }
 
 
@@ -835,12 +833,15 @@ async def dashboard(
     if not records and empty != "false":
         # No models registered — show empty state
         return request.app.state.templates.TemplateResponse(
-            request, "models_empty.html", {"active_nav": "models"},
+            request,
+            "models_empty.html",
+            {"active_nav": "models"},
         )
 
     models = [_model_to_template_dict(r) for r in records] if records else DUMMY_MODELS
     return request.app.state.templates.TemplateResponse(
-        request, "models.html",
+        request,
+        "models.html",
         {"models": models, "alerts": DUMMY_ALERTS, "active_nav": "models"},
     )
 
@@ -860,7 +861,8 @@ async def migrations_page(
         migrations = DUMMY_MIGRATIONS  # fallback when DB is empty
 
     return request.app.state.templates.TemplateResponse(
-        request, "migrations.html",
+        request,
+        "migrations.html",
         {"migrations": migrations, "active_nav": "migrations"},
     )
 
@@ -875,7 +877,8 @@ async def new_migration_form(
 ) -> HTMLResponse:
     """Render the new migration form."""
     return request.app.state.templates.TemplateResponse(
-        request, "migration_new.html",
+        request,
+        "migration_new.html",
         {"active_nav": "migrations", "source_model": source or "", "error": None},
     )
 
@@ -899,7 +902,8 @@ async def create_migration_from_form(
     # Validate file upload
     if data_file is None or data_file.filename == "":
         return templates.TemplateResponse(
-            request, "migration_new.html",
+            request,
+            "migration_new.html",
             {
                 "active_nav": "migrations",
                 "source_model": source_model,
@@ -913,7 +917,8 @@ async def create_migration_from_form(
     content = await data_file.read()
     if len(content) > MAX_UPLOAD_SIZE:
         return templates.TemplateResponse(
-            request, "migration_new.html",
+            request,
+            "migration_new.html",
             {
                 "active_nav": "migrations",
                 "source_model": source_model,
@@ -928,7 +933,8 @@ async def create_migration_from_form(
         text_content = content.decode("utf-8")
     except UnicodeDecodeError:
         return templates.TemplateResponse(
-            request, "migration_new.html",
+            request,
+            "migration_new.html",
             {
                 "active_nav": "migrations",
                 "source_model": source_model,
@@ -948,7 +954,8 @@ async def create_migration_from_form(
 
     if not first_line:
         return templates.TemplateResponse(
-            request, "migration_new.html",
+            request,
+            "migration_new.html",
             {
                 "active_nav": "migrations",
                 "source_model": source_model,
@@ -962,7 +969,8 @@ async def create_migration_from_form(
         first_obj = json.loads(first_line)
     except json.JSONDecodeError as e:
         return templates.TemplateResponse(
-            request, "migration_new.html",
+            request,
+            "migration_new.html",
             {
                 "active_nav": "migrations",
                 "source_model": source_model,
@@ -975,7 +983,8 @@ async def create_migration_from_form(
     # Schema validation — must have prompt and response keys
     if not isinstance(first_obj, dict) or "prompt" not in first_obj or "response" not in first_obj:
         return templates.TemplateResponse(
-            request, "migration_new.html",
+            request,
+            "migration_new.html",
             {
                 "active_nav": "migrations",
                 "source_model": source_model,
@@ -991,10 +1000,12 @@ async def create_migration_from_form(
         target_model=target_model,
         status="pending",
         created_at=datetime.now(UTC),
-        config_json=json.dumps({
-            "source_model": source_model,
-            "target_model": target_model,
-        }),
+        config_json=json.dumps(
+            {
+                "source_model": source_model,
+                "target_model": target_model,
+            }
+        ),
     )
     session.add(record)
     session.commit()
@@ -1053,7 +1064,8 @@ async def migration_detail_page(
             raise HTTPException(status_code=404, detail="Migration not found")
 
     return request.app.state.templates.TemplateResponse(
-        request, "migration_detail.html",
+        request,
+        "migration_detail.html",
         {"migration": migration, "active_nav": "migrations"},
     )
 
@@ -1076,7 +1088,8 @@ async def executive_report_page(
 
     report_date = datetime.now(UTC).strftime("%B %-d, %Y")
     return request.app.state.templates.TemplateResponse(
-        request, "executive_report.html",
+        request,
+        "executive_report.html",
         {"migration": migration, "report_date": report_date, "active_nav": "migrations"},
     )
 
@@ -1091,7 +1104,9 @@ async def costs_page(request: Request, session: Session = Depends(get_session)) 
         costs = DUMMY_COSTS  # fallback when no data
 
     return request.app.state.templates.TemplateResponse(
-        request, "costs.html", {"costs": costs, "active_nav": "costs"},
+        request,
+        "costs.html",
+        {"costs": costs, "active_nav": "costs"},
     )
 
 
@@ -1114,7 +1129,9 @@ async def alerts_page(request: Request, session: Session = Depends(get_session))
         alerts = DUMMY_ALERTS  # fallback when DB is empty
 
     return request.app.state.templates.TemplateResponse(
-        request, "alerts.html", {"alerts": alerts, "active_nav": "alerts"},
+        request,
+        "alerts.html",
+        {"alerts": alerts, "active_nav": "alerts"},
     )
 
 
@@ -1178,5 +1195,71 @@ async def test_case_fragment(
         )
 
     return request.app.state.templates.TemplateResponse(
-        request, "fragments/test_case_detail.html", {"tc": tc},
+        request,
+        "fragments/test_case_detail.html",
+        {"tc": tc},
+    )
+
+
+@router.get("/ui/migrations/{migration_id}/test-cases-table", response_class=HTMLResponse)
+async def test_cases_table_fragment(
+    migration_id: int,
+    outcome: str = Query("all"),  # "win" | "loss" | "all"
+    search: str = Query(""),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    request: Request = ...,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """HTMX partial for filterable test case grid."""
+    _get_migration_or_404(migration_id, session)
+
+    conditions = [TestCaseRecord.migration_id == migration_id]
+    if outcome == "win":
+        conditions.append(TestCaseRecord.is_win == True)  # noqa: E712
+    elif outcome == "loss":
+        conditions.append(TestCaseRecord.is_win == False)  # noqa: E712
+    if search:
+        conditions.append(TestCaseRecord.prompt_text.contains(search))  # type: ignore[union-attr]
+
+    count_stmt = select(func.count()).select_from(TestCaseRecord).where(*conditions)
+    total = session.exec(count_stmt).one()
+
+    offset = (page - 1) * page_size
+    stmt = (
+        select(TestCaseRecord)
+        .where(*conditions)
+        .order_by(TestCaseRecord.composite_score.asc())  # type: ignore[union-attr]
+        .offset(offset)
+        .limit(page_size)
+    )
+    test_cases = list(session.exec(stmt).all())
+    total_pages = max(1, (total + page_size - 1) // page_size)
+
+    tc_list = []
+    for tc in test_cases:
+        tc_list.append(
+            {
+                "id": tc.id,
+                "prompt_preview": (tc.prompt_text or "")[:80]
+                + ("…" if tc.prompt_text and len(tc.prompt_text) > 80 else ""),
+                "output_type": tc.output_type.replace("_", " ").title(),
+                "composite_score": round(tc.composite_score, 2),
+                "is_win": tc.is_win,
+            }
+        )
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "fragments/test_cases_table.html",
+        {
+            "migration_id": migration_id,
+            "test_cases": tc_list,
+            "outcome": outcome,
+            "search": search,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": total_pages,
+        },
     )
