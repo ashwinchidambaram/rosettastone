@@ -260,6 +260,18 @@ def test_parse_redisvl_input_text_format():
     assert result.response == "4"
 
 
+def test_parse_redisvl_output_key_variant():
+    """This test proves that a RedisVL entry with 'output' key (not 'response') produces a PromptPair."""
+    data = {"prompt": "Test prompt", "output": "Test output"}
+    value = json.dumps(data).encode()
+
+    result = parse_redisvl_entry(_key("redisvl:key"), value, _SOURCE_MODEL)
+
+    assert isinstance(result, PromptPair), f"Expected PromptPair, got: {type(result)}"
+    assert result.prompt == "Test prompt", f"Unexpected prompt: {result.prompt!r}"
+    assert result.response == "Test output", f"Unexpected response: {result.response!r}"
+
+
 # ---------------------------------------------------------------------------
 # RedisVL parser — None / failure cases
 # ---------------------------------------------------------------------------
@@ -280,6 +292,16 @@ def test_parse_redisvl_returns_none_when_missing_prompt_key():
     result = parse_redisvl_entry(_key(), value, _SOURCE_MODEL)
 
     assert result is None, f"Expected None for missing prompt key, got: {result!r}"
+
+
+def test_parse_redisvl_returns_none_when_no_response_key():
+    """This test proves that a prompt without response/output key returns None."""
+    data = {"prompt": "Test prompt", "something_else": "value"}
+    value = json.dumps(data).encode()
+
+    result = parse_redisvl_entry(_key("redisvl:key"), value, _SOURCE_MODEL)
+
+    assert result is None, f"Expected None when no response key, got: {result!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -344,3 +366,18 @@ def test_parse_gptcache_returns_none_when_no_recognized_format():
     result = parse_gptcache_entry(_key(), value, _SOURCE_MODEL)
 
     assert result is None, f"Expected None for unrecognized format, got: {result!r}"
+
+
+def test_parse_gptcache_falls_back_to_litellm_format():
+    """This test proves that a GPTCache entry in LiteLLM format falls back correctly."""
+    data = {
+        "messages": [{"role": "user", "content": "Fallback query"}],
+        "response": {"choices": [{"message": {"role": "assistant", "content": "Fallback answer"}}]},
+    }
+    value = json.dumps(data).encode()
+
+    result = parse_gptcache_entry(_key("gptcache:key"), value, _SOURCE_MODEL)
+
+    assert isinstance(result, PromptPair), f"Expected PromptPair, got: {type(result)}"
+    assert result.prompt == "Fallback query", f"Unexpected prompt: {result.prompt!r}"
+    assert result.response == "Fallback answer", f"Unexpected response: {result.response!r}"
