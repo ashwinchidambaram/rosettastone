@@ -274,6 +274,50 @@ DUMMY_COSTS = {
     ],
 }
 
+DUMMY_TEST_CASES: dict[int, dict] = {
+    42: {
+        "tc_id": 42,
+        "is_win": False,
+        "composite_score": 0.31,
+        "output_type": "Classification",
+        "phase": "validation",
+        "scores": {"bertscore": 0.54, "embedding": 0.48, "composite": 0.31},
+        "prompt": "Content not stored (run with --store-prompt-content)",
+        "source_response": '{"priority": "urgent", "category": "billing", "confidence": 0.94}',
+        "target_response": (
+            '{"priority": "high_priority", "category": "billing", "confidence": 0.91}'
+        ),
+        "evaluators_used": "bertscore,embedding_similarity",
+        "fallback_triggered": False,
+    },
+    87: {
+        "tc_id": 87,
+        "is_win": False,
+        "composite_score": 0.45,
+        "output_type": "JSON",
+        "phase": "validation",
+        "scores": {"bertscore": 0.61, "embedding": 0.55, "composite": 0.45},
+        "prompt": "Content not stored (run with --store-prompt-content)",
+        "source_response": '{"status": "complete", "result": {"items": [1, 2, 3], "total": 3}}',
+        "target_response": '{"status": "done"}',
+        "evaluators_used": "bertscore,json_validator",
+        "fallback_triggered": False,
+    },
+    103: {
+        "tc_id": 103,
+        "is_win": False,
+        "composite_score": 0.52,
+        "output_type": "Code",
+        "phase": "validation",
+        "scores": {"bertscore": 0.68, "embedding": 0.71, "composite": 0.52},
+        "prompt": "Content not stored (run with --store-prompt-content)",
+        "source_response": "def foo():\n    return 42",
+        "target_response": "def foo() ->None:\n    return 42",
+        "evaluators_used": "bertscore,embedding_similarity",
+        "fallback_triggered": False,
+    },
+}
+
 
 # ---------------------------------------------------------------------------
 # Template data formatting helpers
@@ -1082,6 +1126,45 @@ async def eval_grid_fragment(migration_id: int, request: Request) -> HTMLRespons
 
 
 @router.get("/ui/fragments/test-case/{migration_id}/{tc_id}", response_class=HTMLResponse)
-async def test_case_fragment(migration_id: int, tc_id: int, request: Request) -> HTMLResponse:
+async def test_case_fragment(
+    migration_id: int,
+    tc_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
     """HTMX partial for test case detail."""
-    return HTMLResponse("<div>Template pending integration</div>")
+    migration = session.get(MigrationRecord, migration_id)
+    db_tc = session.get(TestCaseRecord, tc_id) if migration else None
+
+    if db_tc and db_tc.migration_id == migration_id:
+        scores = json.loads(db_tc.scores_json)
+        tc = {
+            "tc_id": db_tc.id,
+            "is_win": db_tc.is_win,
+            "composite_score": round(db_tc.composite_score, 2),
+            "output_type": db_tc.output_type.replace("_", " ").title(),
+            "phase": db_tc.phase,
+            "scores": {
+                "bertscore": round(
+                    scores.get("bertscore", scores.get("bert_score", 0)), 2
+                ),
+                "embedding": round(
+                    scores.get("embedding_similarity", scores.get("embedding", 0)), 2
+                ),
+                "composite": round(db_tc.composite_score, 2),
+            },
+            "prompt": db_tc.prompt_text,
+            "source_response": db_tc.response_text,
+            "target_response": db_tc.new_response_text,
+            "evaluators_used": db_tc.evaluators_used,
+            "fallback_triggered": db_tc.fallback_triggered,
+        }
+    else:
+        tc = DUMMY_TEST_CASES.get(
+            tc_id,
+            DUMMY_TEST_CASES[42],  # default fallback
+        )
+
+    return request.app.state.templates.TemplateResponse(
+        request, "fragments/test_case_detail.html", {"tc": tc},
+    )
