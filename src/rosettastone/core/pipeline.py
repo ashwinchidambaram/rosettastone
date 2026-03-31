@@ -117,12 +117,14 @@ def _build_adapter(config: MigrationConfig) -> Any:
 
 def load_and_split_data(
     config: MigrationConfig,
+    ctx: PipelineContext | None = None,
 ) -> tuple[list[PromptPair], list[PromptPair], list[PromptPair]]:
     adapter = _build_adapter(config)
 
     from rosettastone.ingest.splitter import split_data
 
     pairs = adapter.load()
+    original_count = len(pairs)
 
     # Optional: cluster prompts for analysis/dedup before splitting
     if config.cluster_prompts and pairs:
@@ -145,6 +147,15 @@ def load_and_split_data(
                 # Replace pairs with one representative per cluster + noise pairs
                 representative_pairs = [c.pairs[0] for c in cluster_result.clusters if c.pairs]
                 pairs = representative_pairs + cluster_result.noise_pairs
+
+                # Capture cluster summary in context
+                if ctx:
+                    ctx.cluster_summary = {
+                        "n_clusters": len(cluster_result.clusters),
+                        "silhouette_score": cluster_result.silhouette_score,
+                        "original_pairs": original_count,
+                        "representative_pairs": len(pairs),
+                    }
         except ImportError:
             import logging
 
@@ -337,8 +348,13 @@ def build_result(
 
     total_cost = sum(ctx.costs.values()) if ctx else 0.0
 
+    # Build config dict and add cluster_summary if available
+    config_dict = config.model_dump(mode="json")
+    if ctx and ctx.cluster_summary:
+        config_dict["cluster_summary"] = ctx.cluster_summary
+
     return MigrationResult(
-        config=config.model_dump(mode="json"),
+        config=config_dict,
         optimized_prompt=optimized_prompt,
         baseline_results=baseline,
         validation_results=validation,

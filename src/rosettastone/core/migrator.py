@@ -48,7 +48,7 @@ class Migrator:
 
         # Step 1: Ingest
         t0 = time.time()
-        train, val, test = load_and_split_data(self.config)
+        train, val, test = load_and_split_data(self.config, ctx)
         ctx.timing["ingest"] = time.time() - t0
 
         # Step 1.5: PII scan on ingested data

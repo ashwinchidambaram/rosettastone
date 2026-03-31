@@ -46,3 +46,4 @@ class PipelineContext:
     timing: dict[str, float] = field(default_factory=dict)
     per_type_stats: dict[OutputType, TypeStats] = field(default_factory=dict)
     recommendation: tuple[str, str, dict[str, object]] | None = None
+    cluster_summary: dict[str, object] | None = None

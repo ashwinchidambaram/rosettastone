@@ -111,6 +111,27 @@ class TestGetMigration:
         data = response.json()
         assert len(data["test_cases"]) == 5
 
+    def test_get_detail_includes_cluster_summary(self, client, engine, sample_migration_with_cluster):
+        """Test that cluster_summary is exposed in migration detail response."""
+        response = client.get(f"/api/v1/migrations/{sample_migration_with_cluster.id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert "cluster_summary" in data
+        cluster_summary = data["cluster_summary"]
+        assert cluster_summary is not None
+        assert cluster_summary["n_clusters"] == 5
+        assert cluster_summary["silhouette_score"] == 0.72
+        assert cluster_summary["original_pairs"] == 100
+        assert cluster_summary["representative_pairs"] == 25
+
+    def test_get_detail_cluster_summary_null_when_not_clustered(self, client, engine, sample_migration):
+        """Test that cluster_summary is null when clustering was not enabled."""
+        response = client.get(f"/api/v1/migrations/{sample_migration.id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert "cluster_summary" in data
+        assert data["cluster_summary"] is None
+
     def test_404_for_missing(self, client):
         response = client.get("/api/v1/migrations/999")
         assert response.status_code == 404

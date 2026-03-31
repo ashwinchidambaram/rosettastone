@@ -118,6 +118,8 @@ class MigrationDetail(BaseModel):
     warnings: list[str]
     safety_warnings: list[WarningSchema]
 
+    cluster_summary: dict[str, object] | None = None
+
     test_cases: list[TestCaseSummary]
 
 
