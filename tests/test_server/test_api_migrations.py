@@ -653,3 +653,91 @@ class TestExecutiveSummaryFragment:
         assert "\u2026" in body
         # The full 600-char string should not appear verbatim
         assert "A" * 600 not in body
+
+
+# ---------------------------------------------------------------------------
+# P2.3: Score charts — win-rate donut and score histogram
+# ---------------------------------------------------------------------------
+
+
+class TestScoreCharts:
+    """Tests for chart data injected by _migration_to_template_dict (P2.3)."""
+
+    def test_migration_detail_has_wins_and_losses(
+        self,
+        client: TestClient,
+        engine,
+        session,
+        sample_migration: MigrationRecord,
+    ) -> None:
+        """Migration detail page includes chart canvas elements when per_type data exists."""
+        import json as _json
+
+        from rosettastone.server.models import TestCaseRecord
+
+        # Insert 3 wins and 2 losses
+        for i in range(3):
+            tc = TestCaseRecord(
+                migration_id=sample_migration.id,
+                phase="validation",
+                output_type="json",
+                composite_score=0.85 + i * 0.05,
+                is_win=True,
+                scores_json=_json.dumps({"bertscore": 0.9}),
+                details_json=_json.dumps({}),
+            )
+            session.add(tc)
+        for i in range(2):
+            tc = TestCaseRecord(
+                migration_id=sample_migration.id,
+                phase="validation",
+                output_type="json",
+                composite_score=0.30 + i * 0.05,
+                is_win=False,
+                scores_json=_json.dumps({"bertscore": 0.3}),
+                details_json=_json.dumps({}),
+            )
+            session.add(tc)
+        session.commit()
+
+        resp = client.get(f"/ui/migrations/{sample_migration.id}")
+        assert resp.status_code == 200
+        body = resp.text
+        # Chart canvas elements should be present (per_type is populated in sample_migration)
+        assert "winRateChart" in body
+        assert "scoreHistChart" in body
+
+    def test_score_histogram_always_10_bins(
+        self,
+        client: TestClient,
+        engine,
+        session,
+        sample_migration: MigrationRecord,
+    ) -> None:
+        """score_histogram in the rendered page has exactly 10 bins summing to total test cases."""
+        import json as _json
+
+        from rosettastone.server.api.migrations import _migration_to_template_dict
+        from rosettastone.server.models import TestCaseRecord
+
+        # Insert test cases with scores spread across bins
+        scores = [0.05, 0.15, 0.25, 0.55, 0.75, 0.95]
+        for score in scores:
+            tc = TestCaseRecord(
+                migration_id=sample_migration.id,
+                phase="validation",
+                output_type="json",
+                composite_score=score,
+                is_win=score >= 0.5,
+                scores_json=_json.dumps({"bertscore": score}),
+                details_json=_json.dumps({}),
+            )
+            session.add(tc)
+        session.commit()
+
+        result = _migration_to_template_dict(sample_migration, session)
+
+        histogram = result["score_histogram"]
+        assert isinstance(histogram, list)
+        assert len(histogram) == 10
+        assert sum(histogram) == len(scores)

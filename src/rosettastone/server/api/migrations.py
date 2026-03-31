@@ -133,6 +133,9 @@ DUMMY_MIGRATIONS = [
                 "got": "def foo() ->None:",
             },
         ],
+        "wins": 146,
+        "losses": 10,
+        "score_histogram": [0, 0, 1, 2, 3, 4, 12, 30, 64, 40],
     },
     {
         "id": 2,
@@ -152,6 +155,9 @@ DUMMY_MIGRATIONS = [
         ),
         "per_type": [],
         "regressions": [],
+        "wins": 34,
+        "losses": 9,
+        "score_histogram": [0, 1, 2, 3, 4, 5, 8, 10, 7, 4],
     },
     {
         "id": 3,
@@ -222,6 +228,9 @@ DUMMY_MIGRATIONS = [
                 "got": "general_inquiry",
             },
         ],
+        "wins": 60,
+        "losses": 29,
+        "score_histogram": [2, 5, 8, 10, 4, 6, 12, 18, 14, 10],
     },
 ]
 
@@ -460,6 +469,19 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
             reg["got"] = "Content not stored"
         regressions.append(reg)
     result["regressions"] = regressions
+
+    # Chart data: win/loss counts and score histogram (10 bins)
+    all_tc_stmt = select(TestCaseRecord).where(TestCaseRecord.migration_id == record.id)
+    all_tcs = list(session.exec(all_tc_stmt).all())
+    chart_wins = sum(1 for tc in all_tcs if tc.is_win)
+    chart_losses = len(all_tcs) - chart_wins
+    score_histogram = [0] * 10
+    for tc in all_tcs:
+        bin_idx = min(int(tc.composite_score * 10), 9)
+        score_histogram[bin_idx] += 1
+    result["wins"] = chart_wins
+    result["losses"] = chart_losses
+    result["score_histogram"] = score_histogram
 
     return result
 

@@ -293,6 +293,68 @@ function showPersonaView(view) {
                 {% endfor %}
             </div>
         </section>
+        <!-- Score Charts (P2.3) -->
+        <div class="mt-8">
+          <h3 class="text-base font-semibold mb-4 text-on-surface-variant uppercase tracking-widest text-[11px] font-mono">Score Distribution</h3>
+          <div class="flex flex-wrap gap-6">
+            <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex flex-col items-center" style="min-width:200px">
+              <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Win Rate</p>
+              <canvas id="winRateChart3" width="180" height="180"></canvas>
+            </div>
+            <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex-1" style="min-width:300px">
+              <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Score Distribution</p>
+              <canvas id="scoreHistChart3" height="180"></canvas>
+            </div>
+          </div>
+          <script>
+            (function() {
+              var winCtx = document.getElementById('winRateChart3');
+              if (winCtx) {
+                new Chart(winCtx, {
+                  type: 'doughnut',
+                  data: {
+                    labels: ['Win', 'Loss'],
+                    datasets: [{
+                      data: [{{ migration.wins }}, {{ migration.losses }}],
+                      backgroundColor: ['rgba(139,157,131,0.8)', 'rgba(216,86,80,0.4)'],
+                      borderColor: ['rgba(139,157,131,1)', 'rgba(216,86,80,0.8)'],
+                      borderWidth: 1
+                    }]
+                  },
+                  options: {
+                    responsive: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#a89984', font: { size: 11 } } } }
+                  }
+                });
+              }
+              var histCtx = document.getElementById('scoreHistChart3');
+              if (histCtx) {
+                new Chart(histCtx, {
+                  type: 'bar',
+                  data: {
+                    labels: ['0–10%','10–20%','20–30%','30–40%','40–50%','50–60%','60–70%','70–80%','80–90%','90–100%'],
+                    datasets: [{
+                      label: 'Test Cases',
+                      data: {{ migration.score_histogram | tojson }},
+                      backgroundColor: 'rgba(212,116,94,0.6)',
+                      borderColor: 'rgba(212,116,94,1)',
+                      borderWidth: 1
+                    }]
+                  },
+                  options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                      x: { ticks: { color: '#a89984', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                      y: { ticks: { color: '#a89984', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                  }
+                });
+              }
+            })();
+          </script>
+        </div>
         {% endif %}
     </div>
 
@@ -459,6 +521,68 @@ function showPersonaView(view) {
         {% endfor %}
     </div>
 </div>
+<!-- Score Charts (P2.3) -->
+<div class="mt-8 mb-16">
+  <h3 class="text-base font-semibold mb-4 text-on-surface-variant uppercase tracking-widest text-[11px] font-mono">Score Distribution</h3>
+  <div class="flex flex-wrap gap-6">
+    <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex flex-col items-center" style="min-width:200px">
+      <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Win Rate</p>
+      <canvas id="winRateChart" width="180" height="180"></canvas>
+    </div>
+    <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex-1" style="min-width:300px">
+      <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Score Distribution</p>
+      <canvas id="scoreHistChart" height="180"></canvas>
+    </div>
+  </div>
+  <script>
+    (function() {
+      var winCtx = document.getElementById('winRateChart');
+      if (winCtx) {
+        new Chart(winCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Win', 'Loss'],
+            datasets: [{
+              data: [{{ migration.wins }}, {{ migration.losses }}],
+              backgroundColor: ['rgba(139,157,131,0.8)', 'rgba(216,86,80,0.4)'],
+              borderColor: ['rgba(139,157,131,1)', 'rgba(216,86,80,0.8)'],
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: false,
+            plugins: { legend: { position: 'bottom', labels: { color: '#a89984', font: { size: 11 } } } }
+          }
+        });
+      }
+      var histCtx = document.getElementById('scoreHistChart');
+      if (histCtx) {
+        new Chart(histCtx, {
+          type: 'bar',
+          data: {
+            labels: ['0–10%','10–20%','20–30%','30–40%','40–50%','50–60%','60–70%','70–80%','80–90%','90–100%'],
+            datasets: [{
+              label: 'Test Cases',
+              data: {{ migration.score_histogram | tojson }},
+              backgroundColor: 'rgba(212,116,94,0.6)',
+              borderColor: 'rgba(212,116,94,1)',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { ticks: { color: '#a89984', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+              y: { ticks: { color: '#a89984', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+            }
+          }
+        });
+      }
+    })();
+  </script>
+</div>
 {% endif %}
 
 <!-- Critical Regressions List -->
@@ -548,6 +672,68 @@ function showPersonaView(view) {
         </div>
         {% endfor %}
     </div>
+</div>
+<!-- Score Charts (P2.3) -->
+<div class="mt-8 mb-16">
+  <h3 class="text-base font-semibold mb-4 text-on-surface-variant uppercase tracking-widest text-[11px] font-mono">Score Distribution</h3>
+  <div class="flex flex-wrap gap-6">
+    <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex flex-col items-center" style="min-width:200px">
+      <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Win Rate</p>
+      <canvas id="winRateChart2" width="180" height="180"></canvas>
+    </div>
+    <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex-1" style="min-width:300px">
+      <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Score Distribution</p>
+      <canvas id="scoreHistChart2" height="180"></canvas>
+    </div>
+  </div>
+  <script>
+    (function() {
+      var winCtx = document.getElementById('winRateChart2');
+      if (winCtx) {
+        new Chart(winCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Win', 'Loss'],
+            datasets: [{
+              data: [{{ migration.wins }}, {{ migration.losses }}],
+              backgroundColor: ['rgba(139,157,131,0.8)', 'rgba(216,86,80,0.4)'],
+              borderColor: ['rgba(139,157,131,1)', 'rgba(216,86,80,0.8)'],
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: false,
+            plugins: { legend: { position: 'bottom', labels: { color: '#a89984', font: { size: 11 } } } }
+          }
+        });
+      }
+      var histCtx = document.getElementById('scoreHistChart2');
+      if (histCtx) {
+        new Chart(histCtx, {
+          type: 'bar',
+          data: {
+            labels: ['0–10%','10–20%','20–30%','30–40%','40–50%','50–60%','60–70%','70–80%','80–90%','90–100%'],
+            datasets: [{
+              label: 'Test Cases',
+              data: {{ migration.score_histogram | tojson }},
+              backgroundColor: 'rgba(212,116,94,0.6)',
+              borderColor: 'rgba(212,116,94,1)',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { ticks: { color: '#a89984', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+              y: { ticks: { color: '#a89984', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+            }
+          }
+        });
+      }
+    })();
+  </script>
 </div>
 {% endif %}
 
