@@ -315,7 +315,9 @@ def test_serve_command_registered():
 def test_serve_default_options():
     """serve uses default host 0.0.0.0 and port 8000."""
     with patch("uvicorn.run") as mock_uvicorn:
-        runner.invoke(app, ["serve"])
+        result = runner.invoke(app, ["serve"])
+        assert result.exit_code == 0
+        assert "http://0.0.0.0:8000" in result.output
         mock_uvicorn.assert_called_once()
         call_kwargs = mock_uvicorn.call_args[1]
         assert call_kwargs["host"] == "0.0.0.0"
@@ -327,7 +329,8 @@ def test_serve_default_options():
 def test_serve_custom_host_port():
     """serve accepts --host and --port options."""
     with patch("uvicorn.run") as mock_uvicorn:
-        runner.invoke(app, ["serve", "--host", "127.0.0.1", "--port", "9000"])
+        result = runner.invoke(app, ["serve", "--host", "127.0.0.1", "--port", "9000"])
+        assert result.exit_code == 0
         call_kwargs = mock_uvicorn.call_args[1]
         assert call_kwargs["host"] == "127.0.0.1"
         assert call_kwargs["port"] == 9000
@@ -336,7 +339,8 @@ def test_serve_custom_host_port():
 def test_serve_reload_flag():
     """serve --reload sets reload=True."""
     with patch("uvicorn.run") as mock_uvicorn:
-        runner.invoke(app, ["serve", "--reload"])
+        result = runner.invoke(app, ["serve", "--reload"])
+        assert result.exit_code == 0
         call_kwargs = mock_uvicorn.call_args[1]
         assert call_kwargs["reload"] is True
 
@@ -344,6 +348,7 @@ def test_serve_reload_flag():
 def test_serve_app_factory_reference():
     """serve passes correct app factory reference to uvicorn."""
     with patch("uvicorn.run") as mock_uvicorn:
-        runner.invoke(app, ["serve"])
+        result = runner.invoke(app, ["serve"])
+        assert result.exit_code == 0
         # First positional arg is the app reference
         assert mock_uvicorn.call_args[0][0] == "rosettastone.server.app:create_app"
