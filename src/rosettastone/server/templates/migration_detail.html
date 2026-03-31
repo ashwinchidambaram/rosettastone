@@ -7,6 +7,28 @@
         display: none;
     }
 </style>
+<script>
+function showPersonaView(view) {
+  var engineerEl = document.getElementById('engineer-view');
+  var executiveEl = document.getElementById('executive-summary');
+  var btnEngineer = document.getElementById('btn-engineer');
+  var btnExecutive = document.getElementById('btn-executive');
+  if (engineerEl) engineerEl.style.display = view === 'engineer' ? '' : 'none';
+  if (executiveEl) executiveEl.style.display = view === 'executive' ? '' : 'none';
+  if (btnEngineer) {
+    btnEngineer.className = view === 'engineer'
+      ? 'px-4 py-1.5 text-sm font-medium rounded-lg bg-surface-container-high text-on-surface border border-outline-variant/30 transition-all'
+      : 'px-4 py-1.5 text-sm font-medium rounded-lg bg-transparent text-on-surface-variant border border-outline-variant/20 hover:bg-surface-container-high transition-all';
+    btnEngineer.setAttribute('aria-pressed', view === 'engineer' ? 'true' : 'false');
+  }
+  if (btnExecutive) {
+    btnExecutive.className = view === 'executive'
+      ? 'px-4 py-1.5 text-sm font-medium rounded-lg bg-surface-container-high text-on-surface border border-outline-variant/30 transition-all'
+      : 'px-4 py-1.5 text-sm font-medium rounded-lg bg-transparent text-on-surface-variant border border-outline-variant/20 hover:bg-surface-container-high transition-all';
+    btnExecutive.setAttribute('aria-pressed', view === 'executive' ? 'true' : 'false');
+  }
+}
+</script>
 {% endblock %}
 
 {% block content %}
@@ -77,6 +99,33 @@
         </div>
     </div>
 </div>
+
+<!-- Persona Toggle (P2.2) -->
+<div id="view-toggle" class="flex items-center gap-2 mb-6">
+  <button id="btn-engineer"
+          onclick="showPersonaView('engineer')"
+          class="px-4 py-1.5 text-sm font-medium rounded-lg bg-surface-container-high text-on-surface border border-outline-variant/30 transition-all"
+          aria-pressed="true">
+    <span class="material-symbols-outlined text-[16px] align-middle mr-1">engineering</span>
+    Engineer
+  </button>
+  <button id="btn-executive"
+          onclick="showPersonaView('executive')"
+          hx-get="/ui/migrations/{{ migration.id }}/executive-summary"
+          hx-target="#executive-summary"
+          hx-trigger="click[!document.getElementById('executive-summary').innerHTML.trim()]"
+          hx-swap="innerHTML"
+          class="px-4 py-1.5 text-sm font-medium rounded-lg bg-transparent text-on-surface-variant border border-outline-variant/20 hover:bg-surface-container-high transition-all"
+          aria-pressed="false">
+    <span class="material-symbols-outlined text-[16px] align-middle mr-1">business_center</span>
+    Executive
+  </button>
+</div>
+
+<!-- Executive summary target (hidden initially) -->
+<div id="executive-summary" style="display:none" class="mb-6"></div>
+
+<div id="engineer-view">
 
 {% if migration.status in ['pending', 'running'] %}
 {# ─── PENDING / RUNNING STATE ─── #}
@@ -568,6 +617,8 @@
   </div>
 </div>
 {% endif %}
+
+</div><!-- end #engineer-view -->
 
 <!-- Test Case Grid (P2.1) -->
 <div class="mt-12">

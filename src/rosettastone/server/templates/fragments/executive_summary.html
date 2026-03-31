@@ -1,0 +1,41 @@
+{# HTMX fragment — compact executive summary card #}
+<div class="executive-card rounded-xl border border-outline-variant/20 bg-surface-container-low p-6 space-y-4">
+  <!-- Headline metric -->
+  <div class="flex items-center justify-between">
+    <div>
+      <p class="text-[11px] font-mono uppercase tracking-[0.2em] text-on-surface-variant mb-1">Confidence Score</p>
+      <p class="text-5xl font-bold text-[#E8DCC4]">{{ migration.confidence }}%</p>
+    </div>
+    <!-- Recommendation badge -->
+    <div class="text-right">
+      {% if migration.recommendation == "Safe to ship" %}
+      <span class="px-4 py-2 bg-success/10 text-success border border-success/30 text-sm font-bold uppercase tracking-widest rounded-full">PROCEED</span>
+      {% elif migration.recommendation == "Needs review" %}
+      <span class="px-4 py-2 bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/30 text-sm font-bold uppercase tracking-widest rounded-full">REVIEW</span>
+      {% else %}
+      <span class="px-4 py-2 bg-error/10 text-error border border-error/30 text-sm font-bold uppercase tracking-widest rounded-full">HOLD</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Key metrics row -->
+  <div class="grid grid-cols-3 gap-4 pt-2 border-t border-outline-variant/10">
+    <div>
+      <p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Baseline</p>
+      <p class="text-lg font-semibold">{{ migration.baseline }}%</p>
+    </div>
+    <div>
+      <p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Improvement</p>
+      <p class="text-lg font-semibold text-success">+{{ migration.improvement }}%</p>
+    </div>
+    <div>
+      <p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Cost</p>
+      <p class="text-lg font-semibold">{{ migration.cost }}</p>
+    </div>
+  </div>
+
+  <!-- Narrative -->
+  {% if narrative %}
+  <p class="text-sm text-on-surface-variant leading-relaxed pt-1">{{ narrative }}</p>
+  {% endif %}
+</div>

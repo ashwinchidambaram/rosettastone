@@ -111,7 +111,9 @@ class TestGetMigration:
         data = response.json()
         assert len(data["test_cases"]) == 5
 
-    def test_get_detail_includes_cluster_summary(self, client, engine, sample_migration_with_cluster):
+    def test_get_detail_includes_cluster_summary(
+        self, client, engine, sample_migration_with_cluster
+    ):
         """Test that cluster_summary is exposed in migration detail response."""
         response = client.get(f"/api/v1/migrations/{sample_migration_with_cluster.id}")
         assert response.status_code == 200
@@ -124,7 +126,9 @@ class TestGetMigration:
         assert cluster_summary["original_pairs"] == 100
         assert cluster_summary["representative_pairs"] == 25
 
-    def test_get_detail_cluster_summary_null_when_not_clustered(self, client, engine, sample_migration):
+    def test_get_detail_cluster_summary_null_when_not_clustered(
+        self, client, engine, sample_migration
+    ):
         """Test that cluster_summary is null when clustering was not enabled."""
         response = client.get(f"/api/v1/migrations/{sample_migration.id}")
         assert response.status_code == 200
@@ -601,3 +605,51 @@ class TestTestCasesTableFragment:
         assert resp.status_code == 200
         body = resp.text
         assert "No test cases match your filters." in body
+
+
+# ---------------------------------------------------------------------------
+# P2.2: Inline persona toggle — executive summary fragment
+# ---------------------------------------------------------------------------
+
+
+class TestExecutiveSummaryFragment:
+    """Tests for GET /ui/migrations/{id}/executive-summary HTMX fragment."""
+
+    def test_executive_summary_fragment_returns_200(self, ui_client: TestClient) -> None:
+        """Fragment endpoint returns 200 for a known dummy migration."""
+        resp = ui_client.get("/ui/migrations/1/executive-summary")
+        assert resp.status_code == 200
+
+    def test_executive_summary_contains_confidence(self, ui_client: TestClient) -> None:
+        """Response body includes the confidence score for the migration."""
+        resp = ui_client.get("/ui/migrations/1/executive-summary")
+        assert resp.status_code == 200
+        body = resp.text
+        # Dummy migration 1 has confidence 92
+        assert "92" in body
+        assert "Confidence Score" in body
+
+    def test_executive_summary_narrative_truncated(
+        self, client: TestClient, engine, session
+    ) -> None:
+        """Reasoning longer than 500 chars is capped with an ellipsis."""
+        long_reasoning = "A" * 600
+        record = MigrationRecord(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+            confidence_score=0.88,
+            recommendation="GO",
+            recommendation_reasoning=long_reasoning,
+        )
+        session.add(record)
+        session.commit()
+        session.refresh(record)
+
+        resp = client.get(f"/ui/migrations/{record.id}/executive-summary")
+        assert resp.status_code == 200
+        body = resp.text
+        # The narrative should be truncated and end with ellipsis
+        assert "\u2026" in body
+        # The full 600-char string should not appear verbatim
+        assert "A" * 600 not in body

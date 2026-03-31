@@ -1263,3 +1263,36 @@ async def test_cases_table_fragment(
             "total_pages": total_pages,
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# P2.2: Inline executive summary fragment
+# ---------------------------------------------------------------------------
+
+
+@router.get("/ui/migrations/{migration_id}/executive-summary", response_class=HTMLResponse)
+async def executive_summary_fragment(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """HTMX fragment: compact executive summary card."""
+    record = session.get(MigrationRecord, migration_id)
+    if record:
+        migration = _migration_to_template_dict(record, session)
+    else:
+        migration = next((m for m in DUMMY_MIGRATIONS if m["id"] == migration_id), None)
+        if migration is None:
+            raise HTTPException(status_code=404, detail="Migration not found")
+
+    # Truncate reasoning to first paragraph, max 500 chars
+    reasoning = migration.get("reasoning", "") or ""
+    narrative = reasoning.split("\n\n")[0]  # first paragraph
+    if len(narrative) > 500:
+        narrative = narrative[:497] + "\u2026"
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "fragments/executive_summary.html",
+        {"migration": migration, "narrative": narrative},
+    )
