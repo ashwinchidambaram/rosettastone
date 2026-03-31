@@ -38,12 +38,8 @@ def build_migration_metric(
     if config.improvement_objectives:
         from rosettastone.optimize.improvement import build_improvement_scorer
 
-        objective_descriptions = [
-            str(obj["description"]) for obj in config.improvement_objectives
-        ]
-        improvement_scorer = build_improvement_scorer(
-            objective_descriptions, config.judge_model
-        )
+        objective_descriptions = [str(obj["description"]) for obj in config.improvement_objectives]
+        improvement_scorer = build_improvement_scorer(objective_descriptions, config.judge_model)
 
     def migration_metric(
         gold: Any,

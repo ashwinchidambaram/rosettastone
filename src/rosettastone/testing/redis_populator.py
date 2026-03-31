@@ -26,14 +26,16 @@ class RedisPopulator:
         count = 0
         for pair in data:
             cache_key = self._make_key(pair.messages)
-            value = json.dumps({
-                "messages": pair.messages,
-                "response": {
-                    "choices": [
-                        {"message": {"role": "assistant", "content": pair.response_text}}
-                    ]
-                },
-            })
+            value = json.dumps(
+                {
+                    "messages": pair.messages,
+                    "response": {
+                        "choices": [
+                            {"message": {"role": "assistant", "content": pair.response_text}}
+                        ]
+                    },
+                }
+            )
             self.client.set(cache_key, value.encode())
             count += 1
 

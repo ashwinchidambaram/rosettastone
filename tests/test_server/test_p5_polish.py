@@ -17,8 +17,10 @@ from rosettastone.server.database import get_session  # noqa: E402
 @pytest.fixture
 def client() -> TestClient:
     engine = create_engine(
-        "sqlite://", echo=False,
-        connect_args={"check_same_thread": False}, poolclass=StaticPool,
+        "sqlite://",
+        echo=False,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     SQLModel.metadata.create_all(engine)
     app = create_app()

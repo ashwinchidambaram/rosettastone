@@ -194,7 +194,12 @@ def test_parse_langchain_llmresult_with_message_content():
         "type": "LLMResult",
         "llm_output": {},
         "generations": [
-            [{"text": "The sky is blue.", "message": {"role": "user", "content": "Why is the sky blue?"}}]
+            [
+                {
+                    "text": "The sky is blue.",
+                    "message": {"role": "user", "content": "Why is the sky blue?"},
+                }
+            ]
         ],
     }
     value = json.dumps(data).encode()
@@ -237,7 +242,11 @@ def test_parse_langchain_returns_none_when_no_prompt_found():
 
 def test_parse_redisvl_prompt_response_format():
     """This test proves that a RedisVL prompt/response dict produces a PromptPair."""
-    data = {"prompt": "Summarize quantum entanglement.", "response": "It is spooky action at a distance.", "metadata": {}}
+    data = {
+        "prompt": "Summarize quantum entanglement.",
+        "response": "It is spooky action at a distance.",
+        "metadata": {},
+    }
     value = json.dumps(data).encode()
 
     result = parse_redisvl_entry(_key("redisvl:abc"), value, _SOURCE_MODEL)

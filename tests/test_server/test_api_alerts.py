@@ -83,9 +83,7 @@ class TestGenerateAlerts:
         assert alerts[0]["type"] == "deprecation"  # migration_failed maps to deprecation
         assert alerts[0]["severity"] == "critical"
 
-    def test_generate_creates_alert_for_no_go_complete(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_generate_creates_alert_for_no_go_complete(self, client: TestClient, engine) -> None:
         """A complete/NO_GO migration (blocked) produces a critical alert."""
         with Session(engine) as session:
             _make_migration(session, status="complete", recommendation="NO_GO")
@@ -315,9 +313,7 @@ class TestDeleteAlert:
 
 
 class TestUIAlertsPage:
-    def test_alerts_page_renders_with_real_alerts(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_alerts_page_renders_with_real_alerts(self, client: TestClient, engine) -> None:
         """When DB has alerts, /ui/alerts renders real data."""
         with Session(engine) as session:
             _make_migration(session, status="complete", recommendation="GO")
@@ -339,9 +335,7 @@ class TestUIAlertsPage:
         # Dummy data contains gpt-4o-0613
         assert "gpt-4o-0613" in body
 
-    def test_alerts_page_auto_generates_on_load(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_alerts_page_auto_generates_on_load(self, client: TestClient, engine) -> None:
         """The alerts page auto-calls _generate_alerts so migrations appear without
         manually hitting the generate endpoint first."""
         with Session(engine) as session:
@@ -354,9 +348,7 @@ class TestUIAlertsPage:
         # Should see real migration data, not dummy
         assert "claude-sonnet-4" in body
 
-    def test_alerts_page_shows_failed_migration(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_alerts_page_shows_failed_migration(self, client: TestClient, engine) -> None:
         """Failed migrations render with the correct deprecation styling cue."""
         with Session(engine) as session:
             _make_migration(
@@ -375,9 +367,7 @@ class TestUIAlertsPage:
         # Template uses border-[#D85650] for deprecation type
         assert "border-[#D85650]" in body
 
-    def test_alerts_page_shows_conditional_migration(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_alerts_page_shows_conditional_migration(self, client: TestClient, engine) -> None:
         """CONDITIONAL migrations appear as new_model type (warning severity)."""
         with Session(engine) as session:
             _make_migration(session, status="complete", recommendation="CONDITIONAL")
@@ -425,18 +415,14 @@ class TestTypeMappingInAPIResponse:
         alerts = client.get("/api/v1/alerts").json()
         assert alerts[0]["type"] == "new_model"
 
-    def test_failed_migration_maps_to_deprecation(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_failed_migration_maps_to_deprecation(self, client: TestClient, engine) -> None:
         with Session(engine) as session:
             _make_migration(session, status="failed", recommendation="NO_GO")
         client.post("/api/v1/alerts/generate")
         alerts = client.get("/api/v1/alerts").json()
         assert alerts[0]["type"] == "deprecation"
 
-    def test_conditional_migration_maps_to_new_model(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_conditional_migration_maps_to_new_model(self, client: TestClient, engine) -> None:
         with Session(engine) as session:
             _make_migration(session, status="complete", recommendation="CONDITIONAL")
         client.post("/api/v1/alerts/generate")

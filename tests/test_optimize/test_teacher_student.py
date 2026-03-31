@@ -131,15 +131,22 @@ class TestTeacherStudentOptimizer:
         train_set = [_make_prompt_pair("q1"), _make_prompt_pair("q2")]
 
         expected_result = {"step1": "optimized instructions 1", "step2": "optimized instructions 2"}
-        teacher_demos = [_make_prompt_pair("q1", "teacher ans 1"), _make_prompt_pair("q2", "teacher ans 2")]
+        teacher_demos = [
+            _make_prompt_pair("q1", "teacher ans 1"),
+            _make_prompt_pair("q2", "teacher ans 2"),
+        ]
 
         optimizer = TeacherStudentOptimizer()
 
-        with patch.object(optimizer, "generate_teacher_demos", return_value=teacher_demos) as mock_gen, \
-             patch(
-                 "rosettastone.optimize.teacher_student.optimize_pipeline",
-                 return_value=expected_result,
-             ) as mock_opt:
+        with (
+            patch.object(
+                optimizer, "generate_teacher_demos", return_value=teacher_demos
+            ) as mock_gen,
+            patch(
+                "rosettastone.optimize.teacher_student.optimize_pipeline",
+                return_value=expected_result,
+            ) as mock_opt,
+        ):
             result = optimizer.pipeline_optimize(pipeline_config, train_set, migration_config)
 
         mock_gen.assert_called_once_with(train_set, migration_config.source_model, pipeline_config)
@@ -158,11 +165,13 @@ class TestTeacherStudentOptimizer:
 
         optimizer = TeacherStudentOptimizer()
 
-        with patch.object(optimizer, "generate_teacher_demos", return_value=teacher_demos), \
-             patch(
-                 "rosettastone.optimize.teacher_student.optimize_pipeline",
-                 return_value=fake_result,
-             ):
+        with (
+            patch.object(optimizer, "generate_teacher_demos", return_value=teacher_demos),
+            patch(
+                "rosettastone.optimize.teacher_student.optimize_pipeline",
+                return_value=fake_result,
+            ),
+        ):
             result = optimizer.pipeline_optimize(pipeline_config, [], migration_config)
 
         assert isinstance(result, dict)

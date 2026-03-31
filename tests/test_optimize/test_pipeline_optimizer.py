@@ -232,13 +232,9 @@ class TestOptimizePipeline:
 
         mock_compiled = MagicMock()
         mock_compiled.predict_step1 = MagicMock()
-        mock_compiled.predict_step1.extended_signature = MagicMock(
-            instructions="optimized step1"
-        )
+        mock_compiled.predict_step1.extended_signature = MagicMock(instructions="optimized step1")
         mock_compiled.predict_step2 = MagicMock()
-        mock_compiled.predict_step2.extended_signature = MagicMock(
-            instructions="optimized step2"
-        )
+        mock_compiled.predict_step2.extended_signature = MagicMock(instructions="optimized step2")
 
         mock_gepa_instance = MagicMock()
         mock_gepa_instance.compile.return_value = mock_compiled

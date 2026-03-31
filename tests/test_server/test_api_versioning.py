@@ -124,9 +124,7 @@ class TestRollback:
             s.commit()
 
         # Rollback to original version
-        resp = client.post(
-            f"/api/v1/migrations/{sample_migration.id}/versions/{vid}/rollback"
-        )
+        resp = client.post(f"/api/v1/migrations/{sample_migration.id}/versions/{vid}/rollback")
         assert resp.status_code == 200
         data = resp.json()
         # New version created with incremented number
@@ -152,6 +150,7 @@ class TestRollback:
 
         with Session(engine) as s:
             from sqlmodel import select
+
             audits = list(s.exec(select(AuditLog)).all())
             assert len(audits) == 1
             assert audits[0].action == "rollback"
@@ -161,7 +160,5 @@ class TestRollback:
 
     def test_rollback_404_missing_version(self, client, sample_migration):
         """POST rollback returns 404 for non-existent version."""
-        resp = client.post(
-            f"/api/v1/migrations/{sample_migration.id}/versions/999/rollback"
-        )
+        resp = client.post(f"/api/v1/migrations/{sample_migration.id}/versions/999/rollback")
         assert resp.status_code == 404

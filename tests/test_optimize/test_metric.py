@@ -325,9 +325,7 @@ class TestKnownIssueWeight:
             )
         ]
         metric = build_migration_metric(config, train_set=train_set)
-        gold = dspy.Example(
-            prompt=known_prompt, expected_response="Paris"
-        ).with_inputs("prompt")
+        gold = dspy.Example(prompt=known_prompt, expected_response="Paris").with_inputs("prompt")
         pred = dspy.Prediction(response="Paris")
 
         sem_score = 0.8
@@ -359,9 +357,7 @@ class TestKnownIssueWeight:
             )
         ]
         metric = build_migration_metric(config, train_set=train_set)
-        gold = dspy.Example(
-            prompt=known_prompt, expected_response="4"
-        ).with_inputs("prompt")
+        gold = dspy.Example(prompt=known_prompt, expected_response="4").with_inputs("prompt")
         pred = dspy.Prediction(response="4")
 
         with patch("rosettastone.evaluate.bertscore.compute_bertscore", return_value=0.9):
@@ -390,9 +386,9 @@ class TestKnownIssueWeight:
         ]
         metric = build_migration_metric(config, train_set=train_set)
         # The gold prompt does NOT match any key in the feedback map
-        gold = dspy.Example(
-            prompt="unrelated prompt", expected_response="result"
-        ).with_inputs("prompt")
+        gold = dspy.Example(prompt="unrelated prompt", expected_response="result").with_inputs(
+            "prompt"
+        )
         pred = dspy.Prediction(response="result")
 
         sem_score = 0.9

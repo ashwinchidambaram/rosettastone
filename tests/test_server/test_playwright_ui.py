@@ -371,9 +371,7 @@ class TestMigrationDetailSafeToShip:
         expect(page.locator("text=Safe to ship").first).to_be_visible()
         expect(page.locator("text=92%").first).to_be_visible()
         expect(page.locator("text=Confidence Score")).to_be_visible()
-        expect(
-            page.locator("text=All output types meet or exceed").first
-        ).to_be_visible()
+        expect(page.locator("text=All output types meet or exceed").first).to_be_visible()
 
     def test_migration_detail_safe_kpi_grid(self, page: Page, server: str):
         """KPI grid shows Parity Score 92%, Baseline 85%, Improvement +7%."""
@@ -415,9 +413,7 @@ class TestMigrationDetailSafeToShip:
     def test_migration_detail_safe_config_collapsible(self, page: Page, server: str):
         """Collapsible 'Configuration and details' toggles open/close."""
         page.goto(f"{server}/ui/migrations/1")
-        config_btn = page.locator(
-            '[data-action="toggle-collapse"][data-target="config-details"]'
-        )
+        config_btn = page.locator('[data-action="toggle-collapse"][data-target="config-details"]')
         config_content = page.locator("#config-details")
 
         expect(config_btn).to_be_visible()
@@ -541,7 +537,9 @@ class TestMigrationDetailDoNotShip:
         page.goto(f"{server}/ui/migrations/3")
         expect(page.locator("h3:has-text('Critical regressions')")).to_be_visible()
         expect(page.locator("text=Showing 3 of 3")).to_be_visible()
-        expect(page.locator("text=Schema Violation: Missing required key 'metadata'")).to_be_visible()
+        expect(
+            page.locator("text=Schema Violation: Missing required key 'metadata'")
+        ).to_be_visible()
         expect(page.locator("text=Syntax error in generated Python")).to_be_visible()
         expect(page.locator("text=Wrong classification category")).to_be_visible()
 
@@ -609,9 +607,7 @@ class TestCostsPage:
         """'Optimization opportunities' shows 2 opportunity cards with correct data."""
         page.goto(f"{server}/ui/costs")
         expect(page.locator("h2:has-text('Optimization opportunities')")).to_be_visible()
-        expect(
-            page.locator("text=Switch gpt-4o classification to gpt-4o-mini")
-        ).to_be_visible()
+        expect(page.locator("text=Switch gpt-4o classification to gpt-4o-mini")).to_be_visible()
         expect(page.locator("text=$187/mo")).to_be_visible()
         expect(page.locator("text=94% parity")).to_be_visible()
         expect(page.locator("text=Batch non-urgent gpt-4o requests")).to_be_visible()
@@ -783,25 +779,19 @@ class TestExecutiveReport:
         page.goto(f"{server}/ui/migrations/1/executive")
         bg = page.evaluate("() => getComputedStyle(document.body).backgroundColor")
         # Background should be light (#F9F7F4 = rgb(249, 247, 244)) not dark (#131313)
-        assert "249" in bg or "247" in bg or "244" in bg, (
-            f"Expected light background, got: {bg}"
-        )
+        assert "249" in bg or "247" in bg or "244" in bg, f"Expected light background, got: {bg}"
 
     def test_executive_report_do_not_ship(self, page: Page, server: str):
         """GET /ui/migrations/3/executive shows 'Recommendation: Do not switch', High risk, Blocked."""
         page.goto(f"{server}/ui/migrations/3/executive")
-        expect(
-            page.locator("h2").filter(has_text="Recommendation: Do not switch")
-        ).to_be_visible()
+        expect(page.locator("h2").filter(has_text="Recommendation: Do not switch")).to_be_visible()
         expect(page.locator("text=High")).to_be_visible()
         expect(page.locator("text=Blocked")).to_be_visible()
 
     def test_executive_report_needs_review(self, page: Page, server: str):
         """GET /ui/migrations/2/executive shows 'Recommendation: Needs review', Medium risk, Pending."""
         page.goto(f"{server}/ui/migrations/2/executive")
-        expect(
-            page.locator("h2").filter(has_text="Recommendation: Needs review")
-        ).to_be_visible()
+        expect(page.locator("h2").filter(has_text="Recommendation: Needs review")).to_be_visible()
         expect(page.locator("text=Medium")).to_be_visible()
         expect(page.locator("text=Pending")).to_be_visible()
 
@@ -971,7 +961,9 @@ class TestThemeToggle:
     def test_theme_toggle_updates_localstorage(self, dark_mode_page: Page, server: str):
         """Theme toggle updates localStorage 'rosettastone-theme' key."""
         dark_mode_page.goto(f"{server}/ui/")
-        _initial_stored = dark_mode_page.evaluate("() => localStorage.getItem('rosettastone-theme')")
+        _initial_stored = dark_mode_page.evaluate(
+            "() => localStorage.getItem('rosettastone-theme')"
+        )
         dark_mode_page.locator('[data-action="toggle-theme"]').click()
         stored = dark_mode_page.evaluate("() => localStorage.getItem('rosettastone-theme')")
         assert stored == "light", f"Expected localStorage 'light', got: {stored}"

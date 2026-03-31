@@ -117,9 +117,7 @@ class TestDeleteModel:
 
 
 class TestImportFromMigrations:
-    def test_import_from_migrations_with_existing_records(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_import_from_migrations_with_existing_records(self, client: TestClient, engine) -> None:
         # Seed migration records directly in DB
         with Session(engine) as session:
             for source, target in [
@@ -198,18 +196,14 @@ class TestGetModelInfo:
 
 
 class TestUIModelsIntegration:
-    def test_ui_shows_empty_state_when_no_models_registered(
-        self, client: TestClient
-    ) -> None:
+    def test_ui_shows_empty_state_when_no_models_registered(self, client: TestClient) -> None:
         """With no registered models, /ui/ should show the empty state page."""
         resp = client.get("/ui/")
         assert resp.status_code == 200
         body = resp.text
         assert "Welcome to RosettaStone" in body
 
-    def test_ui_shows_model_cards_after_registration(
-        self, client: TestClient
-    ) -> None:
+    def test_ui_shows_model_cards_after_registration(self, client: TestClient) -> None:
         """After registering models, /ui/ should show model cards."""
         client.post("/api/v1/models", json={"model_id": "openai/gpt-4o"})
         client.post("/api/v1/models", json={"model_id": "anthropic/claude-sonnet-4"})

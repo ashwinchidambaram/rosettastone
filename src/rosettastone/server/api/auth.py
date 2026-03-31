@@ -197,7 +197,7 @@ def _extract_bearer(request: Request) -> str | None:
     """Extract Bearer token from Authorization header, or None."""
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
-        return auth_header[len("Bearer "):]
+        return auth_header[len("Bearer ") :]
     return None
 
 

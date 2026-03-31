@@ -22,6 +22,7 @@ from rosettastone.batch import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_migration_result(**overrides) -> MagicMock:
     """Return a MagicMock that looks like a MigrationResult."""
     defaults = {
@@ -66,6 +67,7 @@ def _write_manifest(tmp_path: Path, content: dict) -> Path:
 # load_manifest — valid YAML
 # ---------------------------------------------------------------------------
 
+
 def test_load_manifest_valid(tmp_path: Path) -> None:
     manifest_path = _write_manifest(
         tmp_path,
@@ -90,6 +92,7 @@ def test_load_manifest_valid(tmp_path: Path) -> None:
 # load_manifest — invalid YAML
 # ---------------------------------------------------------------------------
 
+
 def test_load_manifest_invalid_yaml(tmp_path: Path) -> None:
     bad_yaml = tmp_path / "manifest.yaml"
     bad_yaml.write_text("migrations: [this: is: not: valid yaml }: }")
@@ -102,6 +105,7 @@ def test_load_manifest_invalid_yaml(tmp_path: Path) -> None:
 # load_manifest — missing required key
 # ---------------------------------------------------------------------------
 
+
 def test_load_manifest_missing_required(tmp_path: Path) -> None:
     # "migrations" key is absent — Pydantic should raise ValidationError
     manifest_path = _write_manifest(tmp_path, {"version": 1, "defaults": {}})
@@ -113,6 +117,7 @@ def test_load_manifest_missing_required(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Defaults merging
 # ---------------------------------------------------------------------------
+
 
 def test_defaults_merging(tmp_path: Path) -> None:
     # Entry does not specify gepa_auto, so it should inherit from defaults
@@ -148,6 +153,7 @@ def test_defaults_override(tmp_path: Path) -> None:
 # BatchEntry defaults
 # ---------------------------------------------------------------------------
 
+
 def test_batch_entry_defaults() -> None:
     entry = BatchEntry(
         name="test",
@@ -163,6 +169,7 @@ def test_batch_entry_defaults() -> None:
 # ---------------------------------------------------------------------------
 # run_batch — success
 # ---------------------------------------------------------------------------
+
 
 def test_run_batch_success(tmp_path: Path) -> None:
     manifest = BatchManifest(
@@ -193,18 +200,19 @@ def test_run_batch_success(tmp_path: Path) -> None:
 # run_batch — blocked
 # ---------------------------------------------------------------------------
 
+
 def test_run_batch_blocked(tmp_path: Path) -> None:
     from rosettastone.core.migrator import MigrationBlockedError
 
-    manifest = BatchManifest(
-        migrations=[BatchEntry(**_minimal_entry_dict())]
-    )
+    manifest = BatchManifest(migrations=[BatchEntry(**_minimal_entry_dict())])
 
     with (
         patch("rosettastone.config.MigrationConfig"),
         patch("rosettastone.core.migrator.Migrator") as mock_migrator,
     ):
-        mock_migrator.return_value.run.side_effect = MigrationBlockedError("context window too small")
+        mock_migrator.return_value.run.side_effect = MigrationBlockedError(
+            "context window too small"
+        )
 
         results = run_batch(manifest, tmp_path)
 
@@ -218,10 +226,9 @@ def test_run_batch_blocked(tmp_path: Path) -> None:
 # run_batch — failed (generic exception)
 # ---------------------------------------------------------------------------
 
+
 def test_run_batch_failed(tmp_path: Path) -> None:
-    manifest = BatchManifest(
-        migrations=[BatchEntry(**_minimal_entry_dict())]
-    )
+    manifest = BatchManifest(migrations=[BatchEntry(**_minimal_entry_dict())])
 
     with (
         patch("rosettastone.config.MigrationConfig"),
@@ -241,12 +248,11 @@ def test_run_batch_failed(tmp_path: Path) -> None:
 # run_batch — mixed results
 # ---------------------------------------------------------------------------
 
+
 def test_run_batch_mixed_results(tmp_path: Path) -> None:
     entry_a = _minimal_entry_dict(name="alpha")
     entry_b = _minimal_entry_dict(name="beta")
-    manifest = BatchManifest(
-        migrations=[BatchEntry(**entry_a), BatchEntry(**entry_b)]
-    )
+    manifest = BatchManifest(migrations=[BatchEntry(**entry_a), BatchEntry(**entry_b)])
     mock_result = _make_migration_result()
 
     call_count = 0
@@ -275,12 +281,11 @@ def test_run_batch_mixed_results(tmp_path: Path) -> None:
 # run_batch — continues on failure
 # ---------------------------------------------------------------------------
 
+
 def test_run_batch_continues_on_failure(tmp_path: Path) -> None:
     entry_a = _minimal_entry_dict(name="first")
     entry_b = _minimal_entry_dict(name="second")
-    manifest = BatchManifest(
-        migrations=[BatchEntry(**entry_a), BatchEntry(**entry_b)]
-    )
+    manifest = BatchManifest(migrations=[BatchEntry(**entry_a), BatchEntry(**entry_b)])
     mock_result = _make_migration_result()
 
     call_count = 0
@@ -314,6 +319,7 @@ def test_run_batch_continues_on_failure(tmp_path: Path) -> None:
 # format_batch_summary — basic table structure
 # ---------------------------------------------------------------------------
 
+
 def test_format_batch_summary_basic() -> None:
     results = [
         BatchResult(
@@ -339,6 +345,7 @@ def test_format_batch_summary_basic() -> None:
 # ---------------------------------------------------------------------------
 # format_batch_summary — aggregate footer counts
 # ---------------------------------------------------------------------------
+
 
 def test_format_batch_summary_aggregates() -> None:
     results = [
@@ -376,6 +383,7 @@ def test_format_batch_summary_aggregates() -> None:
 # format_batch_summary — empty results
 # ---------------------------------------------------------------------------
 
+
 def test_format_batch_summary_empty() -> None:
     summary = format_batch_summary([])
     assert "No results." in summary
@@ -385,8 +393,7 @@ def test_format_batch_summary_empty() -> None:
 # BatchManifest — version defaults to 1
 # ---------------------------------------------------------------------------
 
+
 def test_batch_manifest_version() -> None:
-    manifest = BatchManifest(
-        migrations=[BatchEntry(**_minimal_entry_dict())]
-    )
+    manifest = BatchManifest(migrations=[BatchEntry(**_minimal_entry_dict())])
     assert manifest.version == 1

@@ -88,9 +88,7 @@ class TestRunnerNoDataPath:
             captured_calls.append(list(train_set))
             return {m.name: "instructions" for m in config.modules}
 
-        with patch(
-            "rosettastone.optimize.teacher_student.TeacherStudentOptimizer"
-        ) as mock_cls:
+        with patch("rosettastone.optimize.teacher_student.TeacherStudentOptimizer") as mock_cls:
             mock_optimizer = MagicMock()
             mock_optimizer.pipeline_optimize.side_effect = fake_pipeline_optimize
             mock_cls.return_value = mock_optimizer
@@ -108,12 +106,8 @@ class TestRunnerStageRecords:
             pipeline = _insert_pipeline(session)
             pipeline_id = pipeline.id
 
-        with patch(
-            "rosettastone.optimize.teacher_student.TeacherStudentOptimizer"
-        ) as mock_cls:
-            mock_cls.return_value = _mock_optimizer(
-                {"module1": "opt1", "module2": "opt2"}
-            )
+        with patch("rosettastone.optimize.teacher_student.TeacherStudentOptimizer") as mock_cls:
+            mock_cls.return_value = _mock_optimizer({"module1": "opt1", "module2": "opt2"})
             run_pipeline_background(pipeline_id, engine=mem_engine)
 
         with Session(mem_engine) as session:
@@ -135,9 +129,7 @@ class TestRunnerStageRecords:
             pipeline = _insert_pipeline(session)
             pipeline_id = pipeline.id
 
-        with patch(
-            "rosettastone.optimize.teacher_student.TeacherStudentOptimizer"
-        ) as mock_cls:
+        with patch("rosettastone.optimize.teacher_student.TeacherStudentOptimizer") as mock_cls:
             mock_cls.return_value = _mock_optimizer(
                 {"module1": "instructions for module1", "module2": "instructions for module2"}
             )
@@ -162,9 +154,7 @@ class TestRunnerStageRecords:
             pipeline = _insert_pipeline(session)
             pipeline_id = pipeline.id
 
-        with patch(
-            "rosettastone.optimize.teacher_student.TeacherStudentOptimizer"
-        ) as mock_cls:
+        with patch("rosettastone.optimize.teacher_student.TeacherStudentOptimizer") as mock_cls:
             mock_cls.return_value = _mock_optimizer({"module1": "x", "module2": "y"})
             run_pipeline_background(pipeline_id, engine=mem_engine)
 
@@ -189,9 +179,7 @@ class TestRunnerStatusTransitions:
             pipeline = _insert_pipeline(session)
             pipeline_id = pipeline.id
 
-        with patch(
-            "rosettastone.optimize.teacher_student.TeacherStudentOptimizer"
-        ) as mock_cls:
+        with patch("rosettastone.optimize.teacher_student.TeacherStudentOptimizer") as mock_cls:
             mock_cls.return_value = _mock_optimizer({"module1": "a", "module2": "b"})
             run_pipeline_background(pipeline_id, engine=mem_engine)
 
@@ -206,9 +194,7 @@ class TestRunnerStatusTransitions:
             pipeline = _insert_pipeline(session)
             pipeline_id = pipeline.id
 
-        with patch(
-            "rosettastone.optimize.teacher_student.TeacherStudentOptimizer"
-        ) as mock_cls:
+        with patch("rosettastone.optimize.teacher_student.TeacherStudentOptimizer") as mock_cls:
             mock_optimizer = MagicMock()
             mock_optimizer.pipeline_optimize.side_effect = ValueError("something went wrong")
             mock_cls.return_value = mock_optimizer

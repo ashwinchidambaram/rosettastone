@@ -109,9 +109,7 @@ class TestValidateDag:
         modules = [
             _make_module("a", input_fields=["prompt"], output_fields=["a_out"], depends_on=[]),
             _make_module("b", input_fields=["a_out"], output_fields=["b_out"], depends_on=["a"]),
-            _make_module(
-                "c", input_fields=["b_out"], output_fields=["c_out"], depends_on=["b"]
-            ),
+            _make_module("c", input_fields=["b_out"], output_fields=["c_out"], depends_on=["b"]),
         ]
         config = _make_config(modules)
         order = validate_dag(config)
@@ -121,7 +119,9 @@ class TestValidateDag:
     def test_validate_dag_parallel_branches(self) -> None:
         """Two modules depending on the same root — root comes first."""
         modules = [
-            _make_module("root", input_fields=["prompt"], output_fields=["root_out"], depends_on=[]),
+            _make_module(
+                "root", input_fields=["prompt"], output_fields=["root_out"], depends_on=[]
+            ),
             _make_module(
                 "branch1",
                 input_fields=["root_out"],

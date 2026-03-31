@@ -18,13 +18,16 @@ class TestCreateABTest:
             s.refresh(v1)
             s.refresh(v2)
 
-        resp = client.post("/api/v1/ab-tests", json={
-            "migration_id": sample_migration.id,
-            "version_a_id": v1.id,
-            "version_b_id": v2.id,
-            "name": "Test AB",
-            "traffic_split": 0.6,
-        })
+        resp = client.post(
+            "/api/v1/ab-tests",
+            json={
+                "migration_id": sample_migration.id,
+                "version_a_id": v1.id,
+                "version_b_id": v2.id,
+                "name": "Test AB",
+                "traffic_split": 0.6,
+            },
+        )
         assert resp.status_code == 201
         data = resp.json()
         assert data["name"] == "Test AB"
@@ -32,11 +35,14 @@ class TestCreateABTest:
 
     def test_create_missing_migration(self, client):
         """POST with non-existent migration returns 404."""
-        resp = client.post("/api/v1/ab-tests", json={
-            "migration_id": 999,
-            "version_a_id": 1,
-            "version_b_id": 2,
-        })
+        resp = client.post(
+            "/api/v1/ab-tests",
+            json={
+                "migration_id": 999,
+                "version_a_id": 1,
+                "version_b_id": 2,
+            },
+        )
         assert resp.status_code == 404
 
     def test_create_missing_version(self, client, engine, sample_migration):
@@ -46,11 +52,14 @@ class TestCreateABTest:
             s.commit()
             s.refresh(v1)
 
-        resp = client.post("/api/v1/ab-tests", json={
-            "migration_id": sample_migration.id,
-            "version_a_id": v1.id,
-            "version_b_id": 999,
-        })
+        resp = client.post(
+            "/api/v1/ab-tests",
+            json={
+                "migration_id": sample_migration.id,
+                "version_a_id": v1.id,
+                "version_b_id": 999,
+            },
+        )
         assert resp.status_code == 404
 
 
@@ -72,11 +81,14 @@ class TestListABTests:
             s.refresh(v1)
             s.refresh(v2)
 
-        client.post("/api/v1/ab-tests", json={
-            "migration_id": sample_migration.id,
-            "version_a_id": v1.id,
-            "version_b_id": v2.id,
-        })
+        client.post(
+            "/api/v1/ab-tests",
+            json={
+                "migration_id": sample_migration.id,
+                "version_a_id": v1.id,
+                "version_b_id": v2.id,
+            },
+        )
 
         resp = client.get("/api/v1/ab-tests")
         assert resp.status_code == 200
@@ -93,12 +105,15 @@ class TestABTestLifecycle:
             s.refresh(v1)
             s.refresh(v2)
 
-        resp = client.post("/api/v1/ab-tests", json={
-            "migration_id": sample_migration.id,
-            "version_a_id": v1.id,
-            "version_b_id": v2.id,
-            "name": "Lifecycle test",
-        })
+        resp = client.post(
+            "/api/v1/ab-tests",
+            json={
+                "migration_id": sample_migration.id,
+                "version_a_id": v1.id,
+                "version_b_id": v2.id,
+                "name": "Lifecycle test",
+            },
+        )
         return resp.json()["id"]
 
     def test_start(self, client, engine, sample_migration):

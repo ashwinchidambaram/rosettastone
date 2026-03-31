@@ -72,7 +72,9 @@ def run_batch(manifest: BatchManifest, output_base: Path) -> list[BatchResult]:
     for entry in manifest.migrations:
         logger.info(
             "Starting migration: %s (%s -> %s)",
-            entry.name, entry.source_model, entry.target_model,
+            entry.name,
+            entry.source_model,
+            entry.target_model,
         )
 
         # Sanitize the name for use as a directory component
@@ -111,7 +113,9 @@ def run_batch(manifest: BatchManifest, output_base: Path) -> list[BatchResult]:
                 )
             )
             logger.info(
-                "Completed: %s (confidence=%.2f)", entry.name, result.confidence_score,
+                "Completed: %s (confidence=%.2f)",
+                entry.name,
+                result.confidence_score,
             )
         except MigrationBlockedError as exc:
             logger.warning("Migration blocked: %s — %s", entry.name, exc)

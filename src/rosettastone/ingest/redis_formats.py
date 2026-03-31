@@ -92,7 +92,12 @@ def parse_langchain_entry(key: bytes, value: bytes, source_model: str) -> Prompt
     # Structure 1: simple input/output dict
     direct_input = data.get("input")
     direct_output = data.get("output")
-    if isinstance(direct_input, str) and direct_input and isinstance(direct_output, str) and direct_output:  # noqa: E501
+    if (
+        isinstance(direct_input, str)
+        and direct_input
+        and isinstance(direct_output, str)
+        and direct_output
+    ):  # noqa: E501
         return PromptPair(prompt=direct_input, response=direct_output, source_model=source_model)
 
     # Structure 2: LLMResult with generations list

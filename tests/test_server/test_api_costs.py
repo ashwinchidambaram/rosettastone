@@ -69,7 +69,9 @@ class TestComputeCosts:
         assert result["total_month"] == "$3.00"
 
     def test_cost_attributed_to_target_model(self, session: Session) -> None:
-        _insert_migration(session, source="openai/gpt-4o", target="anthropic/claude-sonnet-4", cost=5.00)
+        _insert_migration(
+            session, source="openai/gpt-4o", target="anthropic/claude-sonnet-4", cost=5.00
+        )
         result = _compute_costs(session)
         assert result is not None
         by_model = result["by_model"]
@@ -240,9 +242,7 @@ class TestGetCostsEndpoint:
         assert data["by_model"] == []
         assert data["opportunities"] == []
 
-    def test_with_migrations_returns_aggregated_data(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_with_migrations_returns_aggregated_data(self, client: TestClient, engine) -> None:
         with Session(engine) as session:
             _insert_migration(session, target="openai/gpt-4o", cost=3.00)
             _insert_migration(session, target="anthropic/claude-sonnet-4", cost=1.00)
@@ -335,9 +335,7 @@ class TestCostsUIPage:
         # Dummy data total is $1,247
         assert "$1,247" in resp.text
 
-    def test_costs_page_shows_real_total_when_data_exists(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_costs_page_shows_real_total_when_data_exists(self, client: TestClient, engine) -> None:
         with Session(engine) as session:
             _insert_migration(session, target="openai/gpt-4o", cost=10.00)
 
@@ -357,9 +355,7 @@ class TestCostsUIPage:
         assert "gpt-4o" in resp.text
         assert "claude-sonnet-4" in resp.text
 
-    def test_costs_page_shows_opportunities_section(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_costs_page_shows_opportunities_section(self, client: TestClient, engine) -> None:
         with Session(engine) as session:
             _insert_migration(
                 session,
@@ -382,9 +378,7 @@ class TestCostsUIPage:
         # The base template marks the active nav, so "costs" should appear
         assert "costs" in resp.text.lower()
 
-    def test_costs_page_with_zero_cost_migrations(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_costs_page_with_zero_cost_migrations(self, client: TestClient, engine) -> None:
         """Migrations with zero cost should not crash (no division by zero)."""
         with Session(engine) as session:
             _insert_migration(session, cost=0.0)

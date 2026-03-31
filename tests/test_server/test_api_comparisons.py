@@ -14,7 +14,6 @@ from sqlmodel import Session  # noqa: E402
 from rosettastone.server.api.comparisons import _word_diff_html  # noqa: E402
 from rosettastone.server.models import TestCaseRecord  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Unit tests for _word_diff_html
 # ---------------------------------------------------------------------------
@@ -207,7 +206,9 @@ class TestUIFragments:
         # Dummy data has these values; template always renders outer structure
         assert "BERTScore" in body
 
-    def test_diff_fragment_with_real_data(self, client, engine, sample_migration, sample_test_cases):
+    def test_diff_fragment_with_real_data(
+        self, client, engine, sample_migration, sample_test_cases
+    ):
         """When real TC exists, the fragment renders with DB data."""
         tc = sample_test_cases[0]
         response = client.get(f"/ui/fragments/diff/{sample_migration.id}/{tc.id}")

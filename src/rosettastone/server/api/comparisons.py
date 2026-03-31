@@ -246,14 +246,14 @@ async def diff_fragment(
         expected_text: str = diff.get("expected", "") or ""
         actual_text: str = diff.get("actual", "") or ""
         if content_stored and expected_text and actual_text:
-            diff["expected_html"], diff["actual_html"] = _word_diff_html(
-                expected_text, actual_text
-            )
+            diff["expected_html"], diff["actual_html"] = _word_diff_html(expected_text, actual_text)
     else:
         diff = DUMMY_DIFF  # fallback
 
     return request.app.state.templates.TemplateResponse(
-        request, "fragments/diff_slideout.html", {"diff": diff},
+        request,
+        "fragments/diff_slideout.html",
+        {"diff": diff},
     )
 
 

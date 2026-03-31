@@ -160,7 +160,10 @@ class TestFormSubmission:
         }
 
         resp = client.post(
-            "/ui/migrations/new", data=form_data, files=files, follow_redirects=False,
+            "/ui/migrations/new",
+            data=form_data,
+            files=files,
+            follow_redirects=False,
         )
         assert resp.status_code == 303
 
@@ -247,9 +250,7 @@ class TestRunMigrationBackground:
 
             # Verify TestCaseRecord was created
             tcs = list(
-                session.exec(
-                    select(TestCaseRecord).where(TestCaseRecord.migration_id == mid)
-                ).all()
+                session.exec(select(TestCaseRecord).where(TestCaseRecord.migration_id == mid)).all()
             )
             assert len(tcs) == 1
             assert tcs[0].phase == "validation"

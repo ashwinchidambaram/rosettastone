@@ -374,9 +374,9 @@ def test_check_deprecations_idempotent(session: Session) -> None:
     assert second == 0
 
     count = session.exec(
-        select(func.count()).select_from(Alert).where(
-            Alert.alert_type == "deprecation", Alert.model_id == model_id
-        )
+        select(func.count())
+        .select_from(Alert)
+        .where(Alert.alert_type == "deprecation", Alert.model_id == model_id)
     ).one()
     assert count == 1
 
@@ -410,9 +410,7 @@ def test_check_deprecations_custom_json(session: Session, monkeypatch: pytest.Mo
 
     assert count == 1
     alert = session.exec(
-        select(Alert).where(
-            Alert.alert_type == "deprecation", Alert.model_id == custom_model_id
-        )
+        select(Alert).where(Alert.alert_type == "deprecation", Alert.model_id == custom_model_id)
     ).first()
     assert alert is not None
     assert alert.severity == "critical"
