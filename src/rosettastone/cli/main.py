@@ -300,5 +300,26 @@ def ci_report(
         raise typer.Exit(code=1)
 
 
+@app.command()
+def serve(
+    host: str = typer.Option("0.0.0.0", "--host", help="Server host"),
+    port: int = typer.Option(8000, "--port", help="Server port"),
+    reload: bool = typer.Option(False, "--reload", help="Enable hot-reload (development)"),
+) -> None:
+    """Start the RosettaStone FastAPI server."""
+    import uvicorn
+
+    url = f"http://{host}:{port}"
+    console.print(f"[bold green]Starting RosettaStone server at {url}[/bold green]")
+
+    uvicorn.run(
+        "rosettastone.server.app:create_app",
+        host=host,
+        port=port,
+        reload=reload,
+        factory=True,
+    )
+
+
 if __name__ == "__main__":
     app()
