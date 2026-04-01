@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import AsyncGenerator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -65,6 +66,32 @@ def _recover_orphaned_migrations() -> None:
             logger.info("Recovered %d orphaned migration(s)", len(orphaned))
 
 
+_JWT_SECRET_ENV = "ROSETTASTONE_JWT_SECRET"
+_JWT_SECRET_DEFAULT = "dev-secret-change-in-production"
+_JWT_SECRET_MIN_BYTES = 32
+_SERVER_LOGGER = logging.getLogger("rosettastone.server")
+
+
+def _check_jwt_secret() -> None:
+    """Warn when multi-user mode is active with an insecure JWT secret."""
+    multi_user = os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
+    if not multi_user:
+        return
+
+    secret = os.environ.get(_JWT_SECRET_ENV, _JWT_SECRET_DEFAULT)
+    if secret == _JWT_SECRET_DEFAULT:
+        _SERVER_LOGGER.warning(
+            "ROSETTASTONE_JWT_SECRET is set to the default dev value"
+            " — set a strong secret before deploying to production"
+        )
+    elif len(secret) < _JWT_SECRET_MIN_BYTES:
+        _SERVER_LOGGER.warning(
+            "ROSETTASTONE_JWT_SECRET is %d bytes"
+            " — minimum recommended length is 32 bytes for HS256",
+            len(secret),
+        )
+
+
 def _check_model_deprecations() -> None:
     """Check registered models for upcoming deprecations and create alerts."""
     try:
@@ -87,6 +114,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     init_db()
     _recover_orphaned_migrations()
     _check_model_deprecations()
+    _check_jwt_secret()
 
     # Single-worker executor — serializes all migrations (DSPy thread-safety)
     executor = ThreadPoolExecutor(max_workers=1)
