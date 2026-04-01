@@ -6,6 +6,7 @@ import json
 import logging
 import statistics
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -101,10 +102,31 @@ def _estimate_per_call_cost(config: Any) -> dict[str, Any] | None:
         return None
 
 
+def _make_gepa_callback(migration_id: int) -> Callable[[int, int, float], None]:
+    """Return a callback that emits SSE gepa_iteration events from the GEPA optimizer thread."""
+
+    def on_iteration(iteration: int, total_iterations: int, mean_score: float) -> None:
+        from rosettastone.server.progress import emit_progress
+
+        emit_progress(
+            migration_id,
+            {
+                "type": "gepa_iteration",
+                "migration_id": migration_id,
+                "iteration": iteration,
+                "total_iterations": total_iterations,
+                "running_mean_score": mean_score,
+            },
+        )
+
+    return on_iteration
+
+
 def _make_progress_writer(migration_id: int, engine: Any) -> Any:
-    """Return a callback that writes stage progress to the DB."""
+    """Return a callback that writes stage progress to the DB and emits SSE events."""
 
     def _write_progress(stage: str, stage_pct: float, overall_pct: float) -> None:
+        # Write to DB
         try:
             with Session(engine) as sess:
                 record = sess.get(MigrationRecord, migration_id)
@@ -118,6 +140,20 @@ def _make_progress_writer(migration_id: int, engine: Any) -> Any:
             logger.warning(
                 "Failed to write stage progress for migration %d: %s", migration_id, exc
             )
+
+        # Emit to SSE clients
+        from rosettastone.server.progress import emit_progress
+
+        emit_progress(
+            migration_id,
+            {
+                "type": "progress",
+                "migration_id": migration_id,
+                "current_stage": stage,
+                "stage_progress": stage_pct,
+                "overall_progress": overall_pct,
+            },
+        )
 
     return _write_progress
 
@@ -163,8 +199,13 @@ def run_migration_background(
         config = MigrationConfig(**config_dict)
 
         progress_cb = _make_progress_writer(migration_id, engine)
+        gepa_cb = _make_gepa_callback(migration_id)
         result = Migrator(
-            config, progress_callback=progress_cb, migration_id=migration_id, engine=engine
+            config,
+            progress_callback=progress_cb,
+            migration_id=migration_id,
+            engine=engine,
+            gepa_iteration_callback=gepa_cb,
         ).run()
 
         # Latency sampling — measure first 5 prompts against source and target
@@ -275,6 +316,13 @@ def run_migration_background(
 
             session.add(record)
 
+            # Record actual cost spend for budget tracking (multi-user mode only)
+            from rosettastone.server.api.costs import record_spend
+            from rosettastone.server.rbac import _is_multi_user
+
+            if _is_multi_user() and record.owner_id is not None and result.cost_usd:
+                record_spend(record.owner_id, result.cost_usd, session)
+
             # Auto-version and audit log (atomic with the migration record update)
             if not is_dry_run:
                 try:
@@ -285,6 +333,15 @@ def run_migration_background(
 
             session.commit()
 
+        # Emit final status to SSE clients
+        final_status = "dry_run_complete" if is_dry_run else "complete"
+        from rosettastone.server.progress import emit_progress
+
+        emit_progress(
+            migration_id,
+            {"type": "status", "status": final_status, "migration_id": migration_id},
+        )
+
     except Exception as exc:
         # Import here to avoid circular import issues in test environments
         try:
@@ -294,6 +351,7 @@ def run_migration_background(
         except ImportError:
             is_blocked = False
 
+        error_status = "blocked" if is_blocked else "failed"
         try:
             with Session(engine) as session:
                 record = session.get(MigrationRecord, migration_id)
@@ -316,6 +374,14 @@ def run_migration_background(
                 commit_err,
                 exc_info=True,
             )
+
+        # Emit final status to SSE clients
+        from rosettastone.server.progress import emit_progress
+
+        emit_progress(
+            migration_id,
+            {"type": "status", "status": error_status, "migration_id": migration_id},
+        )
 
     finally:
         # Clean up temp uploaded data file (keep output dir for reports)

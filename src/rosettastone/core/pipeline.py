@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -170,7 +171,12 @@ def load_and_split_data(
     return split_data(pairs, config.train_split, config.val_split)
 
 
-def optimize_prompt(train: list[PromptPair], val: list[PromptPair], config: MigrationConfig) -> str:
+def optimize_prompt(
+    train: list[PromptPair],
+    val: list[PromptPair],
+    config: MigrationConfig,
+    on_iteration: Callable[[int, int, float], None] | None = None,
+) -> str:
     from rosettastone.optimize.base import Optimizer
 
     optimizer: Optimizer
@@ -178,11 +184,12 @@ def optimize_prompt(train: list[PromptPair], val: list[PromptPair], config: Migr
         from rosettastone.optimize.mipro import MIPROv2Optimizer
 
         optimizer = MIPROv2Optimizer()
+        return optimizer.optimize(train, val, config)
     else:
         from rosettastone.optimize.gepa import GEPAOptimizer
 
         optimizer = GEPAOptimizer()
-    return optimizer.optimize(train, val, config)
+        return optimizer.optimize(train, val, config, on_iteration=on_iteration)
 
 
 def evaluate_baseline(test: list[PromptPair], config: MigrationConfig) -> list[EvalResult]:

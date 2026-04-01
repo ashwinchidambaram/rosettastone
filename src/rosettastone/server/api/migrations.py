@@ -800,6 +800,17 @@ async def create_migration(
                 detail=f"data_path must be within the rosettastone data directory ({safe_base})",
             )
 
+    # Budget check (multi-user mode only)
+    from rosettastone.server.api.costs import check_budget
+    from rosettastone.server.rbac import _is_multi_user
+
+    if _is_multi_user():
+        user_id = get_current_user_id(request)
+        if user_id is not None:
+            # Use max_cost_usd from config as estimated cost, or 0.0 if not set
+            estimated = max_cost_usd or 0.0
+            check_budget(user_id, estimated, session)
+
     config = {
         "source_model": source_model,
         "target_model": target_model,

@@ -22,11 +22,13 @@ class Migrator:
         progress_callback: Callable[[str, float, float], None] | None = None,
         migration_id: int | None = None,
         engine: object | None = None,
+        gepa_iteration_callback: Callable[[int, int, float], None] | None = None,
     ) -> None:
         self.config = config
         self._progress_callback = progress_callback
         self.migration_id = migration_id
         self.engine = engine
+        self._gepa_iteration_callback = gepa_iteration_callback
 
     def _emit(self, stage: str, stage_pct: float, overall_pct: float) -> None:
         """Invoke progress_callback if set; swallow any exception it raises."""
@@ -158,7 +160,7 @@ class Migrator:
 
         # Step 3: Optimize
         t0 = time.time()
-        optimized_prompt = optimize_prompt(train, val, self.config)
+        optimized_prompt = optimize_prompt(train, val, self.config, self._gepa_iteration_callback)
         ctx.timing["optimize"] = time.time() - t0
         self._emit("optimize", 1.0, 0.75)
 

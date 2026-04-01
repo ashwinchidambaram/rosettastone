@@ -823,4 +823,41 @@ function showPersonaView(view) {
 </div>
 
 </div>
+
+{% if migration.status in ['pending', 'running'] %}
+<script>
+(function() {
+  var migrationId = {{ migration.id }};
+  var es = new EventSource('/api/v1/migrations/' + migrationId + '/stream');
+
+  es.onmessage = function(event) {
+    try {
+      var data = JSON.parse(event.data);
+
+      // Update overall progress bar if present
+      var progressBar = document.getElementById('overall-progress');
+      if (progressBar && data.overall_progress !== undefined) {
+        var pct = Math.round(data.overall_progress * 100);
+        progressBar.style.width = pct + '%';
+        progressBar.setAttribute('aria-valuenow', pct);
+      }
+
+      // If terminal status received, close stream and reload page
+      var terminal = ['complete', 'failed', 'cancelled', 'blocked', 'dry_run_complete'];
+      if (data.status && terminal.indexOf(data.status) !== -1) {
+        es.close();
+        window.location.reload();
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  };
+
+  es.onerror = function() {
+    es.close();
+  };
+})();
+</script>
+{% endif %}
+
 {% endblock %}

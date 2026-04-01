@@ -1,14 +1,16 @@
-"""Cost aggregation and optimization endpoints."""
+"""Cost aggregation and optimization endpoints + per-user budget management."""
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session, select
 
 from rosettastone.server.database import get_session
-from rosettastone.server.models import MigrationRecord
+from rosettastone.server.models import MigrationRecord, UserBudget
+from rosettastone.server.rbac import get_current_user_id, require_role
 
 router = APIRouter()
 
@@ -147,3 +149,120 @@ async def get_costs_by_model(session: Session = Depends(get_session)) -> list[di
     if costs is None:
         return []
     return costs["by_model"]  # type: ignore[no-any-return]
+
+
+# ---------------------------------------------------------------------------
+# Per-User Budget Tracking (Task 3.5)
+# ---------------------------------------------------------------------------
+
+
+def _current_month() -> str:
+    """Return current month in YYYY-MM format."""
+    return datetime.now(tz=UTC).strftime("%Y-%m")
+
+
+def get_or_create_budget(user_id: int, session: Session) -> UserBudget:
+    """Get or create UserBudget for user_id. Resets spend if month changed.
+
+    Note: 0.0 monthly_limit_usd means unlimited. None should not be used.
+    """
+    budget = session.exec(select(UserBudget).where(UserBudget.user_id == user_id)).first()
+    month = _current_month()
+    if budget is None:
+        budget = UserBudget(
+            user_id=user_id,
+            monthly_limit_usd=0.0,  # 0.0 means unlimited
+            current_month_spend_usd=0.0,
+            budget_month=month,
+        )
+        session.add(budget)
+        session.commit()
+        session.refresh(budget)
+    elif budget.budget_month != month:
+        budget.current_month_spend_usd = 0.0
+        budget.budget_month = month
+        session.add(budget)
+        session.commit()
+        session.refresh(budget)
+    return budget
+
+
+def check_budget(user_id: int, estimated_cost: float, session: Session) -> None:
+    """Raise HTTP 402 if adding estimated_cost would exceed the user's monthly limit.
+
+    No-op if user has no limit set (monthly_limit_usd is 0.0 means unlimited).
+    """
+    budget = get_or_create_budget(user_id, session)
+    if budget.monthly_limit_usd <= 0:
+        # 0 or negative means unlimited
+        return
+    if budget.current_month_spend_usd + estimated_cost > budget.monthly_limit_usd:
+        remaining = budget.monthly_limit_usd - budget.current_month_spend_usd
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                f"Monthly budget exceeded. Limit: ${budget.monthly_limit_usd:.2f}, "
+                f"Spent: ${budget.current_month_spend_usd:.2f}, "
+                f"Remaining: ${remaining:.2f}, "
+                f"Estimated: ${estimated_cost:.2f}"
+            ),
+        )
+
+
+def record_spend(user_id: int, actual_cost: float, session: Session) -> None:
+    """Add actual_cost to the user's current month spend."""
+    if actual_cost <= 0:
+        return
+    budget = get_or_create_budget(user_id, session)
+    budget.current_month_spend_usd = (budget.current_month_spend_usd or 0.0) + actual_cost
+    session.add(budget)
+    session.commit()
+
+
+@router.get(
+    "/api/v1/budgets/me",
+    dependencies=[Depends(require_role("viewer", "editor", "admin"))],
+)
+async def get_my_budget(request: Request, session: Session = Depends(get_session)) -> dict:
+    """Get current user's budget status.
+
+    Returns:
+        - monthly_limit_usd: 0.0 means unlimited, positive value is the limit
+        - current_month_spend_usd: current month's spend
+        - budget_month: YYYY-MM format
+    """
+    user_id = get_current_user_id(request)
+    if user_id is None:
+        raise HTTPException(status_code=400, detail="User ID not available")
+    budget = get_or_create_budget(user_id, session)
+    return {
+        "user_id": user_id,
+        "monthly_limit_usd": budget.monthly_limit_usd,
+        "current_month_spend_usd": budget.current_month_spend_usd,
+        "budget_month": budget.budget_month,
+    }
+
+
+@router.put(
+    "/api/v1/budgets/{user_id}",
+    dependencies=[Depends(require_role("admin"))],
+)
+async def set_user_budget(
+    user_id: int,
+    monthly_limit_usd: float,
+    session: Session = Depends(get_session),
+) -> dict:
+    """Admin: set monthly budget limit for a user."""
+    if monthly_limit_usd < 0:
+        raise HTTPException(status_code=422, detail="monthly_limit_usd must be non-negative")
+    budget = get_or_create_budget(user_id, session)
+    budget.monthly_limit_usd = monthly_limit_usd
+    session.add(budget)
+    session.commit()
+    session.refresh(budget)
+    return {
+        "user_id": user_id,
+        "monthly_limit_usd": budget.monthly_limit_usd,
+        "current_month_spend_usd": budget.current_month_spend_usd,
+        "budget_month": budget.budget_month,
+    }

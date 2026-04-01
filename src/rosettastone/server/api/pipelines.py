@@ -8,6 +8,7 @@ from sqlmodel import Session, func, select
 
 from rosettastone.server.database import get_session
 from rosettastone.server.models import PipelineRecord, PipelineStageRecord
+from rosettastone.server.rate_limit import check_rate_limit
 from rosettastone.server.rbac import (
     check_resource_owner,
     get_current_user_id,
@@ -91,6 +92,13 @@ def create_pipeline(
     target_model). Returns the created PipelineSummary with status 201.
     Returns 422 if the YAML is invalid or missing required fields.
     """
+    is_limited, retry_after = check_rate_limit(request, "pipeline_submit")
+    if is_limited:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. Too many pipeline submissions.",
+            headers={"Retry-After": str(retry_after)},
+        )
     import yaml
     from pydantic import ValidationError
 

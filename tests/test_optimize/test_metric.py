@@ -1,4 +1,4 @@
-"""Tests for build_migration_metric() in optimize/metric.py.
+"""Tests for build_migration_metric() and IterationTracker in optimize/metric.py.
 
 The metric must return dspy.Prediction(score, feedback) for every input, and
 the feedback text must reflect which similarity threshold band was hit.
@@ -12,6 +12,8 @@ so the patch is visible when the closure executes its local import.
 from __future__ import annotations
 
 import sys
+import threading
+from typing import Any
 from unittest.mock import patch
 
 import dspy
@@ -20,7 +22,7 @@ from pydantic import ValidationError
 
 from rosettastone.config import MigrationConfig
 from rosettastone.core.types import PromptPair
-from rosettastone.optimize.metric import build_migration_metric
+from rosettastone.optimize.metric import IterationTracker, build_migration_metric
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -407,3 +409,227 @@ class TestKnownIssueWeight:
                 target_model="b",
                 known_issue_weight=0.0,
             )
+
+
+# ---------------------------------------------------------------------------
+# IterationTracker tests
+# ---------------------------------------------------------------------------
+
+
+def _make_stub_metric(score: float = 0.8) -> Any:
+    """Return a stub metric function that returns a dspy.Prediction with a fixed score."""
+
+    def stub(example: Any, pred: Any, trace: Any = None) -> dspy.Prediction:
+        return dspy.Prediction(score=score, feedback="stub")
+
+    return stub
+
+
+class TestIterationTrackerFiresCallback:
+    """Callback fires exactly once after each full trainset sweep."""
+
+    def test_fires_after_trainset_sweep(self) -> None:
+        """Callback fires after exactly trainset_size calls — not before."""
+        calls: list[tuple[int, int, float]] = []
+
+        def callback(iteration: int, total: int, mean: float) -> None:
+            calls.append((iteration, total, mean))
+
+        tracker = IterationTracker(trainset_size=3, total_iterations=10, callback=callback)
+        wrapped = tracker.wrap(_make_stub_metric(score=0.9))
+
+        example = dspy.Example(prompt="q", expected_response="a").with_inputs("prompt")
+        pred = dspy.Prediction(response="a")
+
+        # Two calls — no callback yet
+        wrapped(example, pred)
+        wrapped(example, pred)
+        assert calls == [], "Callback must not fire before a full sweep"
+
+        # Third call — one full sweep
+        wrapped(example, pred)
+        assert len(calls) == 1, "Callback must fire exactly once after trainset_size calls"
+        assert calls[0][0] == 1, "First callback must report iteration=1"
+        assert calls[0][1] == 10, "Callback must pass total_iterations=10"
+
+    def test_fires_once_per_sweep(self) -> None:
+        """Callback fires once per full sweep — not once per call."""
+        count = [0]
+
+        def callback(iteration: int, total: int, mean: float) -> None:
+            count[0] += 1
+
+        tracker = IterationTracker(trainset_size=2, total_iterations=5, callback=callback)
+        wrapped = tracker.wrap(_make_stub_metric())
+
+        example = dspy.Example(prompt="q", expected_response="a").with_inputs("prompt")
+        pred = dspy.Prediction(response="a")
+
+        for _ in range(6):  # 3 full sweeps
+            wrapped(example, pred)
+
+        assert count[0] == 3, f"Expected 3 callbacks for 6 calls with sweep=2, got {count[0]}"
+
+    def test_zero_trainset_size_is_noop(self) -> None:
+        """When trainset_size=0, wrap returns the original function unchanged."""
+        called = [False]
+
+        def callback(iteration: int, total: int, mean: float) -> None:
+            called[0] = True
+
+        tracker = IterationTracker(trainset_size=0, total_iterations=5, callback=callback)
+        original = _make_stub_metric()
+        wrapped = tracker.wrap(original)
+
+        # wrap must return the original function when trainset_size == 0
+        assert wrapped is original, "trainset_size=0 must return original function unchanged"
+        assert not called[0], "Callback must never fire when trainset_size=0"
+
+
+class TestIterationTrackerMeanScore:
+    """running_mean_score passed to the callback is correct."""
+
+    def test_mean_score_is_correct(self) -> None:
+        """running_mean_score is the cumulative mean of all scores seen so far."""
+        received: list[float] = []
+
+        def callback(iteration: int, total: int, mean: float) -> None:
+            received.append(mean)
+
+        trainset_size = 4
+        tracker = IterationTracker(
+            trainset_size=trainset_size, total_iterations=3, callback=callback
+        )
+
+        scores = [0.6, 0.8, 1.0, 0.4]  # mean = 0.7
+        example = dspy.Example(prompt="q", expected_response="a").with_inputs("prompt")
+
+        for s in scores:
+            pred = dspy.Prediction(response="a")
+            tracker.wrap(_make_stub_metric(score=s))(example, pred)
+
+        assert len(received) == 1
+        assert received[0] == pytest.approx(sum(scores) / len(scores), abs=0.001)
+
+    def test_mean_score_cumulative_across_sweeps(self) -> None:
+        """Mean grows cumulatively (all scores seen), not just the last sweep."""
+        sweep1_scores = [0.5, 0.5]  # mean after sweep 1 = 0.5
+        sweep2_scores = [1.0, 1.0]  # cumulative mean after sweep 2 = (0.5+0.5+1.0+1.0)/4 = 0.75
+
+        received: list[float] = []
+
+        def callback(iteration: int, total: int, mean: float) -> None:
+            received.append(mean)
+
+        tracker = IterationTracker(trainset_size=2, total_iterations=5, callback=callback)
+        example = dspy.Example(prompt="q", expected_response="a").with_inputs("prompt")
+
+        for s in sweep1_scores + sweep2_scores:
+            tracker.wrap(_make_stub_metric(score=s))(example, dspy.Prediction(response="a"))
+
+        assert len(received) == 2
+        assert received[0] == pytest.approx(0.5, abs=0.001)
+        assert received[1] == pytest.approx(0.75, abs=0.001)
+
+    def test_score_extraction_fallback(self) -> None:
+        """If the metric result has no .score attribute, float(result) is used."""
+        received: list[float] = []
+
+        def callback(iteration: int, total: int, mean: float) -> None:
+            received.append(mean)
+
+        tracker = IterationTracker(trainset_size=1, total_iterations=1, callback=callback)
+
+        # Metric returns a plain float rather than dspy.Prediction
+        def plain_metric(example: Any, pred: Any, trace: Any = None) -> float:
+            return 0.77
+
+        wrapped = tracker.wrap(plain_metric)
+        example = dspy.Example(prompt="q", expected_response="a").with_inputs("prompt")
+        wrapped(example, dspy.Prediction(response="a"))
+
+        assert received == [pytest.approx(0.77, abs=0.001)]
+
+
+class TestIterationTrackerThreadSafety:
+    """IterationTracker must be correct under concurrent metric calls."""
+
+    def test_concurrent_calls_count_correctly(self) -> None:
+        """All concurrent metric calls are counted; no calls are lost or double-counted."""
+        n_threads = 5
+        calls_per_thread = 10  # 5 threads × 10 calls = 50 total = exactly one full sweep
+        trainset_size = n_threads * calls_per_thread
+
+        callback_count = [0]
+        lock = threading.Lock()
+
+        def callback(iteration: int, total: int, mean: float) -> None:
+            with lock:
+                callback_count[0] += 1
+
+        tracker = IterationTracker(
+            trainset_size=trainset_size,
+            total_iterations=10,
+            callback=callback,
+        )
+        wrapped = tracker.wrap(_make_stub_metric(score=0.5))
+        example = dspy.Example(prompt="q", expected_response="a").with_inputs("prompt")
+        pred = dspy.Prediction(response="a")
+
+        def worker() -> None:
+            for _ in range(calls_per_thread):
+                wrapped(example, pred)
+
+        threads = [threading.Thread(target=worker) for _ in range(n_threads)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert tracker._call_count == trainset_size, (
+            f"Expected {trainset_size} total calls, got {tracker._call_count}"
+        )
+        assert callback_count[0] == 1, (
+            f"Expected exactly 1 callback for one full sweep, got {callback_count[0]}"
+        )
+
+    def test_many_sweeps_concurrent(self) -> None:
+        """Callback fires the correct number of times under heavy concurrent load."""
+        trainset_size = 10
+        n_sweeps = 5
+        total_calls = trainset_size * n_sweeps
+        n_threads = 10
+
+        callback_count = [0]
+        cblock = threading.Lock()
+
+        def callback(iteration: int, total: int, mean: float) -> None:
+            with cblock:
+                callback_count[0] += 1
+
+        tracker = IterationTracker(
+            trainset_size=trainset_size,
+            total_iterations=n_sweeps,
+            callback=callback,
+        )
+        wrapped = tracker.wrap(_make_stub_metric(score=0.6))
+        example = dspy.Example(prompt="q", expected_response="a").with_inputs("prompt")
+        pred = dspy.Prediction(response="a")
+
+        def worker(n: int) -> None:
+            for _ in range(n):
+                wrapped(example, pred)
+
+        calls_per_thread = total_calls // n_threads
+        threads = [threading.Thread(target=worker, args=(calls_per_thread,)) for _ in range(n_threads)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert tracker._call_count == total_calls, (
+            f"Expected {total_calls} total calls, got {tracker._call_count}"
+        )
+        assert callback_count[0] == n_sweeps, (
+            f"Expected {n_sweeps} callbacks for {n_sweeps} sweeps, got {callback_count[0]}"
+        )

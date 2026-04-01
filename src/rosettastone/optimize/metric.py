@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import threading
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import dspy
@@ -10,6 +12,57 @@ import dspy
 if TYPE_CHECKING:
     from rosettastone.config import MigrationConfig
     from rosettastone.core.types import PromptPair
+
+
+class IterationTracker:
+    """Thread-safe counter that fires a callback after each full trainset sweep.
+
+    This class is importable without DSPy — it only depends on stdlib threading.
+    If trainset_size is 0 the tracker is a no-op (wrap returns the original function).
+    """
+
+    def __init__(
+        self,
+        trainset_size: int,
+        total_iterations: int,
+        callback: Callable[[int, int, float], None],
+    ) -> None:
+        self._lock = threading.Lock()
+        self._call_count = 0
+        self._trainset_size = trainset_size
+        self._total_iterations = total_iterations
+        self._iteration = 0
+        self._scores: list[float] = []
+        self._callback = callback  # (iteration, total_iterations, running_mean_score) -> None
+
+    def wrap(self, metric_fn: Any) -> Any:
+        """Wrap a DSPy metric function to track iteration progress.
+
+        The wrapper calls the original metric, records the score, and fires the
+        callback after every ``trainset_size`` calls (= one full GEPA iteration).
+        The callback is invoked *outside* the lock to avoid deadlocks.
+        """
+        if self._trainset_size == 0:
+            return metric_fn
+
+        tracker = self  # avoid closure capture of self in nested def
+
+        def wrapped(example: Any, pred: Any, trace: Any = None) -> Any:
+            result = metric_fn(example, pred, trace)
+            score = result.score if hasattr(result, "score") else float(result or 0)
+            fire_callback: tuple[int, int, float] | None = None
+            with tracker._lock:
+                tracker._call_count += 1
+                tracker._scores.append(score)
+                if tracker._call_count % tracker._trainset_size == 0:
+                    tracker._iteration += 1
+                    mean = sum(tracker._scores) / len(tracker._scores)
+                    fire_callback = (tracker._iteration, tracker._total_iterations, mean)
+            if fire_callback is not None:
+                tracker._callback(*fire_callback)
+            return result
+
+        return wrapped
 
 
 def build_migration_metric(

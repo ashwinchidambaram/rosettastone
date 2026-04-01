@@ -396,7 +396,14 @@ class TestRunMigrationBackground:
         received_callbacks = []
 
         class FakeMigrator:
-            def __init__(self, config, progress_callback=None, migration_id=None, engine=None):
+            def __init__(
+                self,
+                config,
+                progress_callback=None,
+                migration_id=None,
+                engine=None,
+                gepa_iteration_callback=None,
+            ):
                 received_callbacks.append(progress_callback)
 
             def run(self):

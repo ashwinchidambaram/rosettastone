@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
 sqlmodel = pytest.importorskip("sqlmodel")
 
+from fastapi import HTTPException  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-from sqlmodel import Session  # noqa: E402
+from sqlmodel import Session, select  # noqa: E402
 
 from rosettastone.server.api.costs import _compute_costs, _generate_opportunities  # noqa: E402
-from rosettastone.server.models import MigrationRecord  # noqa: E402
+from rosettastone.server.models import MigrationRecord, UserBudget  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -386,3 +389,88 @@ class TestCostsUIPage:
         resp = client.get("/ui/costs")
         assert resp.status_code == 200
         assert "$0.00" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Per-User Budget Tracking Tests (Task 3.5)
+# ---------------------------------------------------------------------------
+
+
+class TestBudgetTracking:
+    """Test per-user budget tracking functionality."""
+
+    def test_get_or_create_budget_creates_if_missing(self, session: Session) -> None:
+        """get_or_create_budget creates a new budget if missing."""
+        from rosettastone.server.api.costs import get_or_create_budget
+
+        budget = get_or_create_budget(1, session)
+        assert budget.user_id == 1
+        assert budget.monthly_limit_usd == 0.0  # 0.0 means unlimited
+        assert budget.current_month_spend_usd == 0.0
+
+    def test_check_budget_no_limit_passes(self, session: Session) -> None:
+        """check_budget is a no-op when no limit is set."""
+        from rosettastone.server.api.costs import check_budget
+
+        check_budget(1, 999.0, session)  # Should not raise
+
+    def test_check_budget_within_limit_passes(self, session: Session) -> None:
+        """check_budget passes when spend + estimate <= limit."""
+        from rosettastone.server.api.costs import check_budget
+
+        month = datetime.now(tz=UTC).strftime("%Y-%m")
+        budget = UserBudget(
+            user_id=2,
+            monthly_limit_usd=10.0,
+            current_month_spend_usd=5.0,
+            budget_month=month,
+        )
+        session.add(budget)
+        session.commit()
+
+        check_budget(2, 4.0, session)  # 5.0 + 4.0 = 9.0 <= 10.0
+
+    def test_check_budget_over_limit_raises_402(self, session: Session) -> None:
+        """check_budget raises 402 when spend + estimate > limit."""
+        from rosettastone.server.api.costs import check_budget
+
+        month = datetime.now(tz=UTC).strftime("%Y-%m")
+        budget = UserBudget(
+            user_id=3,
+            monthly_limit_usd=10.0,
+            current_month_spend_usd=9.0,
+            budget_month=month,
+        )
+        session.add(budget)
+        session.commit()
+
+        with pytest.raises(HTTPException) as exc_info:
+            check_budget(3, 2.0, session)  # 9.0 + 2.0 = 11.0 > 10.0
+        assert exc_info.value.status_code == 402
+
+    def test_record_spend_increments_counter(self, session: Session) -> None:
+        """record_spend adds cost to current_month_spend_usd."""
+        from rosettastone.server.api.costs import get_or_create_budget, record_spend
+
+        get_or_create_budget(4, session)
+        record_spend(4, 3.0, session)
+
+        budget = session.exec(select(UserBudget).where(UserBudget.user_id == 4)).first()
+        assert budget is not None
+        assert abs(budget.current_month_spend_usd - 3.0) < 0.001
+
+    def test_monthly_reset_resets_spend(self, session: Session) -> None:
+        """get_or_create_budget resets spend when budget_month differs from current month."""
+        from rosettastone.server.api.costs import get_or_create_budget
+
+        budget = UserBudget(
+            user_id=5,
+            monthly_limit_usd=10.0,
+            current_month_spend_usd=8.0,
+            budget_month="2020-01",  # Old month
+        )
+        session.add(budget)
+        session.commit()
+
+        budget = get_or_create_budget(5, session)
+        assert budget.current_month_spend_usd == 0.0
