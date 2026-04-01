@@ -12,9 +12,12 @@ if TYPE_CHECKING:
 
 
 class PreflightReport:
-    def __init__(self, warnings: list[str], blockers: list[str]) -> None:
+    def __init__(
+        self, warnings: list[str], blockers: list[str], estimated_cost_usd: float = 0.0
+    ) -> None:
         self.warnings = warnings
         self.blockers = blockers
+        self.estimated_cost_usd = estimated_cost_usd
 
     @property
     def has_blockers(self) -> bool:

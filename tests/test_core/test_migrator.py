@@ -49,12 +49,13 @@ def _make_eval_result(is_win: bool = True) -> EvalResult:
     )
 
 
-def _make_preflight_report(warnings=None, blockers=None, dry_run_result=None):
+def _make_preflight_report(warnings=None, blockers=None, dry_run_result=None, estimated_cost_usd=0.0):
     """Return a mock PreflightReport."""
     report = MagicMock()
     report.warnings = warnings or []
     report.blockers = blockers or []
     report.has_blockers = bool(blockers)
+    report.estimated_cost_usd = estimated_cost_usd
 
     if dry_run_result is not None:
         report.as_dry_run_result.return_value = dry_run_result
@@ -513,3 +514,92 @@ class TestSkipPreflight:
         mock_preflight.assert_not_called()
         # No preflight warnings injected
         assert result.warnings == []
+
+
+class TestMaxCostUsdGuardrail:
+    def test_max_cost_usd_abort_at_preflight(self):
+        """When preflight estimated cost exceeds max_cost_usd, migration must abort."""
+        config = _make_config(dry_run=False, skip_preflight=False, max_cost_usd=5.0)
+        migrator = Migrator(config)
+
+        # Preflight report with high estimated cost
+        high_cost_report = _make_preflight_report(estimated_cost_usd=50.0)
+
+        with (
+            patch("rosettastone.core.pipeline.run_preflight", return_value=high_cost_report),
+            patch("rosettastone.core.pipeline.load_and_split_data") as mock_load,
+        ):
+            with pytest.raises(ValueError) as exc_info:
+                migrator.run()
+
+        # Verify error message contains cost info
+        assert "50.0000" in str(exc_info.value) or "50" in str(exc_info.value)
+        assert "5.0000" in str(exc_info.value) or "5" in str(exc_info.value)
+        # Verify load_and_split_data was not called (migration aborted early)
+        mock_load.assert_not_called()
+
+    def test_max_cost_usd_none_allows_any_cost(self):
+        """When max_cost_usd=None, any estimated cost is allowed."""
+        config = _make_config(dry_run=False, skip_preflight=False, max_cost_usd=None)
+        migrator = Migrator(config)
+
+        # Preflight report with high estimated cost
+        high_cost_report = _make_preflight_report(estimated_cost_usd=100.0)
+        pairs = [_make_pair()]
+        eval_results = [_make_eval_result(is_win=True)]
+
+        with (
+            patch("rosettastone.core.pipeline.run_preflight", return_value=high_cost_report),
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data",
+                return_value=(pairs, pairs, pairs),
+            ),
+            patch("rosettastone.core.pipeline.run_pii_scan"),
+            patch("rosettastone.core.pipeline.evaluate_baseline", return_value=eval_results),
+            patch("rosettastone.core.pipeline.optimize_prompt", return_value="opt"),
+            patch("rosettastone.core.pipeline.run_pii_scan_text"),
+            patch("rosettastone.core.pipeline.run_prompt_audit"),
+            patch("rosettastone.core.pipeline.evaluate_optimized", return_value=eval_results),
+            patch(
+                "rosettastone.core.pipeline.make_recommendation",
+                return_value=("GO", "ok", {}),
+            ),
+            patch("rosettastone.core.pipeline.generate_report"),
+        ):
+            result = migrator.run()
+
+        # Should complete successfully despite high cost
+        assert isinstance(result, MigrationResult)
+
+    def test_max_cost_usd_within_cap_allows_migration(self):
+        """When estimated cost is within max_cost_usd cap, migration proceeds."""
+        config = _make_config(dry_run=False, skip_preflight=False, max_cost_usd=100.0)
+        migrator = Migrator(config)
+
+        # Preflight report with cost under cap
+        low_cost_report = _make_preflight_report(estimated_cost_usd=25.0)
+        pairs = [_make_pair()]
+        eval_results = [_make_eval_result(is_win=True)]
+
+        with (
+            patch("rosettastone.core.pipeline.run_preflight", return_value=low_cost_report),
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data",
+                return_value=(pairs, pairs, pairs),
+            ),
+            patch("rosettastone.core.pipeline.run_pii_scan"),
+            patch("rosettastone.core.pipeline.evaluate_baseline", return_value=eval_results),
+            patch("rosettastone.core.pipeline.optimize_prompt", return_value="opt"),
+            patch("rosettastone.core.pipeline.run_pii_scan_text"),
+            patch("rosettastone.core.pipeline.run_prompt_audit"),
+            patch("rosettastone.core.pipeline.evaluate_optimized", return_value=eval_results),
+            patch(
+                "rosettastone.core.pipeline.make_recommendation",
+                return_value=("GO", "ok", {}),
+            ),
+            patch("rosettastone.core.pipeline.generate_report"),
+        ):
+            result = migrator.run()
+
+        # Should complete successfully
+        assert isinstance(result, MigrationResult)

@@ -44,3 +44,48 @@ def require_role(*roles: str) -> Callable[[Request], Coroutine[Any, Any, None]]:
 async def get_current_user(request: Request) -> dict[str, Any] | None:
     """Return the current user from request.state, or None in legacy mode."""
     return getattr(request.state, "user", None)
+
+
+def _is_multi_user() -> bool:
+    import os
+
+    return os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
+
+
+def get_current_user_id(request: Request) -> int | None:
+    """Return current user's DB id, or None in single-user mode.
+
+    Checks both "id" and "user_id" keys for compatibility with JWT payload format.
+    """
+    if not _is_multi_user():
+        return None
+    user = getattr(request.state, "user", None)
+    if user is None:
+        return None
+    if isinstance(user, dict):
+        return user.get("id") or user.get("user_id")
+    return getattr(user, "id", None) or getattr(user, "user_id", None)
+
+
+def is_admin_user(request: Request) -> bool:
+    """Return True if the current user has the admin role."""
+    user = getattr(request.state, "user", None)
+    if user is None:
+        return False
+    if isinstance(user, dict):
+        return user.get("role") == "admin"
+    return getattr(user, "role", None) == "admin"
+
+
+def check_resource_owner(resource_owner_id: int | None, request: Request) -> None:
+    """Raise HTTP 403 if caller doesn't own the resource (multi-user mode only).
+
+    No-op in single-user mode. Admins bypass the check.
+    """
+    if not _is_multi_user():
+        return
+    if is_admin_user(request):
+        return
+    current_id = get_current_user_id(request)
+    if resource_owner_id is not None and resource_owner_id != current_id:
+        raise HTTPException(status_code=403, detail="Access denied")

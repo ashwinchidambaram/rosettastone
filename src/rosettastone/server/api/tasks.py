@@ -158,7 +158,9 @@ def run_migration_background(
         config = MigrationConfig(**config_dict)
 
         progress_cb = _make_progress_writer(migration_id, engine)
-        result = Migrator(config, progress_callback=progress_cb).run()
+        result = Migrator(
+            config, progress_callback=progress_cb, migration_id=migration_id, engine=engine
+        ).run()
 
         # Latency sampling — measure first 5 prompts against source and target
         latency_data = _sample_latency(result, config)

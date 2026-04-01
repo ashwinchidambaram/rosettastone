@@ -93,7 +93,7 @@ def test_light_mode_cost_matches_formula():
     with patch("litellm.get_model_info", return_value=model_info):
         from rosettastone.preflight.cost_estimator import estimate_cost
 
-        warnings = estimate_cost(config)
+        warnings, _ = estimate_cost(config)
 
     expected = _expected_cost("light", input_cost, output_cost)
     cost_warning = next((w for w in warnings if "$" in w), None)
@@ -123,7 +123,7 @@ def test_medium_mode_cost_matches_formula():
     with patch("litellm.get_model_info", return_value=model_info):
         from rosettastone.preflight.cost_estimator import estimate_cost
 
-        warnings = estimate_cost(config)
+        warnings, _ = estimate_cost(config)
 
     expected = _expected_cost("medium", input_cost, output_cost)
     cost_warning = next((w for w in warnings if "$" in w and f"${expected:.2f}" in w), None)
@@ -150,7 +150,7 @@ def test_heavy_mode_cost_matches_formula():
     with patch("litellm.get_model_info", return_value=model_info):
         from rosettastone.preflight.cost_estimator import estimate_cost
 
-        warnings = estimate_cost(config)
+        warnings, _ = estimate_cost(config)
 
     expected = _expected_cost("heavy", input_cost, output_cost)
     cost_warning = next((w for w in warnings if "$" in w and f"${expected:.2f}" in w), None)
@@ -181,7 +181,7 @@ def test_cost_above_20_dollars_produces_additional_threshold_warning():
     with patch("litellm.get_model_info", return_value=expensive_info):
         from rosettastone.preflight.cost_estimator import estimate_cost
 
-        warnings = estimate_cost(config)
+        warnings, _ = estimate_cost(config)
 
     # Should have 2 warnings: one with cost amount, one about exceeding $20
     assert len(warnings) >= 2, (
@@ -213,7 +213,7 @@ def test_cost_under_20_dollars_does_not_produce_threshold_warning():
     with patch("litellm.get_model_info", return_value=cheap_info):
         from rosettastone.preflight.cost_estimator import estimate_cost
 
-        warnings = estimate_cost(config)
+        warnings, _ = estimate_cost(config)
 
     threshold_warning = next(
         (w for w in warnings if "exceeds $20" in w or "Exceeds $20" in w), None
@@ -246,7 +246,7 @@ def test_cost_just_below_20_does_not_trigger_threshold():
     with patch("litellm.get_model_info", return_value=boundary_info):
         from rosettastone.preflight.cost_estimator import estimate_cost
 
-        warnings = estimate_cost(config)
+        warnings, _ = estimate_cost(config)
 
     threshold_warning = next(
         (w for w in warnings if "exceeds $20" in w or "Exceeds $20" in w), None
@@ -273,7 +273,7 @@ def test_zero_cost_tokens_produce_no_cost_warning():
     with patch("litellm.get_model_info", return_value=free_info):
         from rosettastone.preflight.cost_estimator import estimate_cost
 
-        warnings = estimate_cost(config)
+        warnings, _ = estimate_cost(config)
 
     assert warnings == [], f"Expected no warnings for zero-cost pricing, got: {warnings}"
 
@@ -290,7 +290,7 @@ def test_null_cost_fields_treated_as_zero_no_cost_warning():
     with patch("litellm.get_model_info", return_value=null_pricing_info):
         from rosettastone.preflight.cost_estimator import estimate_cost
 
-        warnings = estimate_cost(config)
+        warnings, _ = estimate_cost(config)
 
     # None pricing should be treated as zero → no cost warning (not a crash)
     assert all("$" not in w for w in warnings), (
@@ -310,7 +310,7 @@ def test_get_model_info_raises_returns_unavailable_warning():
     with patch("litellm.get_model_info", side_effect=Exception("Connection refused")):
         from rosettastone.preflight.cost_estimator import estimate_cost
 
-        warnings = estimate_cost(config)
+        warnings, _ = estimate_cost(config)
 
     assert len(warnings) >= 1, "Expected at least one warning when get_model_info raises, got none"
     unavailable_warning = next(
@@ -333,10 +333,13 @@ def test_get_model_info_raises_returns_list_not_crash():
     with patch("litellm.get_model_info", side_effect=RuntimeError("Model unknown")):
         from rosettastone.preflight.cost_estimator import estimate_cost
 
-        result = estimate_cost(config)
+        warnings, estimated_cost = estimate_cost(config)
 
-    assert isinstance(result, list), (
-        f"Expected estimate_cost to return a list even on failure, got: {type(result)}"
+    assert isinstance(warnings, list), (
+        f"Expected estimate_cost warnings to be a list even on failure, got: {type(warnings)}"
+    )
+    assert isinstance(estimated_cost, float), (
+        f"Expected estimate_cost cost to be a float even on failure, got: {type(estimated_cost)}"
     )
 
 
@@ -345,17 +348,20 @@ def test_get_model_info_raises_returns_list_not_crash():
 # ---------------------------------------------------------------------------
 
 
-def test_estimate_cost_always_returns_list():
-    """This test proves that estimate_cost always returns a list of strings."""
+def test_estimate_cost_always_returns_tuple():
+    """This test proves that estimate_cost always returns (list[str], float)."""
     config = _config()
 
     with patch("litellm.get_model_info", return_value=_BASE_MODEL_INFO_WITH_PRICING.copy()):
         from rosettastone.preflight.cost_estimator import estimate_cost
 
-        result = estimate_cost(config)
+        warnings, estimated_cost = estimate_cost(config)
 
-    assert isinstance(result, list), f"Expected list return type, got: {type(result)}"
-    for item in result:
+    assert isinstance(warnings, list), f"Expected warnings to be a list, got: {type(warnings)}"
+    assert isinstance(estimated_cost, float), (
+        f"Expected estimated_cost to be a float, got: {type(estimated_cost)}"
+    )
+    for item in warnings:
         assert isinstance(item, str), (
             f"Expected all warnings to be strings, got: {type(item)} — {item!r}"
         )

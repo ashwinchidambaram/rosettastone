@@ -8,7 +8,12 @@ from sqlmodel import Session, func, select
 
 from rosettastone.server.database import get_session
 from rosettastone.server.models import PipelineRecord, PipelineStageRecord
-from rosettastone.server.rbac import require_role
+from rosettastone.server.rbac import (
+    check_resource_owner,
+    get_current_user_id,
+    is_admin_user,
+    require_role,
+)
 from rosettastone.server.schemas import (
     PaginatedResponse,
     PipelineCreate,
@@ -112,6 +117,7 @@ def create_pipeline(
         source_model=config.source_model,
         target_model=config.target_model,
         status="pending",
+        owner_id=get_current_user_id(request),
     )
     session.add(pipeline)
     session.commit()
@@ -125,18 +131,26 @@ def create_pipeline(
 
 @router.get("/api/v1/pipelines", response_model=PaginatedResponse[PipelineSummary])
 def list_pipelines(
+    request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_session),
 ) -> PaginatedResponse[PipelineSummary]:
     """List all pipelines, paginated and ordered by created_at DESC."""
-    count_stmt = select(func.count()).select_from(PipelineRecord)
+    from rosettastone.server.rbac import _is_multi_user
+
+    base = select(PipelineRecord)
+    if _is_multi_user() and not is_admin_user(request):
+        owner_filter = get_current_user_id(request)
+        if owner_filter is not None:
+            base = base.where(PipelineRecord.owner_id == owner_filter)
+
+    count_stmt = select(func.count()).select_from(base.subquery())
     total = session.exec(count_stmt).one()
 
     offset = (page - 1) * per_page
     stmt = (
-        select(PipelineRecord)
-        .order_by(PipelineRecord.created_at.desc())  # type: ignore[attr-defined]
+        base.order_by(PipelineRecord.created_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(per_page)
     )
@@ -149,6 +163,7 @@ def list_pipelines(
 @router.get("/api/v1/pipelines/{pipeline_id}/status", response_model=PipelineDetail)
 def get_pipeline_status(
     pipeline_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> PipelineDetail:
     """Return overall pipeline status plus per-stage progress.
@@ -158,6 +173,7 @@ def get_pipeline_status(
     pipeline = session.get(PipelineRecord, pipeline_id)
     if not pipeline:
         raise HTTPException(status_code=404, detail=f"Pipeline {pipeline_id} not found")
+    check_resource_owner(pipeline.owner_id, request)
 
     stages = list(
         session.exec(

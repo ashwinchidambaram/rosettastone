@@ -20,7 +20,12 @@ from rosettastone.server.models import (
     MigrationRecord,
     MigrationVersion,
 )
-from rosettastone.server.rbac import require_role
+from rosettastone.server.rbac import (
+    check_resource_owner,
+    get_current_user_id,
+    is_admin_user,
+    require_role,
+)
 from rosettastone.server.schemas import (
     ABTestCreate,
     ABTestDetail,
@@ -134,6 +139,7 @@ def _ab_test_to_detail(ab_test: ABTest, metrics: ABTestMetrics | None = None) ->
 )
 def create_ab_test(
     body: ABTestCreate,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> ABTestSummary:
     """Create a new A/B test.
@@ -166,6 +172,7 @@ def create_ab_test(
         name=body.name,
         traffic_split=body.traffic_split,
         status="draft",
+        owner_id=get_current_user_id(request),
     )
     session.add(ab_test)
 
@@ -190,18 +197,26 @@ def create_ab_test(
 
 @router.get("/api/v1/ab-tests", response_model=PaginatedResponse[ABTestSummary])
 def list_ab_tests(
+    request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_session),
 ) -> PaginatedResponse[ABTestSummary]:
     """List all A/B tests, paginated and ordered by created_at DESC."""
-    count_stmt = select(func.count()).select_from(ABTest)
+    from rosettastone.server.rbac import _is_multi_user
+
+    base = select(ABTest)
+    if _is_multi_user() and not is_admin_user(request):
+        owner_filter = get_current_user_id(request)
+        if owner_filter is not None:
+            base = base.where(ABTest.owner_id == owner_filter)
+
+    count_stmt = select(func.count()).select_from(base.subquery())
     total = session.exec(count_stmt).one()
 
     offset = (page - 1) * per_page
     stmt = (
-        select(ABTest)
-        .order_by(ABTest.created_at.desc())  # type: ignore[attr-defined]
+        base.order_by(ABTest.created_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(per_page)
     )
@@ -214,13 +229,14 @@ def list_ab_tests(
 @router.get("/api/v1/ab-tests/{ab_test_id}", response_model=ABTestDetail)
 def get_ab_test(
     ab_test_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> ABTestDetail:
     """Return A/B test detail. Metrics are not included here -- use the /metrics endpoint."""
     ab_test = session.get(ABTest, ab_test_id)
     if not ab_test:
         raise HTTPException(status_code=404, detail=f"A/B test {ab_test_id} not found")
-
+    check_resource_owner(ab_test.owner_id, request)
     return _ab_test_to_detail(ab_test)
 
 

@@ -72,18 +72,26 @@
                     <option value="heavy">Heavy (thorough, slower)</option>
                 </select>
             </div>
-            <div class="flex flex-col justify-end gap-4">
-                <label class="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" name="dry_run" value="true"
-                        class="w-4 h-4 rounded border-outline-variant/30 text-[#D4745E] focus:ring-[#D4745E]/50">
-                    <span class="text-sm text-on-surface">Dry run (preflight only)</span>
-                </label>
-                <label class="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" name="store_prompt_content" value="true"
-                        class="w-4 h-4 rounded border-outline-variant/30 text-[#D4745E] focus:ring-[#D4745E]/50">
-                    <span class="text-sm text-on-surface">Store prompt content (enables diff view)</span>
-                </label>
+            <div>
+                <label for="max_cost_usd" class="block text-xs font-label uppercase tracking-widest text-on-surface-variant mb-2">Max Cost (USD)</label>
+                <input type="number" id="max_cost_usd" name="max_cost_usd" min="0" step="0.01"
+                    placeholder="e.g. 50.00 (optional)"
+                    class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-lg px-4 py-3 text-sm text-on-surface placeholder-on-surface-variant/40 focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all">
+                <p class="text-xs text-on-surface-variant/50 mt-1">Optional cost guardrail — migration aborts if estimated cost exceeds this.</p>
             </div>
+        </div>
+
+        <div class="flex flex-col gap-4">
+            <label class="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" name="dry_run" value="true"
+                    class="w-4 h-4 rounded border-outline-variant/30 text-[#D4745E] focus:ring-[#D4745E]/50">
+                <span class="text-sm text-on-surface">Dry run (preflight only)</span>
+            </label>
+            <label class="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" name="store_prompt_content" value="true"
+                    class="w-4 h-4 rounded border-outline-variant/30 text-[#D4745E] focus:ring-[#D4745E]/50">
+                <span class="text-sm text-on-surface">Store prompt content (enables diff view)</span>
+            </label>
         </div>
     </section>
 

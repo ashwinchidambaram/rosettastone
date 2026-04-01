@@ -29,7 +29,9 @@ def run_all_checks(config: MigrationConfig) -> PreflightReport:
     blockers.extend(tok_blockers)
 
     # Cost estimation
-    cost_warnings = estimate_cost(config)
+    cost_warnings, estimated_cost_usd = estimate_cost(config)
     warnings.extend(cost_warnings)
 
-    return PreflightReport(warnings=warnings, blockers=blockers)
+    return PreflightReport(
+        warnings=warnings, blockers=blockers, estimated_cost_usd=estimated_cost_usd
+    )

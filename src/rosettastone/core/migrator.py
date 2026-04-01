@@ -20,9 +20,13 @@ class Migrator:
         self,
         config: MigrationConfig,
         progress_callback: Callable[[str, float, float], None] | None = None,
+        migration_id: int | None = None,
+        engine: object | None = None,
     ) -> None:
         self.config = config
         self._progress_callback = progress_callback
+        self.migration_id = migration_id
+        self.engine = engine
 
     def _emit(self, stage: str, stage_pct: float, overall_pct: float) -> None:
         """Invoke progress_callback if set; swallow any exception it raises."""
@@ -31,6 +35,43 @@ class Migrator:
                 self._progress_callback(stage, stage_pct, overall_pct)
             except Exception:
                 pass
+
+    def _persist_preflight_estimate(self, estimated_cost_usd: float) -> None:
+        """Store estimated cost to the migration record in DB."""
+        if self.migration_id is None or self.engine is None:
+            return
+        try:
+            from sqlmodel import Session
+
+            with Session(self.engine) as session:
+                from rosettastone.server.models import MigrationRecord
+
+                record = session.get(MigrationRecord, self.migration_id)
+                if record is not None:
+                    record.estimated_cost_usd = estimated_cost_usd
+                    session.add(record)
+                    session.commit()
+        except Exception:
+            pass  # Silently swallow DB errors — preflight estimate is non-critical
+
+    def _update_migration_failed(self, error_message: str) -> None:
+        """Mark migration as failed with error message."""
+        if self.migration_id is None or self.engine is None:
+            return
+        try:
+            from sqlmodel import Session
+
+            with Session(self.engine) as session:
+                from rosettastone.server.models import MigrationRecord
+
+                record = session.get(MigrationRecord, self.migration_id)
+                if record is not None:
+                    record.status = "failed"
+                    record.recommendation_reasoning = error_message
+                    session.add(record)
+                    session.commit()
+        except Exception:
+            pass  # Silently swallow DB errors
 
     def run(self) -> MigrationResult:
         from rosettastone.core.context import PipelineContext
@@ -77,6 +118,24 @@ class Migrator:
                 raise MigrationBlockedError(preflight_report)
             if self.config.dry_run:
                 return preflight_report.as_dry_run_result()  # type: ignore[no-any-return]
+
+            # Store estimated cost and check cost cap
+            if self.migration_id is not None and self.engine is not None:
+                self._persist_preflight_estimate(preflight_report.estimated_cost_usd)
+
+            # Check cost cap against estimated cost
+            if self.config.max_cost_usd is not None:
+                estimated_cost = preflight_report.estimated_cost_usd
+                if estimated_cost > self.config.max_cost_usd:
+                    # Update migration record status to failed
+                    msg = (
+                        f"Estimated cost ${estimated_cost:.4f} exceeds "
+                        f"max_cost_usd cap of ${self.config.max_cost_usd:.4f}"
+                    )
+                    if self.migration_id is not None and self.engine is not None:
+                        self._update_migration_failed(msg)
+                    raise ValueError(msg)
+
             self._emit("preflight", 1.0, 0.12)
 
         # Step 1: Ingest

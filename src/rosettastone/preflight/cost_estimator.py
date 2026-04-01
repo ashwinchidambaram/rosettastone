@@ -23,14 +23,15 @@ MIPRO_METRIC_CALLS = {
 }
 
 
-def estimate_cost(config: MigrationConfig) -> list[str]:
+def estimate_cost(config: MigrationConfig) -> tuple[list[str], float]:
     """Estimate total API cost for a migration run.
 
-    Returns list of cost-related warnings.
+    Returns tuple of (cost-related warnings list, estimated_cost_usd float).
     """
     import litellm
 
     warnings: list[str] = []
+    estimated_cost_usd = 0.0
 
     try:
         target_info = litellm.get_model_info(config.target_model)
@@ -38,7 +39,7 @@ def estimate_cost(config: MigrationConfig) -> list[str]:
         output_cost = target_info.get("output_cost_per_token", 0) or 0
     except Exception:
         warnings.append("Could not estimate cost — model pricing not available.")
-        return warnings
+        return warnings, 0.0
 
     # Optimizer cost
     if config.mipro_auto is not None:
@@ -71,6 +72,7 @@ def estimate_cost(config: MigrationConfig) -> list[str]:
             pass
 
     total_cost = estimated_cost + judge_cost
+    estimated_cost_usd = total_cost
 
     if total_cost > 0:
         cost_parts = [f"optimizer: ${estimated_cost:.2f} (~{metric_calls} calls, {opt_label})"]
@@ -92,4 +94,4 @@ def estimate_cost(config: MigrationConfig) -> list[str]:
                 "redis-url specified but 'redis' package not installed. Install with: uv add redis"
             )
 
-    return warnings
+    return warnings, estimated_cost_usd

@@ -108,3 +108,9 @@ class MigrationConfig(BaseModel):
     known_issue_weight: float = Field(
         default=2.0, gt=0.0, description="Score divisor applied to known-issue pairs in GEPA metric"
     )
+
+    # Cost guardrail
+    max_cost_usd: float | None = Field(
+        default=None,
+        description="Max migration cost in USD; aborts if preflight estimate exceeds this",
+    )

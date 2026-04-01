@@ -196,6 +196,42 @@ class TestCreateMigration:
         response = client.post("/api/v1/migrations", json=payload)
         assert response.status_code == 422
 
+    def test_create_migration_negative_max_cost_returns_422(self, client):
+        """Posting with negative max_cost_usd should return 422."""
+        payload = {
+            "source_model": "openai/gpt-4o",
+            "target_model": "anthropic/claude-sonnet-4",
+            "max_cost_usd": -1.0,
+        }
+        response = client.post("/api/v1/migrations", json=payload)
+        assert response.status_code == 422
+        data = response.json()
+        assert "max_cost_usd" in data.get("detail", "").lower()
+
+    def test_create_migration_max_cost_accepted(self, client, tmp_path, monkeypatch, engine):
+        """Posting with valid max_cost_usd should be accepted and stored."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        payload = {
+            "source_model": "openai/gpt-4o",
+            "target_model": "anthropic/claude-sonnet-4",
+            "data_path": str(tmp_path / ".rosettastone" / "data.jsonl"),
+            "max_cost_usd": 10.0,
+        }
+        response = client.post("/api/v1/migrations", json=payload)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["id"] is not None
+
+        # Verify the record was created with max_cost_usd
+        migration_id = data["id"]
+        with Session(engine) as session:
+            stmt = select(MigrationRecord).where(MigrationRecord.id == migration_id)
+            migration = session.exec(stmt).first()
+            assert migration is not None
+            assert migration.max_cost_usd == 10.0
+            config = json.loads(migration.config_json)
+            assert config.get("max_cost_usd") == 10.0
+
 
 class TestListTestCases:
     def test_list_test_cases(self, client, engine, sample_migration, sample_test_cases):

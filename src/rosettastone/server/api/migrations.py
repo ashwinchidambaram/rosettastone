@@ -15,7 +15,12 @@ from sqlmodel import Session, func, select
 from rosettastone.server.api.utils import _get_migration_or_404
 from rosettastone.server.database import get_session
 from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningRecord
-from rosettastone.server.rbac import require_role
+from rosettastone.server.rbac import (
+    check_resource_owner,
+    get_current_user_id,
+    is_admin_user,
+    require_role,
+)
 from rosettastone.server.schemas import (
     MigrationDetail,
     MigrationSummary,
@@ -701,17 +706,27 @@ def _migration_to_detail(record: MigrationRecord, session: Session) -> Migration
 
 @router.get("/api/v1/migrations", response_model=PaginatedResponse[MigrationSummary])
 async def list_migrations(
+    request: Request,
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_session),
 ) -> PaginatedResponse[MigrationSummary]:
     """List migrations with pagination."""
-    count_stmt = select(func.count()).select_from(MigrationRecord)
+    from rosettastone.server.rbac import _is_multi_user
+
+    owner_filter = None
+    if _is_multi_user() and not is_admin_user(request):
+        owner_filter = get_current_user_id(request)
+
+    base = select(MigrationRecord)
+    if owner_filter is not None:
+        base = base.where(MigrationRecord.owner_id == owner_filter)
+
+    count_stmt = select(func.count()).select_from(base.subquery())
     total = session.exec(count_stmt).one()
 
     stmt = (
-        select(MigrationRecord)
-        .order_by(MigrationRecord.created_at.desc())  # type: ignore[attr-defined]
+        base.order_by(MigrationRecord.created_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(limit)
     )
@@ -729,10 +744,12 @@ async def list_migrations(
 @router.get("/api/v1/migrations/{migration_id}", response_model=MigrationDetail)
 async def get_migration(
     migration_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> MigrationDetail:
     """Get migration detail by ID."""
     record = _get_migration_or_404(migration_id, session)
+    check_resource_owner(record.owner_id, request)
     return _migration_to_detail(record, session)
 
 
@@ -753,9 +770,14 @@ async def create_migration(
     data_path = body.get("data_path")
     cluster_prompts = body.get("cluster_prompts", False)
     improvement_objectives = body.get("improvement_objectives")
+    max_cost_usd = body.get("max_cost_usd")
 
     if not source_model or not target_model:
         raise HTTPException(status_code=422, detail="source_model and target_model are required")
+
+    # Validate max_cost_usd
+    if max_cost_usd is not None and max_cost_usd < 0:
+        raise HTTPException(status_code=422, detail="max_cost_usd must be non-negative")
 
     # Validate data_path is within a safe directory (prevent path traversal)
     if data_path:
@@ -779,6 +801,8 @@ async def create_migration(
         config["cluster_prompts"] = cluster_prompts
     if improvement_objectives is not None:
         config["improvement_objectives"] = improvement_objectives
+    if max_cost_usd is not None:
+        config["max_cost_usd"] = max_cost_usd
 
     record = MigrationRecord(
         source_model=source_model,
@@ -786,6 +810,8 @@ async def create_migration(
         status="pending",
         created_at=datetime.now(UTC),
         config_json=json.dumps(config),
+        max_cost_usd=max_cost_usd,
+        owner_id=get_current_user_id(request),
     )
     session.add(record)
     session.commit()
@@ -1043,6 +1069,7 @@ async def create_migration_from_form(
                 "target_model": target_model,
             }
         ),
+        owner_id=get_current_user_id(request),
     )
     session.add(record)
     session.commit()
