@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from sqlmodel import Session
 
+import rosettastone.server.api.ab_testing as ab_testing_module
 from rosettastone.server.api.versioning import create_version
+from rosettastone.server.models import ABTestResult
 
 
 class TestCreateABTest:
@@ -174,3 +178,181 @@ class TestABTestLifecycle:
         """GET non-existent test returns 404."""
         resp = client.get("/api/v1/ab-tests/999")
         assert resp.status_code == 404
+
+
+class TestMetricsCache:
+    """Tests for the in-memory metrics cache on GET /metrics."""
+
+    def _setup_ab_test(self, client, engine, sample_migration):
+        """Helper: create versions + AB test, return ab_test_id."""
+        with Session(engine) as s:
+            v1 = create_version(sample_migration.id, s)
+            v2 = create_version(sample_migration.id, s)
+            s.commit()
+            s.refresh(v1)
+            s.refresh(v2)
+
+        resp = client.post(
+            "/api/v1/ab-tests",
+            json={
+                "migration_id": sample_migration.id,
+                "version_a_id": v1.id,
+                "version_b_id": v2.id,
+                "name": "Cache test",
+            },
+        )
+        assert resp.status_code == 201
+        return resp.json()["id"]
+
+    def _add_result(self, engine, ab_test_id: int, winner: str = "a") -> None:
+        """Insert a single ABTestResult row directly into the DB."""
+        with Session(engine) as s:
+            row = ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version=winner,
+                score_a=0.8,
+                score_b=0.6,
+                winner=winner,
+            )
+            s.add(row)
+            s.commit()
+
+    def _clear_cache(self, ab_test_id: int | None = None) -> None:
+        """Clear the module-level metrics cache between tests."""
+        with ab_testing_module._metrics_cache_lock:
+            if ab_test_id is not None:
+                ab_testing_module._metrics_cache.pop(ab_test_id, None)
+            else:
+                ab_testing_module._metrics_cache.clear()
+
+    # ------------------------------------------------------------------
+
+    def test_metrics_cache_hit_for_concluded_test(self, client, engine, sample_migration):
+        """Second GET /metrics for a concluded test returns the cached value without re-querying DB."""
+        ab_test_id = self._setup_ab_test(client, engine, sample_migration)
+        self._clear_cache(ab_test_id)
+
+        # Start and conclude
+        client.post(f"/api/v1/ab-tests/{ab_test_id}/start")
+        client.post(f"/api/v1/ab-tests/{ab_test_id}/conclude")
+
+        # First request — populates cache
+        resp1 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+        assert resp1.status_code == 200
+
+        # Verify entry is now in cache with status "concluded"
+        with ab_testing_module._metrics_cache_lock:
+            entry = ab_testing_module._metrics_cache.get(ab_test_id)
+        assert entry is not None
+        cached_metrics, _, cached_status = entry
+        assert cached_status == "concluded"
+
+        # Patch session.exec so that if a DB query fires the test fails
+        original_exec = Session.exec
+
+        call_count = {"n": 0}
+
+        def counting_exec(self, stmt, *args, **kwargs):
+            call_count["n"] += 1
+            return original_exec(self, stmt, *args, **kwargs)
+
+        with patch.object(Session, "exec", counting_exec):
+            resp2 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+
+        assert resp2.status_code == 200
+        # Only the session.get(ABTest, ...) call should go through -- no ABTestResult query
+        assert call_count["n"] == 0, f"Expected 0 exec calls on cache hit, got {call_count['n']}"
+        assert resp2.json()["total_results"] == resp1.json()["total_results"]
+
+    def test_metrics_cache_miss_for_draft_test(self, client, engine, sample_migration):
+        """Draft tests are never cached -- each GET hits the DB."""
+        ab_test_id = self._setup_ab_test(client, engine, sample_migration)
+        self._clear_cache(ab_test_id)
+
+        # First call
+        resp1 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+        assert resp1.status_code == 200
+
+        # Cache must NOT contain this draft entry
+        with ab_testing_module._metrics_cache_lock:
+            entry = ab_testing_module._metrics_cache.get(ab_test_id)
+        assert entry is None, "Draft test metrics should not be cached"
+
+        # Second call should also return valid (zero) metrics
+        resp2 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+        assert resp2.status_code == 200
+        assert resp2.json()["total_results"] == 0
+
+    def test_metrics_cache_invalidated_on_conclude(self, client, engine, sample_migration):
+        """After POST /conclude, the cached running-test entry is evicted and next GET is fresh."""
+        ab_test_id = self._setup_ab_test(client, engine, sample_migration)
+        self._clear_cache(ab_test_id)
+
+        client.post(f"/api/v1/ab-tests/{ab_test_id}/start")
+
+        # Seed a result so metrics are non-trivial
+        self._add_result(engine, ab_test_id, winner="a")
+
+        # First GET while running -- populates cache with status="running"
+        resp_running = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+        assert resp_running.status_code == 200
+
+        with ab_testing_module._metrics_cache_lock:
+            entry_before = ab_testing_module._metrics_cache.get(ab_test_id)
+        assert entry_before is not None
+        assert entry_before[2] == "running"
+
+        # Conclude -- should evict the cache entry
+        conclude_resp = client.post(f"/api/v1/ab-tests/{ab_test_id}/conclude")
+        assert conclude_resp.status_code == 200
+
+        with ab_testing_module._metrics_cache_lock:
+            entry_after_conclude = ab_testing_module._metrics_cache.get(ab_test_id)
+        assert entry_after_conclude is None, "Cache entry should be evicted by POST /conclude"
+
+        # Next GET should recompute and re-cache with status="concluded"
+        resp_concluded = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+        assert resp_concluded.status_code == 200
+
+        with ab_testing_module._metrics_cache_lock:
+            entry_final = ab_testing_module._metrics_cache.get(ab_test_id)
+        assert entry_final is not None
+        assert entry_final[2] == "concluded"
+
+    def test_metrics_running_test_cache_ttl(self, client, engine, sample_migration):
+        """Running-test cache entry expires after 5 s; patching monotonic simulates the TTL."""
+        ab_test_id = self._setup_ab_test(client, engine, sample_migration)
+        self._clear_cache(ab_test_id)
+
+        client.post(f"/api/v1/ab-tests/{ab_test_id}/start")
+
+        base_time = 1000.0
+
+        with patch("rosettastone.server.api.ab_testing.time") as mock_time:
+            mock_time.monotonic.return_value = base_time
+
+            # First GET -- cache miss, populates cache at t=1000
+            resp1 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+            assert resp1.status_code == 200
+
+            # Within TTL (t=1004) -- cache hit
+            mock_time.monotonic.return_value = base_time + 4.0
+            resp2 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+            assert resp2.status_code == 200
+
+            with ab_testing_module._metrics_cache_lock:
+                entry_mid = ab_testing_module._metrics_cache.get(ab_test_id)
+            # cached_at should still be the original base_time (cache was not refreshed)
+            assert entry_mid is not None
+            assert entry_mid[1] == base_time
+
+            # Past TTL (t=1006) -- cache miss, cache refreshed
+            mock_time.monotonic.return_value = base_time + 6.0
+            resp3 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+            assert resp3.status_code == 200
+
+            with ab_testing_module._metrics_cache_lock:
+                entry_after = ab_testing_module._metrics_cache.get(ab_test_id)
+            assert entry_after is not None
+            # cached_at timestamp should have been updated to the new monotonic value
+            assert entry_after[1] == base_time + 6.0

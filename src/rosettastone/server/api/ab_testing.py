@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+import time
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -28,18 +30,24 @@ from rosettastone.server.schemas import (
 
 router = APIRouter()
 
+# ---------------------------------------------------------------------------
+# Metrics cache
+# ---------------------------------------------------------------------------
+
+# Maps ab_test_id -> (metrics, cached_at_monotonic, status_at_cache_time)
+_metrics_cache: dict[int, tuple[ABTestMetrics, float, str]] = {}
+_metrics_cache_lock = threading.Lock()
+
+_RUNNING_TTL = 5.0  # seconds
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _build_metrics(ab_test_id: int, session: Session) -> ABTestMetrics:
-    """Compute aggregated metrics from ABTestResult rows."""
-    results = list(
-        session.exec(select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)).all()  # type: ignore[arg-type]
-    )
-
+def _build_metrics_from_results(results: list[ABTestResult]) -> ABTestMetrics:
+    """Compute aggregated metrics from a pre-fetched list of ABTestResult rows."""
     if not results:
         return ABTestMetrics(
             total_results=0,
@@ -71,6 +79,14 @@ def _build_metrics(ab_test_id: int, session: Session) -> ABTestMetrics:
         mean_score_a=sum(scores_a) / max(len(scores_a), 1),
         mean_score_b=sum(scores_b) / max(len(scores_b), 1),
     )
+
+
+def _build_metrics(ab_test_id: int, session: Session) -> ABTestMetrics:
+    """Fetch ABTestResult rows and compute aggregated metrics."""
+    results = list(
+        session.exec(select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)).all()  # type: ignore[arg-type]
+    )
+    return _build_metrics_from_results(results)
 
 
 def _ab_test_to_summary(ab_test: ABTest) -> ABTestSummary:
@@ -259,19 +275,38 @@ def get_ab_test_metrics(
     Queries ABTestResult rows and computes win counts, win rates, and mean scores.
     If the test is concluded, also includes statistical significance values.
     Returns empty metrics (all zeros) if no results exist yet.
+
+    Caching behaviour:
+    - concluded tests: cached forever (metrics are immutable after conclusion)
+    - running tests: cached for 5 seconds (polling-friendly)
+    - draft tests: never cached (no results yet)
     """
     ab_test = session.get(ABTest, ab_test_id)
     if not ab_test:
         raise HTTPException(status_code=404, detail=f"A/B test {ab_test_id} not found")
 
-    metrics = _build_metrics(ab_test_id, session)
+    status = ab_test.status
 
-    if ab_test.status == "concluded" and metrics.total_results > 0:
-        results = list(
-            session.exec(
-                select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)  # type: ignore[arg-type]
-            ).all()
-        )
+    # Check cache for concluded / running tests.
+    if status in ("concluded", "running"):
+        with _metrics_cache_lock:
+            cached = _metrics_cache.get(ab_test_id)
+        if cached is not None:
+            cached_metrics, cached_at, cached_status = cached
+            if cached_status == "concluded":
+                return cached_metrics
+            if cached_status == "running" and time.monotonic() - cached_at < _RUNNING_TTL:
+                return cached_metrics
+
+    # Cache miss — compute from DB (single query).
+    results = list(
+        session.exec(
+            select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)  # type: ignore[arg-type]
+        ).all()
+    )
+    metrics = _build_metrics_from_results(results)
+
+    if status == "concluded" and metrics.total_results > 0:
         result_dicts = [
             {
                 "assigned_version": r.assigned_version,
@@ -288,6 +323,11 @@ def get_ab_test_metrics(
         metrics.mean_diff = sig.mean_diff
         metrics.ci_lower = sig.ci_lower
         metrics.ci_upper = sig.ci_upper
+
+    # Store in cache for concluded / running tests.
+    if status in ("concluded", "running"):
+        with _metrics_cache_lock:
+            _metrics_cache[ab_test_id] = (metrics, time.monotonic(), status)
 
     return metrics
 
@@ -365,6 +405,10 @@ def conclude_ab_test(
 
     session.commit()
     session.refresh(ab_test)
+
+    # Invalidate cached metrics so the next GET /metrics sees concluded-status data.
+    with _metrics_cache_lock:
+        _metrics_cache.pop(ab_test_id, None)
 
     return _ab_test_to_detail(ab_test)
 
