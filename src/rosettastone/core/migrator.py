@@ -248,9 +248,17 @@ class Migrator:
                 ctx.timing["optimize"] = 0.0
         else:
             t0 = time.time()
-            optimized_prompt = optimize_prompt(
-                train, val, self.config, self._gepa_iteration_callback
-            )
+            try:
+                optimized_prompt = optimize_prompt(
+                    train, val, self.config, self._gepa_iteration_callback
+                )
+            except TimeoutError:
+                timeout = getattr(self.config, "gepa_timeout_seconds", 600)
+                ctx.warnings.append(
+                    f"GEPA timed out after {timeout}s — using best intermediate result. "
+                    f"Consider increasing gepa_timeout_seconds or reducing gepa_auto complexity."
+                )
+                raise
             ctx.timing["optimize"] = time.time() - t0
             self._checkpoint("optimize", {"optimized_prompt": optimized_prompt})
         self._emit("optimize", 1.0, 0.75)

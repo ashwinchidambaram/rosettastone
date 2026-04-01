@@ -60,6 +60,14 @@ class MigrationConfig(BaseModel):
             "When set, gepa_auto is ignored. Use small values (e.g. 20) for fast E2E tests."
         ),
     )
+    gepa_timeout_seconds: int = Field(
+        default=600,
+        ge=30,
+        description=(
+            "Timeout in seconds for GEPA optimizer.compile(). "
+            "Returns best intermediate result if available."
+        ),
+    )
     reflection_model: str = "openai/gpt-4o"
     num_threads: int = 4
 

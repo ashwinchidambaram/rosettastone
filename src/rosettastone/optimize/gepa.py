@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import concurrent.futures
+import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -10,14 +12,16 @@ import dspy
 from rosettastone.optimize.base import Optimizer
 from rosettastone.optimize.dspy_program import MigrationProgram
 from rosettastone.optimize.metric import IterationTracker, build_migration_metric
+from rosettastone.optimize.utils import InstructionExtractionError, extract_optimized_instructions
 
 if TYPE_CHECKING:
     from rosettastone.config import MigrationConfig
     from rosettastone.core.types import PromptPair
 
+logger = logging.getLogger(__name__)
 
-class InstructionExtractionError(Exception):
-    """Raised when optimized instructions cannot be extracted from a compiled DSPy program."""
+# Re-export for backward compatibility — callers import InstructionExtractionError from gepa.py
+__all__ = ["GEPAOptimizer", "InstructionExtractionError"]
 
 
 class GEPAOptimizer(Optimizer):
@@ -52,6 +56,10 @@ class GEPAOptimizer(Optimizer):
             for p in train_set
         ]
 
+        # best_intermediate accumulates the most recent extractable instructions after each
+        # iteration fires. Using a list so the thread's closure can append to it safely.
+        best_intermediate: list[str] = []
+
         # Wrap metric with iteration tracker if a callback was provided
         if on_iteration is not None and len(trainset) > 0:
             # GEPA "light"=25, "medium"=50, "heavy"=100 iterations by default.
@@ -64,30 +72,59 @@ class GEPAOptimizer(Optimizer):
                 total_iterations=total_iterations,
                 callback=on_iteration,
             )
-            metric = tracker.wrap(metric)
+            base_metric = tracker.wrap(metric)
+        else:
+            base_metric = metric
+
+        def _iteration_capturing_metric(gold, pred, trace=None):
+            """Wraps the base metric and captures program state after each call."""
+            result = base_metric(gold, pred, trace)
+            # After each metric call, try to snapshot the current program state.
+            # Extraction failure must not interrupt the metric callback.
+            try:
+                snapshot = extract_optimized_instructions(program)
+                best_intermediate.append(snapshot)
+            except Exception:
+                pass
+            return result
 
         # Run GEPA — use explicit max_metric_calls if provided, otherwise use auto preset
         gepa_max_metric_calls = getattr(config, "gepa_max_metric_calls", None)
         gepa_kwargs: dict[str, object]
         if gepa_max_metric_calls is not None:
             gepa_kwargs = {
-                "metric": metric,
+                "metric": _iteration_capturing_metric,
                 "max_metric_calls": gepa_max_metric_calls,
                 "reflection_lm": reflection_lm,
                 "num_threads": config.num_threads,
             }
         else:
             gepa_kwargs = {
-                "metric": metric,
+                "metric": _iteration_capturing_metric,
                 "auto": config.gepa_auto,
                 "reflection_lm": reflection_lm,
                 "num_threads": config.num_threads,
             }
 
-        with dspy.context(lm=target_lm):
-            optimizer = dspy.GEPA(**gepa_kwargs)
-            compiled = optimizer.compile(program, trainset=trainset)
+        timeout = getattr(config, "gepa_timeout_seconds", 600)
 
-        from rosettastone.optimize.utils import extract_optimized_instructions
+        def _run_gepa() -> dspy.Module:
+            with dspy.context(lm=target_lm):
+                optimizer = dspy.GEPA(**gepa_kwargs)
+                return optimizer.compile(program, trainset=trainset)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_run_gepa)
+            try:
+                compiled = future.result(timeout=timeout)
+            except concurrent.futures.TimeoutError:
+                if best_intermediate:
+                    logger.warning(
+                        "GEPA timed out after %ds — returning best intermediate result.", timeout
+                    )
+                    return best_intermediate[-1]
+                raise TimeoutError(
+                    f"GEPA timed out after {timeout}s with no intermediate result"
+                )
 
         return extract_optimized_instructions(compiled)

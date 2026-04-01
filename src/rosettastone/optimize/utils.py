@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import dspy
 
-from rosettastone.optimize.gepa import InstructionExtractionError
+
+class InstructionExtractionError(Exception):
+    """Raised when optimized instructions cannot be extracted from a compiled DSPy program."""
 
 
 def extract_optimized_instructions(compiled: dspy.Module) -> str:
