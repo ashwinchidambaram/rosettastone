@@ -193,3 +193,58 @@ def test_build_result_no_ctx_cost_breakdown_empty():
 
     assert result.cost_usd == pytest.approx(0.0)
     assert result.cost_breakdown == {}
+
+
+# ---------------------------------------------------------------------------
+# 6. GEPA success_callback reads kwargs["response_cost"]
+# ---------------------------------------------------------------------------
+
+
+class TestGEPACostCallback:
+    """Verify the GEPA litellm success_callback reads response_cost from kwargs."""
+
+    def test_gepa_callback_reads_kwargs_response_cost(self):
+        import litellm
+
+        ctx = PipelineContext()
+
+        # Simulate what migrator.py does
+        _gepa_cost: list[float] = [0.0]
+
+        def _gepa_cost_callback(
+            kwargs: dict,
+            completion_response: object,
+            start_time: object,
+            end_time: object,
+        ) -> None:
+            cost = kwargs.get("response_cost", 0.0) or 0.0
+            _gepa_cost[0] += cost
+
+        litellm.success_callback.append(_gepa_cost_callback)
+        try:
+            dummy_response = MagicMock()
+            dummy_response._hidden_params = {}  # should NOT be used
+
+            _gepa_cost_callback(
+                kwargs={"response_cost": 0.15},
+                completion_response=dummy_response,
+                start_time=None,
+                end_time=None,
+            )
+
+            assert _gepa_cost[0] == pytest.approx(0.15)
+
+            # Ensure _hidden_params path would have returned 0.0 (i.e., it's the wrong path)
+            wrong_cost = (
+                getattr(dummy_response, "_hidden_params", {}).get("response_cost", 0.0) or 0.0
+            )
+            assert wrong_cost == pytest.approx(0.0)
+        finally:
+            try:
+                litellm.success_callback.remove(_gepa_cost_callback)
+            except ValueError:
+                pass
+
+        # ctx not mutated by manual call here — just verifying accumulator
+        ctx.add_cost("optimization", _gepa_cost[0])
+        assert ctx.costs["optimization"] == pytest.approx(0.15)

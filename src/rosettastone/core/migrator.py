@@ -242,10 +242,7 @@ class Migrator:
                 start_time: object,
                 end_time: object,
             ) -> None:
-                cost = (
-                    getattr(completion_response, "_hidden_params", {}).get("response_cost", 0.0)
-                    or 0.0
-                )
+                cost = kwargs.get("response_cost", 0.0) or 0.0
                 gepa_cost_accumulator[0] += cost
 
             return _gepa_cost_callback
@@ -279,9 +276,10 @@ class Migrator:
                     )
                     raise
                 finally:
-                    _litellm.success_callback = [
-                        cb for cb in _litellm.success_callback if cb is not _gepa_cb
-                    ]
+                    try:
+                        _litellm.success_callback.remove(_gepa_cb)
+                    except ValueError:
+                        pass
                     ctx.add_cost("optimization", _gepa_cost[0])
                 ctx.timing["optimize"] = time.time() - t0
             else:
@@ -306,9 +304,10 @@ class Migrator:
                 )
                 raise
             finally:
-                _litellm.success_callback = [
-                    cb for cb in _litellm.success_callback if cb is not _gepa_cb2
-                ]
+                try:
+                    _litellm.success_callback.remove(_gepa_cb2)
+                except ValueError:
+                    pass
                 ctx.add_cost("optimization", _gepa_cost2[0])
             ctx.timing["optimize"] = time.time() - t0
             self._checkpoint("optimize", {"optimized_prompt": optimized_prompt})

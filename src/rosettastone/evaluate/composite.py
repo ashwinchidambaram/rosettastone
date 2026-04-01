@@ -228,7 +228,7 @@ class CompositeEvaluator:
             try:
                 from rosettastone.evaluate.llm_judge import LLMJudgeEvaluator
 
-                judge_scores = LLMJudgeEvaluator(config=self.config).score(
+                judge_scores = LLMJudgeEvaluator(config=self.config, ctx=self._ctx).score(
                     expected, actual, prompt=prompt_str
                 )
                 scores.update(judge_scores)

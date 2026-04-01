@@ -48,7 +48,10 @@ class PipelineContext:
     per_type_stats: dict[OutputType, TypeStats] = field(default_factory=dict)
     recommendation: tuple[str, str, dict[str, object]] | None = None
     cluster_summary: dict[str, object] | None = None
-    _cost_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def __post_init__(self) -> None:
+        # Not a dataclass field — excluded from asdict/repr/compare
+        object.__setattr__(self, "_cost_lock", threading.Lock())
 
     def add_cost(self, phase: str, cost: float) -> None:
         """Thread-safely accumulate cost for a pipeline phase."""
