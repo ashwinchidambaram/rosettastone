@@ -54,6 +54,10 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 WORKDIR /app
 COPY src/ src/
 
+# Copy alembic migration config so alembic upgrade head works at startup
+COPY alembic/ alembic/
+COPY alembic.ini .
+
 # Transfer ownership to the non-root user
 RUN chown -R rosettastone:rosettastone /app
 
@@ -64,4 +68,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
-CMD ["uvicorn", "rosettastone.server.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+# Run DB migrations before starting the server.
+# alembic upgrade head is idempotent — safe to run on every container start.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn rosettastone.server.app:create_app --factory --host 0.0.0.0 --port 8000"]

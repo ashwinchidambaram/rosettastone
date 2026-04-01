@@ -53,7 +53,16 @@ def get_engine() -> Engine:
 
 
 def init_db() -> None:
-    """Create all tables if they don't exist, and migrate schema for new columns."""
+    """Create all tables if they don't exist, and migrate schema for new columns.
+
+    Usage notes:
+    - Production deployments: run ``alembic upgrade head`` before starting the app.
+      Alembic tracks applied revisions and only runs new migrations.
+    - Tests / dev: ``create_all()`` below is still the fast path — it creates tables
+      directly from SQLModel metadata without needing alembic revision tracking.
+    - ``_migrate_add_columns()`` remains as a safety net for pre-alembic deployments
+      that may be missing columns added after the initial schema was created.
+    """
     import rosettastone.server.models  # noqa: F401 — ensure models registered
 
     engine = get_engine()

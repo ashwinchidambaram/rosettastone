@@ -109,6 +109,7 @@ warn_unused_ignores = false
 
 [dependency-groups]
 dev = [
+    "alembic>=1.18.4",
     "playwright>=1.58.0",
     "types-pyyaml>=6.0.12.20250915",
 ]
