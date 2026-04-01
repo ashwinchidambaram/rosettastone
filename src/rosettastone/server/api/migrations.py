@@ -910,7 +910,16 @@ async def get_migration_regressions(
     """
     from rosettastone.decision.recommendation import DEFAULT_THRESHOLDS
 
-    _get_migration_or_404(migration_id, session)
+    record = _get_migration_or_404(migration_id, session)
+
+    stored_win_thresholds: dict[str, float] = {}
+    if record.config_json:
+        try:
+            stored_config = json.loads(record.config_json)
+            stored_win_thresholds = stored_config.get("win_thresholds", {})
+        except (json.JSONDecodeError, TypeError):
+            pass
+    effective_thresholds = {**DEFAULT_THRESHOLDS, **stored_win_thresholds}
 
     # Query baseline and validation rows in insertion order
     baseline_stmt = (
@@ -934,7 +943,7 @@ async def get_migration_regressions(
         v_score = val_tc.composite_score
         delta = v_score - b_score
         out_type = val_tc.output_type or base_tc.output_type or "unknown"
-        threshold = DEFAULT_THRESHOLDS.get(out_type, 0.80)
+        threshold = effective_thresholds.get(out_type, 0.80)
 
         if delta >= 0.05:
             status = "improved"
@@ -969,7 +978,7 @@ async def get_migration_regressions(
 
     # Sort: at_risk first (delta ascending), then regressed, then stable, then improved
     _status_order = {"at_risk": 0, "regressed": 1, "stable": 2, "improved": 3}
-    prompt_regressions.sort(key=lambda r: (_status_order[r["status"]], r["delta"]))
+    prompt_regressions.sort(key=lambda r: (_status_order.get(r["status"], 99), r["delta"]))
 
     regression_count = sum(1 for r in prompt_regressions if r["status"] == "regressed")
     at_risk_count = sum(1 for r in prompt_regressions if r["status"] == "at_risk")

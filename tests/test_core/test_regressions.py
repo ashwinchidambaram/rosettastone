@@ -78,6 +78,18 @@ class TestRegressionStatus:
         result = build_result(config, "opt", baseline, validation, 1.0)
         assert result.prompt_regressions[0].status == "stable"
 
+    def test_stable_near_neg_0_05_boundary(self, tmp_path):
+        """Values with delta in (-0.05, 0) are stable — tests boundary region."""
+        from rosettastone.core.pipeline import build_result
+
+        config = _make_config(tmp_path)
+        # delta = 0.86 - 0.90 = -0.04 → clearly above -0.05, stable
+        baseline = [_make_result(0.90, True)]
+        validation = [_make_result(0.86, True)]
+        result = build_result(config, "opt", baseline, validation, 1.0)
+        assert result.prompt_regressions[0].status == "stable"
+        assert result.prompt_regressions[0].delta > -0.05
+
 
 class TestRegressionSort:
     def test_at_risk_sorted_before_regressed(self, tmp_path):
