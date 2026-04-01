@@ -186,7 +186,7 @@ class TestRunnerStatusTransitions:
         with Session(mem_engine) as session:
             pipeline = session.get(PipelineRecord, pipeline_id)
             assert pipeline is not None
-            assert pipeline.status == "completed"
+            assert pipeline.status == "complete"
 
     def test_runner_marks_failed_on_exception(self, mem_engine) -> None:
         """Status = 'failed' when optimizer raises an exception."""

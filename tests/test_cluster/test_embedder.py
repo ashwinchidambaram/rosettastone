@@ -478,7 +478,7 @@ class TestEmbedding:
 
         clusterer = PromptClusterer()
         with patch(
-            "rosettastone.cluster.embedder.SentenceTransformer",
+            "rosettastone.cluster.embedder._get_sentence_transformer",
             return_value=mock_model,
         ):
             result = clusterer._embed_prompts(pairs)
@@ -495,7 +495,7 @@ class TestEmbedding:
 
         clusterer = PromptClusterer()
         with patch(
-            "rosettastone.cluster.embedder.SentenceTransformer",
+            "rosettastone.cluster.embedder._get_sentence_transformer",
             return_value=mock_model,
         ):
             clusterer._embed_prompts(pairs)
@@ -517,7 +517,7 @@ class TestEmbedding:
 
         clusterer = PromptClusterer()
         with patch(
-            "rosettastone.cluster.embedder.SentenceTransformer",
+            "rosettastone.cluster.embedder._get_sentence_transformer",
             return_value=mock_model,
         ):
             clusterer._embed_prompts([pair])
@@ -539,7 +539,7 @@ class TestEmbedding:
 
         clusterer = PromptClusterer()
         with patch(
-            "rosettastone.cluster.embedder.SentenceTransformer",
+            "rosettastone.cluster.embedder._get_sentence_transformer",
             return_value=mock_model,
         ):
             result = clusterer._embed_prompts(pairs)
@@ -555,9 +555,9 @@ class TestEmbedding:
 
         clusterer = PromptClusterer()
         with patch.object(clusterer, "_tfidf_embed", return_value=tfidf_result) as mock_tfidf:
-            # Force ImportError on sentence_transformers
+            # Force ImportError by making _get_sentence_transformer raise
             with patch(
-                "rosettastone.cluster.embedder.SentenceTransformer",
+                "rosettastone.cluster.embedder._get_sentence_transformer",
                 side_effect=ImportError("no module"),
             ):
                 result = clusterer._embed_prompts(pairs)
@@ -580,7 +580,7 @@ class TestEmbedding:
 
         clusterer = PromptClusterer()
         with patch(
-            "rosettastone.cluster.embedder.SentenceTransformer",
+            "rosettastone.cluster.embedder._get_sentence_transformer",
             return_value=mock_model,
         ):
             result = clusterer._embed_prompts(pairs)

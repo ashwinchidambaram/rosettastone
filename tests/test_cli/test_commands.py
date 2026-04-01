@@ -313,14 +313,14 @@ def test_serve_command_registered():
 
 
 def test_serve_default_options():
-    """serve uses default host 0.0.0.0 and port 8000."""
+    """serve uses default host 127.0.0.1 and port 8000."""
     with patch("uvicorn.run") as mock_uvicorn:
         result = runner.invoke(app, ["serve"])
         assert result.exit_code == 0
-        assert "http://0.0.0.0:8000" in result.output
+        assert "http://127.0.0.1:8000" in result.output
         mock_uvicorn.assert_called_once()
         call_kwargs = mock_uvicorn.call_args[1]
-        assert call_kwargs["host"] == "0.0.0.0"
+        assert call_kwargs["host"] == "127.0.0.1"
         assert call_kwargs["port"] == 8000
         assert call_kwargs["reload"] is False
         assert call_kwargs["factory"] is True

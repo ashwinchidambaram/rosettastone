@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -30,14 +31,34 @@ def check_token_budget(config: MigrationConfig) -> tuple[list[str], list[str]]:
 
     # Load data and check token counts for a sample
     try:
-        from rosettastone.ingest.jsonl import JSONLAdapter
+        from rosettastone.config import AdapterChoice
 
-        if not config.data_path:
+        adapter_type = config.adapter
+        if config.redis_url and adapter_type == AdapterChoice.JSONL:
+            adapter_type = AdapterChoice.REDIS
+
+        if adapter_type == AdapterChoice.JSONL:
+            from rosettastone.ingest.jsonl import JSONLAdapter
+
+            if not config.data_path:
+                return warnings, blockers
+            adapter = JSONLAdapter(config.data_path)
+        elif adapter_type == AdapterChoice.CSV:
+            from rosettastone.ingest.csv_adapter import CSVAdapter
+
+            if not config.data_path:
+                return warnings, blockers
+            adapter = CSVAdapter(config.data_path)
+        else:
+            warnings.append(
+                f"Token budget check not supported for adapter '{adapter_type}'. Skipping."
+            )
             return warnings, blockers
-        adapter = JSONLAdapter(config.data_path)
-        pairs = adapter.load()
 
-        for i, pair in enumerate(pairs[:5]):
+        pairs = adapter.load()
+        sample = random.sample(pairs, min(20, len(pairs)))
+
+        for i, pair in enumerate(sample):
             prompt_text = pair.prompt if isinstance(pair.prompt, str) else str(pair.prompt)
             try:
                 token_count = litellm.token_counter(model=config.target_model, text=prompt_text)

@@ -45,6 +45,46 @@ def _make_migration(
 
 
 # ---------------------------------------------------------------------------
+# Authentication tests
+# ---------------------------------------------------------------------------
+
+
+class TestAlertAuthentication:
+    def test_generate_alerts_requires_auth(self, monkeypatch) -> None:
+        """In multi-user mode, POST /api/v1/alerts/generate without auth returns 401 or 403."""
+        from sqlalchemy.pool import StaticPool
+        from sqlmodel import SQLModel, create_engine
+
+        from rosettastone.server.app import create_app
+        from rosettastone.server.database import get_session
+
+        monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
+        monkeypatch.setenv("ROSETTASTONE_JWT_SECRET", "a" * 64)
+
+        eng = create_engine(
+            "sqlite://",
+            echo=False,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        SQLModel.metadata.create_all(eng)
+
+        app = create_app()
+
+        from sqlmodel import Session as _Session
+
+        def override_session():
+            with _Session(eng) as s:
+                yield s
+
+        app.dependency_overrides[get_session] = override_session
+
+        test_client = TestClient(app)
+        resp = test_client.post("/api/v1/alerts/generate")
+        assert resp.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
 # Alert generation logic
 # ---------------------------------------------------------------------------
 

@@ -209,6 +209,87 @@ class TestRestartRecovery:
 
 
 # ---------------------------------------------------------------------------
+# Retry logic
+# ---------------------------------------------------------------------------
+
+
+class TestRetryLogic:
+    def test_failed_task_retries_up_to_max_retries(self, worker, engine) -> None:
+        """A task that fails twice but succeeds on the third attempt reaches 'complete'."""
+        mid = _insert_migration(engine)
+        payload = {"source_model": "a", "target_model": "b"}
+
+        attempt_count = {"n": 0}
+
+        def fake_execute(self_w, task):
+            attempt_count["n"] += 1
+            if attempt_count["n"] < 3:
+                # Simulate failure by calling _mark_failed directly
+                worker._mark_failed(task.id, f"simulated failure attempt {attempt_count['n']}")
+            else:
+                worker._mark_complete(task.id)
+
+        with patch.object(TaskWorker, "_execute", fake_execute):
+            task_id = worker.enqueue("migration", mid, payload, priority=0)
+
+            # Set max_retries=2 so it can retry twice
+            with Session(engine) as sess:
+                task = sess.get(TaskQueue, task_id)
+                task.max_retries = 2
+                sess.add(task)
+                sess.commit()
+
+            worker.start()
+
+            deadline = time.time() + 10.0
+            while time.time() < deadline:
+                with Session(engine) as sess:
+                    task = sess.get(TaskQueue, task_id)
+                    if task and task.status == "complete":
+                        break
+                time.sleep(0.05)
+
+        with Session(engine) as sess:
+            task = sess.get(TaskQueue, task_id)
+            assert task is not None
+            assert task.status == "complete"
+
+    def test_task_permanently_fails_after_max_retries(self, worker, engine) -> None:
+        """A task that always raises is marked 'failed' after exhausting max_retries."""
+        mid = _insert_migration(engine)
+        payload = {"source_model": "a", "target_model": "b"}
+
+        def fake_execute(self_w, task):
+            worker._mark_failed(task.id, "always fails")
+
+        with patch.object(TaskWorker, "_execute", fake_execute):
+            task_id = worker.enqueue("migration", mid, payload, priority=0)
+
+            # Set max_retries=1 so it retries once then fails permanently
+            with Session(engine) as sess:
+                task = sess.get(TaskQueue, task_id)
+                task.max_retries = 1
+                sess.add(task)
+                sess.commit()
+
+            worker.start()
+
+            deadline = time.time() + 10.0
+            while time.time() < deadline:
+                with Session(engine) as sess:
+                    task = sess.get(TaskQueue, task_id)
+                    if task and task.status == "failed":
+                        break
+                time.sleep(0.05)
+
+        with Session(engine) as sess:
+            task = sess.get(TaskQueue, task_id)
+            assert task is not None
+            assert task.status == "failed"
+            assert task.error_message is not None
+
+
+# ---------------------------------------------------------------------------
 # Task dispatch by type
 # ---------------------------------------------------------------------------
 

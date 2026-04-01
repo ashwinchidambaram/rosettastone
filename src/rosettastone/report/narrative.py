@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 
 from jinja2 import Environment, FileSystemLoader
 
+from rosettastone.report.executive_prompt import format_executive_prompt
+
 if TYPE_CHECKING:
     from rosettastone.config import MigrationConfig
     from rosettastone.core.types import MigrationResult
@@ -78,7 +80,7 @@ EXECUTIVE_PROMPT = (
 
 
 def _format_per_type(per_type_scores: dict[str, Any]) -> str:
-    """Format per-type scores into a readable summary for the LLM prompt."""
+    """Format per-type scores into a readable summary."""
     if not per_type_scores:
         return "No per-type breakdown available."
     lines = []
@@ -138,12 +140,14 @@ def generate_executive_narrative(
     warnings = result.warnings or []
 
     if local_only:
+        logger.info("Executive narrative: using %s", "template fallback")
         return _template_fallback(result, per_type, safety)
 
+    llm_succeeded = False
     try:
         import litellm
 
-        prompt_text = EXECUTIVE_PROMPT.format(
+        messages = format_executive_prompt(
             source_model=_config_get(result.config, "source_model", "unknown"),
             target_model=_config_get(result.config, "target_model", "unknown"),
             recommendation=getattr(result, "recommendation", "N/A") or "N/A",
@@ -154,25 +158,34 @@ def generate_executive_narrative(
             duration_seconds=result.duration_seconds,
             total_test_cases=len(result.validation_results),
             wins=sum(1 for r in result.validation_results if r.is_win),
-            per_type_summary=_format_per_type(per_type),
-            safety_summary=_format_safety(safety),
-            warnings_summary="\n".join(f"- {w}" for w in warnings) if warnings else "None.",
+            per_type_scores=per_type,
+            safety_warnings=safety,
+            warnings=warnings,
         )
 
         judge_model = getattr(config, "judge_model", None) if config else None
         response = litellm.completion(
             model=judge_model or "openai/gpt-4o",
-            messages=[{"role": "user", "content": prompt_text}],
+            messages=messages,
             max_tokens=1000,
             temperature=0.3,
         )
 
-        return response.choices[0].message.content or _template_fallback(result, per_type, safety)
+        narrative = response.choices[0].message.content
+        if narrative:
+            llm_succeeded = True
+            logger.info("Executive narrative: using %s", "LLM")
+            return narrative
+
+        logger.info("Executive narrative: using %s", "template fallback")
+        return _template_fallback(result, per_type, safety)
 
     except Exception:
         logger.warning(
             "Executive narrative LLM call failed, using template fallback", exc_info=True
         )
+        fallback_or_llm = "LLM" if llm_succeeded else "template fallback"
+        logger.info("Executive narrative: using %s", fallback_or_llm)
         return _template_fallback(result, per_type, safety)
 
 
@@ -209,7 +222,7 @@ def _template_fallback(
     )
 
 
-def _basic_summary(result: MigrationResult, per_type: dict[str, Any]) -> str:
+def _basic_summary(result: MigrationResult, per_type: dict[str, Any] | None = None) -> str:
     """Minimal plain-text summary when no template is available."""
     rec = getattr(result, "recommendation", "N/A") or "N/A"
     source = _config_get(result.config, "source_model", "unknown")

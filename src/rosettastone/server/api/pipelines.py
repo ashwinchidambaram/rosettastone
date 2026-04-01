@@ -195,6 +195,7 @@ def get_pipeline_status(
 @router.get("/api/v1/pipelines/{pipeline_id}/modules", response_model=list[PipelineStageSummary])
 def get_pipeline_modules(
     pipeline_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> list[PipelineStageSummary]:
     """Return per-module detail for a pipeline.
@@ -204,6 +205,7 @@ def get_pipeline_modules(
     pipeline = session.get(PipelineRecord, pipeline_id)
     if not pipeline:
         raise HTTPException(status_code=404, detail=f"Pipeline {pipeline_id} not found")
+    check_resource_owner(pipeline.owner_id, request)
 
     stages = list(
         session.exec(

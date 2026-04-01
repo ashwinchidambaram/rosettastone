@@ -20,8 +20,10 @@ DEFAULT_THRESHOLDS: dict[str, float] = {
     "long_text": 0.75,
 }
 
-# Minimum sample count before we consider statistics reliable.
-MIN_RELIABLE_SAMPLES = 10
+# Minimum sample count before we consider statistics reliable enough for GO.
+MIN_RELIABLE_SAMPLES = 30
+# Minimum sample count for CONDITIONAL (insufficient data caveat).
+MIN_SAMPLES_FOR_CONDITIONAL = 10
 
 
 class Recommendation(StrEnum):
@@ -57,9 +59,11 @@ def make_recommendation(
     Rules (evaluated in priority order):
 
     1. Any safety warning with severity HIGH → NO_GO.
-    2. Any output type whose win_rate falls below its threshold → CONDITIONAL.
-    3. Any output type with fewer than 10 samples → CONDITIONAL (insufficient data caveat).
-    4. All types meet their thresholds with adequate samples → GO.
+    2. Any output type whose Wilson CI lower bound falls below its threshold → CONDITIONAL
+       (statistically uncertain results are CONDITIONAL even if the point estimate passes).
+    3. Any output type with fewer than MIN_SAMPLES_FOR_CONDITIONAL samples → CONDITIONAL
+       (insufficient data caveat).
+    4. All types have ≥ MIN_RELIABLE_SAMPLES samples and CI lower bounds meet thresholds → GO.
 
     Args:
         validation_results: Evaluation results from the validation phase.
@@ -130,13 +134,16 @@ def make_recommendation(
 
     for ot, stats in per_type.items():
         threshold = effective_thresholds.get(ot, 0.80)
-        if stats.sample_count < MIN_RELIABLE_SAMPLES:
+        if stats.sample_count < MIN_SAMPLES_FOR_CONDITIONAL:
             insufficient_samples.append(
                 f"{ot} ({stats.sample_count} sample{'s' if stats.sample_count != 1 else ''})"
             )
-        elif stats.win_rate < threshold:
+        elif stats.confidence_interval[0] < threshold:
+            # Use Wilson CI lower bound: statistically uncertain results are CONDITIONAL
+            # even when the point-estimate win_rate clears the threshold.
             below_threshold.append(
-                f"{ot} (win rate {stats.win_rate:.1%} < threshold {threshold:.1%})"
+                f"{ot} (win rate {stats.win_rate:.1%}, CI lower bound "
+                f"{stats.confidence_interval[0]:.1%} < threshold {threshold:.1%})"
             )
 
     if below_threshold or insufficient_samples:
@@ -163,6 +170,24 @@ def make_recommendation(
     # ── Rule 4: All types pass ───────────────────────────────────────────────
     if not per_type:
         reasoning = "No evaluation results found. Cannot make a recommendation."
+        return RecommendationResult(
+            recommendation=Recommendation.CONDITIONAL,
+            reasoning=reasoning,
+            per_type_details=per_type,
+        )
+
+    # GO requires MIN_RELIABLE_SAMPLES (30) for each type; fewer → CONDITIONAL.
+    low_sample_for_go = [
+        f"{ot} ({stats.sample_count} sample{'s' if stats.sample_count != 1 else ''})"
+        for ot, stats in per_type.items()
+        if stats.sample_count < MIN_RELIABLE_SAMPLES
+    ]
+    if low_sample_for_go:
+        reasoning = (
+            "Insufficient samples for a GO recommendation in: "
+            + ", ".join(low_sample_for_go)
+            + f". At least {MIN_RELIABLE_SAMPLES} samples per type are required for GO."
+        )
         return RecommendationResult(
             recommendation=Recommendation.CONDITIONAL,
             reasoning=reasoning,

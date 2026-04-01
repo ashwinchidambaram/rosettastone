@@ -19,8 +19,11 @@ logger = logging.getLogger(__name__)
 # Lazy imports — these may not be installed.
 try:
     from sentence_transformers import SentenceTransformer
+
+    from rosettastone.evaluate.embedding import _get_sentence_transformer
 except ImportError:  # pragma: no cover
     SentenceTransformer = None  # type: ignore[assignment,misc]
+    _get_sentence_transformer = None  # type: ignore[assignment,misc]
 
 try:
     from sklearn.cluster import HDBSCAN, KMeans
@@ -186,9 +189,9 @@ class PromptClusterer:
         """Embed prompts using sentence-transformers or TF-IDF fallback."""
         texts = [self._extract_prompt_text(p) for p in pairs]
         try:
-            if SentenceTransformer is None:
+            if _get_sentence_transformer is None:
                 raise ImportError("sentence_transformers not installed")
-            model = SentenceTransformer("all-MiniLM-L6-v2")
+            model = _get_sentence_transformer("all-MiniLM-L6-v2")
             return cast(np.ndarray[Any, Any], model.encode(texts))
         except ImportError:
             logger.info("sentence_transformers unavailable, using TF-IDF")

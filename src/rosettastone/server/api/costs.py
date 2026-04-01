@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from rosettastone.server.database import get_session
@@ -13,6 +14,10 @@ from rosettastone.server.models import MigrationRecord, UserBudget
 from rosettastone.server.rbac import get_current_user_id, require_role
 
 router = APIRouter()
+
+
+class BudgetUpdate(BaseModel):
+    monthly_limit_usd: float = Field(..., gt=0)
 
 
 # ---------------------------------------------------------------------------
@@ -249,14 +254,12 @@ async def get_my_budget(request: Request, session: Session = Depends(get_session
 )
 async def set_user_budget(
     user_id: int,
-    monthly_limit_usd: float,
+    body: BudgetUpdate,
     session: Session = Depends(get_session),
 ) -> dict:
     """Admin: set monthly budget limit for a user."""
-    if monthly_limit_usd < 0:
-        raise HTTPException(status_code=422, detail="monthly_limit_usd must be non-negative")
     budget = get_or_create_budget(user_id, session)
-    budget.monthly_limit_usd = monthly_limit_usd
+    budget.monthly_limit_usd = body.monthly_limit_usd
     session.add(budget)
     session.commit()
     session.refresh(budget)

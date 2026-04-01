@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from rosettastone.core.types import PromptPair
@@ -33,6 +34,7 @@ _PRESIDIO_SEVERITY_MAP: dict[str, str] = {
 # Module-level singletons — populated lazily on first use
 _analyzer_instance: Any = None
 _anonymizer_instance: Any = None
+_init_lock = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -43,42 +45,50 @@ _anonymizer_instance: Any = None
 def _get_analyzer() -> Any:
     """Return a cached AnalyzerEngine, importing presidio lazily.
 
+    Uses double-checked locking to ensure thread-safe singleton initialization.
+
     Raises:
         ImportError: When presidio_analyzer is not installed.
     """
     global _analyzer_instance  # noqa: PLW0603
     if _analyzer_instance is None:
-        try:
-            from presidio_analyzer import AnalyzerEngine
-        except ImportError as exc:
-            raise ImportError(
-                "presidio_analyzer is required for Presidio-based PII scanning. "
-                "Install it with: pip install presidio-analyzer"
-            ) from exc
+        with _init_lock:
+            if _analyzer_instance is None:  # double-checked locking
+                try:
+                    from presidio_analyzer import AnalyzerEngine
+                except ImportError as exc:
+                    raise ImportError(
+                        "presidio_analyzer is required for Presidio-based PII scanning. "
+                        "Install it with: pip install presidio-analyzer"
+                    ) from exc
 
-        _analyzer_instance = AnalyzerEngine()
-        logger.debug("AnalyzerEngine initialised (singleton)")
+                _analyzer_instance = AnalyzerEngine()
+                logger.debug("AnalyzerEngine initialised (singleton)")
     return _analyzer_instance
 
 
 def _get_anonymizer() -> Any:
     """Return a cached AnonymizerEngine, importing presidio lazily.
 
+    Uses double-checked locking to ensure thread-safe singleton initialization.
+
     Raises:
         ImportError: When presidio_anonymizer is not installed.
     """
     global _anonymizer_instance  # noqa: PLW0603
     if _anonymizer_instance is None:
-        try:
-            from presidio_anonymizer import AnonymizerEngine
-        except ImportError as exc:
-            raise ImportError(
-                "presidio_anonymizer is required for Presidio-based PII anonymization. "
-                "Install it with: pip install presidio-anonymizer"
-            ) from exc
+        with _init_lock:
+            if _anonymizer_instance is None:  # double-checked locking
+                try:
+                    from presidio_anonymizer import AnonymizerEngine
+                except ImportError as exc:
+                    raise ImportError(
+                        "presidio_anonymizer is required for Presidio-based PII anonymization. "
+                        "Install it with: pip install presidio-anonymizer"
+                    ) from exc
 
-        _anonymizer_instance = AnonymizerEngine()  # type: ignore[no-untyped-call]
-        logger.debug("AnonymizerEngine initialised (singleton)")
+                _anonymizer_instance = AnonymizerEngine()  # type: ignore[no-untyped-call]
+                logger.debug("AnonymizerEngine initialised (singleton)")
     return _anonymizer_instance
 
 
@@ -166,7 +176,7 @@ def scan_pairs_presidio(pairs: list[PromptPair]) -> list[PIIWarning]:
                     pair_index=pair_idx,
                     pii_type=entity_type,
                     severity=_severity_for(entity_type),
-                    count=count,
+                    occurrence_count=count,
                 )
             )
 
@@ -217,7 +227,9 @@ def anonymize_text(text: str) -> str:
 def anonymize_pairs(pairs: list[PromptPair]) -> list[PromptPair]:
     """Return new PromptPair objects with PII anonymized in both prompt and response.
 
-    Original pairs are **not** mutated.
+    Original pairs are **not** mutated. When ``pair.prompt`` is a list of dicts,
+    the structure is preserved — only the ``content`` / ``text`` string values
+    inside each message are anonymized.
 
     Args:
         pairs: List of PromptPair objects to anonymize.
@@ -227,8 +239,19 @@ def anonymize_pairs(pairs: list[PromptPair]) -> list[PromptPair]:
     """
     result: list[PromptPair] = []
     for pair in pairs:
-        prompt_text = _extract_prompt_text(pair.prompt)
-        anon_prompt = anonymize_text(prompt_text)
+        if isinstance(pair.prompt, list):
+            anonymized_messages = []
+            for msg in pair.prompt:
+                new_msg = dict(msg)
+                if "content" in new_msg and isinstance(new_msg["content"], str):
+                    new_msg["content"] = anonymize_text(new_msg["content"])
+                if "text" in new_msg and isinstance(new_msg["text"], str):
+                    new_msg["text"] = anonymize_text(new_msg["text"])
+                anonymized_messages.append(new_msg)
+            anon_prompt: Any = anonymized_messages
+        else:
+            anon_prompt = anonymize_text(str(pair.prompt))
+
         anon_response = anonymize_text(pair.response)
 
         new_pair = pair.model_copy(update={"prompt": anon_prompt, "response": anon_response})

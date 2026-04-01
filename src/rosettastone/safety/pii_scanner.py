@@ -15,7 +15,12 @@ class PIIWarning:
     pair_index: int
     pii_type: str
     severity: str
-    count: int
+    occurrence_count: int
+
+    @property
+    def count(self) -> int:
+        """Backwards-compatible alias for occurrence_count."""
+        return self.occurrence_count
 
 
 # Regex patterns for PII detection
@@ -48,7 +53,7 @@ _PII_PATTERNS = {
 }
 
 
-def scan_text(text: str) -> list[tuple[str, str]]:
+def scan_text(text: str) -> list[tuple[str, str, int]]:
     """
     Scan a single text string for PII.
 
@@ -56,12 +61,13 @@ def scan_text(text: str) -> list[tuple[str, str]]:
         text: String to scan (prompt or response content)
 
     Returns:
-        List of (pii_type, severity) tuples found in the text
+        List of (pii_type, severity, match_count) tuples found in the text
     """
     findings = []
     for pii_type, (pattern, severity) in _PII_PATTERNS.items():
-        if re.search(pattern, text, re.IGNORECASE):
-            findings.append((pii_type, severity))
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        if matches:
+            findings.append((pii_type, severity, len(matches)))
     return findings
 
 
@@ -93,26 +99,24 @@ def scan_pairs(pairs: list[PromptPair]) -> list[PIIWarning]:
                         parts.append(str(item["text"]))
             prompt_text = " ".join(parts)
 
-        # Scan prompt and response
+        # Scan prompt and response — accumulate actual occurrence counts
         all_findings: dict[str, int] = {}
 
-        for pii_type, severity in scan_text(prompt_text):
-            key = pii_type
-            all_findings[key] = all_findings.get(key, 0) + 1
+        for pii_type, _severity, match_count in scan_text(prompt_text):
+            all_findings[pii_type] = all_findings.get(pii_type, 0) + match_count
 
-        for pii_type, severity in scan_text(pair.response):
-            key = pii_type
-            all_findings[key] = all_findings.get(key, 0) + 1
+        for pii_type, _severity, match_count in scan_text(pair.response):
+            all_findings[pii_type] = all_findings.get(pii_type, 0) + match_count
 
         # Create one warning per unique pii_type found
-        for pii_type, count in all_findings.items():
+        for pii_type, occurrence_count in all_findings.items():
             severity = _PII_PATTERNS[pii_type][1]
             warnings.append(
                 PIIWarning(
                     pair_index=pair_idx,
                     pii_type=pii_type,
                     severity=severity,
-                    count=count,
+                    occurrence_count=occurrence_count,
                 )
             )
 

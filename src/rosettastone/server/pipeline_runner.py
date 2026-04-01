@@ -104,13 +104,13 @@ def run_pipeline_background(pipeline_id: int, engine: Any = None) -> None:
                 stage = PipelineStageRecord(
                     pipeline_id=pipeline_id,
                     module_name=module.name,
-                    status="completed",
+                    status="complete",
                     optimized_prompt=optimized_modules.get(module.name, ""),
                     duration_seconds=per_module_duration,
                 )
                 session.add(stage)
 
-            pipeline.status = "completed"
+            pipeline.status = "complete"
             session.add(pipeline)
             session.commit()
 

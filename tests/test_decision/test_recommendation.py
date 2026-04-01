@@ -6,6 +6,7 @@ from rosettastone.core.types import EvalResult, PromptPair
 from rosettastone.decision.recommendation import (
     DEFAULT_THRESHOLDS,
     MIN_RELIABLE_SAMPLES,
+    MIN_SAMPLES_FOR_CONDITIONAL,
     Recommendation,
     RecommendationResult,
     make_recommendation,
@@ -127,8 +128,8 @@ def test_conditional_when_custom_threshold_not_met():
 
 
 def test_conditional_on_insufficient_samples():
-    """Fewer than MIN_RELIABLE_SAMPLES triggers CONDITIONAL with caveat."""
-    results = [_make_result(1.0, "json") for _ in range(MIN_RELIABLE_SAMPLES - 1)]
+    """Fewer than MIN_SAMPLES_FOR_CONDITIONAL triggers CONDITIONAL with caveat."""
+    results = [_make_result(1.0, "json") for _ in range(MIN_SAMPLES_FOR_CONDITIONAL - 1)]
     rec = make_recommendation(results, [], {})
     assert rec.recommendation == Recommendation.CONDITIONAL
     assert "insufficient" in rec.reasoning.lower() or "sample" in rec.reasoning.lower()
@@ -144,17 +145,25 @@ def test_conditional_single_sample():
 
 
 def test_go_when_all_types_pass():
-    """All output types at 100% win rate with enough samples → GO."""
-    results = _enough_results("json", win_rate=1.0) + _enough_results("short_text", win_rate=1.0)
+    """All output types at 100% win rate with enough samples → GO.
+
+    Use long_text (threshold=0.75) and short_text (threshold=0.80) so that the
+    Wilson CI lower bound for MIN_RELIABLE_SAMPLES=30 samples at 100% win rate
+    (≈0.886) comfortably clears the threshold.
+    """
+    results = (
+        _enough_results("long_text", win_rate=1.0) + _enough_results("short_text", win_rate=1.0)
+    )
     rec = make_recommendation(results, [], {})
     assert rec.recommendation == Recommendation.GO
 
 
 def test_go_reasoning_mentions_types():
-    results = _enough_results("classification", win_rate=1.0)
+    """GO reasoning should mention the output type that passed."""
+    results = _enough_results("long_text", win_rate=1.0)
     rec = make_recommendation(results, [], {})
     assert rec.recommendation == Recommendation.GO
-    assert "classification" in rec.reasoning
+    assert "long_text" in rec.reasoning
 
 
 def test_go_with_non_high_warnings_still_goes():
@@ -203,3 +212,53 @@ def test_priority_no_go_beats_threshold_failure():
 def test_returns_recommendation_result_type():
     rec = make_recommendation([], [], {})
     assert isinstance(rec, RecommendationResult)
+
+
+# ── Wilson CI lower bound: CONDITIONAL even when point estimate passes ────────
+
+
+def test_conditional_when_ci_lower_bound_below_threshold():
+    """CONDITIONAL is returned when win_rate >= threshold but Wilson CI lower bound < threshold.
+
+    With a small sample (e.g. n=MIN_SAMPLES_FOR_CONDITIONAL), a win_rate that exceeds the
+    threshold may still have a CI lower bound below it, making the result statistically
+    uncertain.  The recommendation engine must return CONDITIONAL in this case.
+    """
+    from rosettastone.decision.statistics import wilson_interval
+
+    # Use json threshold = 0.95. We want win_rate >= 0.95 but CI lower bound < 0.95.
+    # With n=12 (above MIN_SAMPLES_FOR_CONDITIONAL=10, below MIN_RELIABLE_SAMPLES=30):
+    # wins=12, n=12 → win_rate=1.0, but Wilson CI lower ≈ 0.74 < 0.95.
+    # This satisfies both conditions: point estimate passes, CI lower bound does not.
+    n = 12
+    wins = 12
+    ci_lower, ci_upper = wilson_interval(wins, n)
+    threshold = DEFAULT_THRESHOLDS["json"]  # 0.95
+
+    win_rate = wins / n
+    # Verify our test setup is correct: win_rate passes, CI lower does not
+    assert win_rate >= threshold, f"Test setup error: win_rate {win_rate} should be >= {threshold}"
+    assert ci_lower < threshold, (
+        f"Test setup error: CI lower {ci_lower:.3f} should be < threshold {threshold} "
+        f"for n={n}, wins={wins}"
+    )
+
+    # Build n results all scoring above the json threshold
+    results = [
+        EvalResult(
+            prompt_pair=PromptPair(prompt="q", response="a", source_model="m"),
+            new_response="r",
+            scores={"composite": threshold + 0.01},
+            composite_score=threshold + 0.01,
+            is_win=True,
+            details={"output_type": "json"},
+        )
+        for _ in range(n)
+    ]
+
+    rec = make_recommendation(results, [], {})
+
+    assert rec.recommendation == Recommendation.CONDITIONAL, (
+        f"Expected CONDITIONAL (CI lower bound {ci_lower:.3f} < threshold {threshold}), "
+        f"got {rec.recommendation}. Reasoning: {rec.reasoning}"
+    )

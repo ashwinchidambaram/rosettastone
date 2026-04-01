@@ -277,30 +277,38 @@ def test_multiple_prompts_each_checked_independently():
     assert blockers == [], f"Expected no blockers, got: {blockers}"
 
 
-def test_only_first_5_prompts_are_sampled():
-    """This test proves that token budget checking only samples the first 5 pairs."""
-    # 6 prompts; only the 6th is oversized — it should NOT be caught
-    data_path = _make_jsonl_file(
-        "P1.", "P2.", "P3.", "P4.", "P5.", "P6 oversized and should not trigger."
-    )
+def test_oversized_prompt_beyond_sample_limit_not_caught():
+    """Token budget checks a random sample of up to 20 pairs; prompts beyond position 20 are skipped.
+
+    Patches random.sample to deterministically return the first k items in order, so the
+    21st (oversized) prompt is reliably excluded from the sample and the assertion is stable.
+    """
+    # 21 prompts; only the 21st is oversized
+    data_path = _make_jsonl_file(*[f"P{i}." for i in range(20)], "P21 oversized beyond limit.")
     max_input = _MODEL_INFO_128K["max_input_tokens"]
+
+    oversized_caught = False
 
     def token_counter_side_effect(model, text):
         if "oversized" in text.lower():
-            return max_input * 2  # would be a blocker if checked
+            nonlocal oversized_caught
+            oversized_caught = True
+            return max_input * 2
         return 50
 
     with (
         patch("litellm.get_model_info", return_value=_MODEL_INFO_128K.copy()),
         patch("litellm.token_counter", side_effect=token_counter_side_effect),
+        # Deterministic sample: always return first k items in order, keeping the oversized
+        # 21st prompt (index 20) outside the 20-item sample window.
+        patch("random.sample", side_effect=lambda population, k: list(population)[:k]),
     ):
         from rosettastone.preflight.token_budget import check_token_budget
 
-        warnings, blockers = check_token_budget(_config(data_path))
+        check_token_budget(_config(data_path))
 
-    # The 6th prompt (index 5) is not in pairs[:5], so should NOT be checked
-    assert blockers == [], (
-        f"Expected no blockers — 6th prompt should not be sampled, got: {blockers}"
+    assert not oversized_caught, (
+        "Expected prompt beyond 20-item sample limit not to be checked"
     )
 
 

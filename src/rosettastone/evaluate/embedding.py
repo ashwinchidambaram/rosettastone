@@ -27,7 +27,10 @@ def compute_embedding_sim(expected: str, actual: str) -> float:
     import numpy as np
 
     a, b = embeddings[0], embeddings[1]
-    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+    norm_product = np.linalg.norm(a) * np.linalg.norm(b)
+    if norm_product == 0.0:
+        return 0.0
+    return float(np.dot(a, b) / norm_product)
 
 
 class EmbeddingEvaluator(Evaluator):

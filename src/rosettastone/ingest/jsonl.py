@@ -16,7 +16,7 @@ class JSONLAdapter(DataAdapter):
 
     def load(self) -> list[PromptPair]:
         pairs: list[PromptPair] = []
-        with open(self.path) as f:
+        with open(self.path, encoding="utf-8") as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
                 if not line:

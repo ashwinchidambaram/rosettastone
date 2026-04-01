@@ -17,20 +17,20 @@ class TestScanTextEmailDetection:
         """This test proves that a standard email is detected."""
         findings = scan_text("Contact me at john.doe@example.com for details")
         assert len(findings) > 0, "Expected email to be detected"
-        assert any(pii_type == "email" for pii_type, _ in findings), "Expected email in findings"
+        assert any(pii_type == "email" for pii_type, *_ in findings), "Expected email in findings"
 
     def test_detects_email_with_numbers(self):
         """This test proves that emails with numbers are detected."""
         text = "Reach out to user123@domain.org"
         findings = scan_text(text)
-        assert any(pii_type == "email" for pii_type, _ in findings), (
+        assert any(pii_type == "email" for pii_type, *_ in findings), (
             "Expected numeric email detected"
         )
 
     def test_detects_email_case_insensitive(self):
         """This test proves that emails are detected case-insensitively."""
         findings = scan_text("EMAIL@DOMAIN.COM is the contact")
-        assert any(pii_type == "email" for pii_type, _ in findings), (
+        assert any(pii_type == "email" for pii_type, *_ in findings), (
             "Expected uppercase email detected"
         )
 
@@ -38,7 +38,7 @@ class TestScanTextEmailDetection:
         """This test proves that email severity is MEDIUM."""
         findings = scan_text("user@example.com")
         email_findings = [
-            (pii_type, severity) for pii_type, severity in findings if pii_type == "email"
+            (pii_type, severity) for pii_type, severity, *_ in findings if pii_type == "email"
         ]
         assert len(email_findings) > 0, "Expected email finding"
         assert email_findings[0][1] == "MEDIUM", (
@@ -59,26 +59,26 @@ class TestScanTextPhoneDetection:
     def test_detects_standard_us_phone(self):
         """This test proves that a standard US phone number is detected."""
         findings = scan_text("Call me at (555) 123-4567")
-        assert any(pii_type == "us_phone" for pii_type, _ in findings), "Expected US phone detected"
+        assert any(pii_type == "us_phone" for pii_type, *_ in findings), "Expected US phone detected"
 
     def test_detects_us_phone_without_parentheses(self):
         """This test proves that US phone without parentheses is detected."""
         findings = scan_text("My number is 555-123-4567")
-        assert any(pii_type == "us_phone" for pii_type, _ in findings), (
+        assert any(pii_type == "us_phone" for pii_type, *_ in findings), (
             "Expected phone without parentheses detected"
         )
 
     def test_detects_us_phone_with_dots(self):
         """This test proves that US phone with dots is detected."""
         findings = scan_text("555.123.4567")
-        assert any(pii_type == "us_phone" for pii_type, _ in findings), (
+        assert any(pii_type == "us_phone" for pii_type, *_ in findings), (
             "Expected phone with dots detected"
         )
 
     def test_detects_us_phone_with_plus_1(self):
         """This test proves that US phone with +1 prefix is detected."""
         findings = scan_text("+1-555-123-4567")
-        assert any(pii_type == "us_phone" for pii_type, _ in findings), (
+        assert any(pii_type == "us_phone" for pii_type, *_ in findings), (
             "Expected +1 formatted phone detected"
         )
 
@@ -86,7 +86,7 @@ class TestScanTextPhoneDetection:
         """This test proves that phone severity is MEDIUM."""
         findings = scan_text("555-123-4567")
         phone_findings = [
-            (pii_type, severity) for pii_type, severity in findings if pii_type == "us_phone"
+            (pii_type, severity) for pii_type, severity, *_ in findings if pii_type == "us_phone"
         ]
         assert len(phone_findings) > 0, "Expected phone finding"
         assert phone_findings[0][1] == "MEDIUM", (
@@ -101,7 +101,7 @@ class TestScanTextPhoneDetection:
         """
         for version_string in ("1.234.5678", "v1.2.3456", "release-1.234.5678"):
             findings = scan_text(version_string)
-            phone_findings = [pii_type for pii_type, _ in findings if pii_type == "us_phone"]
+            phone_findings = [pii_type for pii_type, *_ in findings if pii_type == "us_phone"]
             assert len(phone_findings) == 0, (
                 f"Expected no phone match for version string '{version_string}', "
                 f"got {phone_findings}"
@@ -114,13 +114,13 @@ class TestScanTextSSNDetection:
     def test_detects_ssn(self):
         """This test proves that a valid SSN format is detected."""
         findings = scan_text("SSN: 123-45-6789")
-        assert any(pii_type == "ssn" for pii_type, _ in findings), "Expected SSN detected"
+        assert any(pii_type == "ssn" for pii_type, *_ in findings), "Expected SSN detected"
 
     def test_ssn_severity_is_high(self):
         """This test proves that SSN severity is HIGH."""
         findings = scan_text("123-45-6789")
         ssn_findings = [
-            (pii_type, severity) for pii_type, severity in findings if pii_type == "ssn"
+            (pii_type, severity) for pii_type, severity, *_ in findings if pii_type == "ssn"
         ]
         assert len(ssn_findings) > 0, "Expected SSN finding"
         assert ssn_findings[0][1] == "HIGH", (
@@ -130,14 +130,14 @@ class TestScanTextSSNDetection:
     def test_ssn_with_leading_zeros(self):
         """This test proves that SSN with leading zeros is detected."""
         findings = scan_text("001-23-4567")
-        assert any(pii_type == "ssn" for pii_type, _ in findings), (
+        assert any(pii_type == "ssn" for pii_type, *_ in findings), (
             "Expected SSN with leading zeros detected"
         )
 
     def test_no_false_positive_for_partial_ssn(self):
         """This test proves that incomplete SSN patterns are not detected."""
         findings = scan_text("123-456789")
-        ssn_findings = [pii_type for pii_type, _ in findings if pii_type == "ssn"]
+        ssn_findings = [pii_type for pii_type, *_ in findings if pii_type == "ssn"]
         assert len(ssn_findings) == 0, "Expected no SSN match for incomplete format"
 
 
@@ -147,21 +147,21 @@ class TestScanTextCreditCardDetection:
     def test_detects_credit_card_16_digits(self):
         """This test proves that 16-digit credit card is detected."""
         findings = scan_text("4532-1234-5678-9010")
-        assert any(pii_type == "credit_card" for pii_type, _ in findings), (
+        assert any(pii_type == "credit_card" for pii_type, *_ in findings), (
             "Expected credit card detected"
         )
 
     def test_detects_credit_card_without_separators(self):
         """This test proves that credit card without separators is detected."""
         findings = scan_text("4532123456789010")
-        assert any(pii_type == "credit_card" for pii_type, _ in findings), (
+        assert any(pii_type == "credit_card" for pii_type, *_ in findings), (
             "Expected credit card without separators detected"
         )
 
     def test_detects_credit_card_with_spaces(self):
         """This test proves that credit card with spaces is detected."""
         findings = scan_text("4532 1234 5678 9010")
-        assert any(pii_type == "credit_card" for pii_type, _ in findings), (
+        assert any(pii_type == "credit_card" for pii_type, *_ in findings), (
             "Expected credit card with spaces detected"
         )
 
@@ -169,7 +169,7 @@ class TestScanTextCreditCardDetection:
         """This test proves that credit card severity is HIGH."""
         findings = scan_text("4532-1234-5678-9010")
         cc_findings = [
-            (pii_type, severity) for pii_type, severity in findings if pii_type == "credit_card"
+            (pii_type, severity) for pii_type, severity, *_ in findings if pii_type == "credit_card"
         ]
         assert len(cc_findings) > 0, "Expected credit card finding"
         assert cc_findings[0][1] == "HIGH", (
@@ -188,7 +188,7 @@ class TestScanTextCreditCardDetection:
         # regex cannot distinguish them without Luhn validation.
         order_id_text = "Order ID: 1234567890123456"
         findings = scan_text(order_id_text)
-        cc_findings = [pii_type for pii_type, _ in findings if pii_type == "credit_card"]
+        cc_findings = [pii_type for pii_type, *_ in findings if pii_type == "credit_card"]
         # Assert it IS detected — confirming the known false-positive behavior
         assert len(cc_findings) > 0, (
             "Expected credit_card match for 16-digit order ID (known false positive — "
@@ -202,12 +202,12 @@ class TestScanTextIPAddressDetection:
     def test_detects_ipv4_address(self):
         """This test proves that a valid IPv4 address is detected."""
         findings = scan_text("Server at 192.168.1.1")
-        assert any(pii_type == "ipv4" for pii_type, _ in findings), "Expected IPv4 detected"
+        assert any(pii_type == "ipv4" for pii_type, *_ in findings), "Expected IPv4 detected"
 
     def test_detects_ipv4_with_max_values(self):
         """This test proves that IPv4 with max octets is detected."""
         findings = scan_text("255.255.255.255")
-        assert any(pii_type == "ipv4" for pii_type, _ in findings), (
+        assert any(pii_type == "ipv4" for pii_type, *_ in findings), (
             "Expected max-value IPv4 detected"
         )
 
@@ -215,7 +215,7 @@ class TestScanTextIPAddressDetection:
         """This test proves that IPv4 severity is LOW."""
         findings = scan_text("192.168.1.1")
         ipv4_findings = [
-            (pii_type, severity) for pii_type, severity in findings if pii_type == "ipv4"
+            (pii_type, severity) for pii_type, severity, *_ in findings if pii_type == "ipv4"
         ]
         assert len(ipv4_findings) > 0, "Expected IPv4 finding"
         assert ipv4_findings[0][1] == "LOW", (
@@ -225,7 +225,7 @@ class TestScanTextIPAddressDetection:
     def test_no_false_positive_for_invalid_ipv4(self):
         """This test proves that invalid IPv4 (octets >255) is not detected."""
         findings = scan_text("256.256.256.256")
-        ipv4_findings = [pii_type for pii_type, _ in findings if pii_type == "ipv4"]
+        ipv4_findings = [pii_type for pii_type, *_ in findings if pii_type == "ipv4"]
         assert len(ipv4_findings) == 0, "Expected no match for out-of-range IPv4"
 
 
@@ -246,7 +246,7 @@ class TestScanTextEdgeCases:
         """This test proves that multiple PII types in one text are detected."""
         text = "Contact john@example.com at 555-123-4567. SSN: 123-45-6789. IP: 192.168.1.1"
         findings = scan_text(text)
-        pii_types = set(pii_type for pii_type, _ in findings)
+        pii_types = set(pii_type for pii_type, *_ in findings)
         assert "email" in pii_types, "Expected email in findings"
         assert "us_phone" in pii_types, "Expected phone in findings"
         assert "ssn" in pii_types, "Expected SSN in findings"
@@ -256,7 +256,7 @@ class TestScanTextEdgeCases:
         """This test proves that duplicate PII patterns return one tuple per type."""
         text = "Email john@example.com and jane@example.com"
         findings = scan_text(text)
-        email_count = sum(1 for pii_type, _ in findings if pii_type == "email")
+        email_count = sum(1 for pii_type, *_ in findings if pii_type == "email")
         assert email_count == 1, (
             f"Expected one email finding even with multiple emails, got {email_count}"
         )
@@ -438,6 +438,20 @@ class TestScanPairsCountField:
         assert len(result) > 0, "Expected warnings"
         # Count should be >= 1 for at least one IP detection
         assert result[0].count >= 1, f"Expected count >= 1, got {result[0].count}"
+
+    def test_scan_text_count_is_occurrence_count(self):
+        """Proves that scan_text returns actual match counts, not just 1 per PII type.
+
+        A text with 3 email addresses must yield occurrence_count == 3, not 1 or 2.
+        """
+        text = "a@example.com, b@example.com, c@example.com"
+        findings = scan_text(text)
+        email_findings = [(pii_type, count) for pii_type, _sev, count in findings if pii_type == "email"]
+        assert len(email_findings) == 1, f"Expected one email entry, got {email_findings}"
+        _pii_type, occurrence_count = email_findings[0]
+        assert occurrence_count == 3, (
+            f"Expected occurrence_count == 3 for 3 email addresses, got {occurrence_count}"
+        )
 
 
 class TestScanPairsWithMetadata:

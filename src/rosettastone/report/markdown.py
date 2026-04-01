@@ -56,10 +56,10 @@ def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
 
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "migration_report.md"
-    output_path.write_text(report_content)
+    output_path.write_text(report_content, encoding="utf-8")
 
     # Also write the optimized prompt
     prompt_path = output_dir / "optimized_prompt.txt"
-    prompt_path.write_text(result.optimized_prompt)
+    prompt_path.write_text(result.optimized_prompt, encoding="utf-8")
 
     return output_path

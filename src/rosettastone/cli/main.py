@@ -306,12 +306,18 @@ def ci_report(
 
 @app.command()
 def serve(
-    host: str = typer.Option("0.0.0.0", "--host", help="Server host"),
+    host: str = typer.Option("127.0.0.1", "--host", help="Server host"),
     port: int = typer.Option(8000, "--port", help="Server port"),
     reload: bool = typer.Option(False, "--reload", help="Enable hot-reload (development)"),
 ) -> None:
     """Start the RosettaStone FastAPI server."""
     import uvicorn
+
+    if host == "0.0.0.0":
+        console.print(
+            "[yellow]Warning: binding to 0.0.0.0 exposes the server to all network "
+            "interfaces.[/yellow]"
+        )
 
     url = f"http://{host}:{port}"
     console.print(f"[bold green]Starting RosettaStone server at {url}[/bold green]")

@@ -312,3 +312,40 @@ def test_split_data_all_elements_are_prompt_pairs():
         assert isinstance(pair, PromptPair), f"val[{i}] is {type(pair)}, expected PromptPair"
     for i, pair in enumerate(test):
         assert isinstance(pair, PromptPair), f"test[{i}] is {type(pair)}, expected PromptPair"
+
+
+# ---------------------------------------------------------------------------
+# split_data(): seed parameter for reproducibility
+# ---------------------------------------------------------------------------
+
+
+def test_split_data_is_reproducible_with_seed():
+    """This test proves that calling split_data with the same seed produces identical train sets."""
+    pairs = _make_pairs(20)
+
+    train1, val1, test1 = split_data(pairs, seed=42)
+    train2, val2, test2 = split_data(pairs, seed=42)
+
+    train1_ids = [(str(p.prompt), p.response) for p in train1]
+    train2_ids = [(str(p.prompt), p.response) for p in train2]
+    assert train1_ids == train2_ids, (
+        f"Expected identical train sets with seed=42, got different orderings: "
+        f"{train1_ids} vs {train2_ids}"
+    )
+
+
+def test_split_data_without_seed_may_differ():
+    """This test proves that split_data without a seed does not crash.
+
+    Note: without a seed the two calls may (and likely will) produce different splits,
+    but we only assert the call doesn't raise — we do not assert determinism here.
+    """
+    pairs = _make_pairs(20)
+
+    # Both calls should complete without raising
+    train1, val1, test1 = split_data(pairs)
+    train2, val2, test2 = split_data(pairs)
+
+    # Just verify total counts are preserved in both
+    assert len(train1) + len(val1) + len(test1) == 20
+    assert len(train2) + len(val2) + len(test2) == 20

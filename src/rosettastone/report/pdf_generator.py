@@ -74,7 +74,7 @@ def generate_pdf_report(result: MigrationResult, output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "migration_report.pdf"
 
-    doc = weasyprint.HTML(string=html_content)
+    doc = weasyprint.HTML(string=html_content, base_url=str(TEMPLATES_DIR))
     doc.write_pdf(str(output_path))
 
     return output_path

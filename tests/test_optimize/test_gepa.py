@@ -383,3 +383,48 @@ class TestGEPAOptimizerOptimize:
         assert issubclass(GEPAOptimizer, Optimizer), (
             "GEPAOptimizer must be a subclass of Optimizer ABC"
         )
+
+    def test_reflection_lm_extra_kwargs_temperature_does_not_conflict(self, tmp_path) -> None:
+        """When lm_extra_kwargs contains temperature and api_base, reflection_lm must not raise
+        TypeError from duplicate keyword arguments.
+        """
+        config = _make_config(tmp_path)
+        config_with_extras = config.model_copy(
+            update={"lm_extra_kwargs": {"temperature": 0.5, "api_base": "http://localhost"}}
+        )
+        train = _make_pairs(2)
+        val = _make_pairs(1)
+
+        mock_compiled = MagicMock()
+        mock_compiled.predict.signature.instructions = "Instructions"
+
+        lm_calls: list[tuple] = []
+
+        def capture_lm(*args, **kwargs):
+            lm_calls.append((args, kwargs))
+            return MagicMock()
+
+        with (
+            patch("rosettastone.optimize.gepa.dspy.LM", side_effect=capture_lm),
+            patch("rosettastone.optimize.gepa.dspy.GEPA") as mock_gepa_cls,
+            patch("rosettastone.optimize.gepa.dspy.context") as mock_ctx,
+        ):
+            mock_ctx.return_value.__enter__ = lambda s: s
+            mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
+            mock_gepa_cls.return_value.compile.return_value = mock_compiled
+
+            # Must not raise TypeError due to duplicate keyword argument
+            GEPAOptimizer().optimize(train, val, config_with_extras)
+
+        # Verify reflection_lm was called without temperature/max_tokens from extra_kwargs
+        # (second dspy.LM call is for reflection)
+        assert len(lm_calls) == 2, f"Expected 2 dspy.LM calls, got {len(lm_calls)}"
+        _reflection_args, reflection_kwargs = lm_calls[1]
+        # temperature should be the explicit 1.0, not the extra_kwargs 0.5
+        assert reflection_kwargs.get("temperature") == 1.0, (
+            f"Reflection LM temperature should be 1.0 (explicit), got: {reflection_kwargs}"
+        )
+        # api_base should still be passed through
+        assert reflection_kwargs.get("api_base") == "http://localhost", (
+            f"Reflection LM should still receive api_base, got: {reflection_kwargs}"
+        )

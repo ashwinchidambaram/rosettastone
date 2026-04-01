@@ -33,8 +33,11 @@ class GEPAOptimizer(Optimizer):
             dict(config.lm_extra_kwargs) if config.lm_extra_kwargs else {}
         )
         target_lm = dspy.LM(config.target_model, **extra_kwargs)
+        # Filter out keys that conflict with reflection_lm's explicit temperature/max_tokens args
+        _conflict_keys = ("temperature", "max_tokens")
+        reflection_extra = {k: v for k, v in extra_kwargs.items() if k not in _conflict_keys}
         reflection_lm = dspy.LM(
-            config.reflection_model, temperature=1.0, max_tokens=16000, **extra_kwargs
+            config.reflection_model, temperature=1.0, max_tokens=16000, **reflection_extra
         )
 
         # Build DSPy program

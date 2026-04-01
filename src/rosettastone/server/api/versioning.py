@@ -11,7 +11,7 @@ from sqlmodel import Session, func, select
 from rosettastone.server.api.audit import log_audit
 from rosettastone.server.database import get_session
 from rosettastone.server.models import MigrationRecord, MigrationVersion
-from rosettastone.server.rbac import require_role
+from rosettastone.server.rbac import check_resource_owner, require_role
 from rosettastone.server.schemas import (
     MigrationVersionDetail,
     MigrationVersionSummary,
@@ -102,6 +102,7 @@ async def migration_versions_fragment(
 )
 def list_versions(
     migration_id: int,
+    request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
     session: Session = Depends(get_session),
@@ -110,6 +111,7 @@ def list_versions(
     migration = session.get(MigrationRecord, migration_id)
     if not migration:
         raise HTTPException(status_code=404, detail=f"Migration {migration_id} not found")
+    check_resource_owner(migration.owner_id, request)
 
     count_stmt = (
         select(func.count())
@@ -150,6 +152,7 @@ def list_versions(
 def get_version(
     migration_id: int,
     version_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> MigrationVersionDetail:
     """Return a single version with its snapshot parsed from JSON to dict."""
@@ -159,6 +162,9 @@ def get_version(
             status_code=404,
             detail=f"Version {version_id} not found for migration {migration_id}",
         )
+    migration = session.get(MigrationRecord, migration_id)
+    if migration:
+        check_resource_owner(migration.owner_id, request)
 
     return MigrationVersionDetail(
         id=version.id,  # type: ignore[arg-type]
@@ -180,6 +186,7 @@ def get_version(
 def rollback_version(
     migration_id: int,
     version_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> MigrationVersionDetail:
     """Restore a MigrationRecord to a previous version's snapshot state.
@@ -191,6 +198,7 @@ def rollback_version(
     migration = session.get(MigrationRecord, migration_id)
     if not migration:
         raise HTTPException(status_code=404, detail=f"Migration {migration_id} not found")
+    check_resource_owner(migration.owner_id, request)
 
     version = session.get(MigrationVersion, version_id)
     if not version or version.migration_id != migration_id:

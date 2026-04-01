@@ -191,6 +191,8 @@ def run_migration_background(
         config_dict: Serialized MigrationConfig fields.
         engine: SQLAlchemy engine (defaults to get_engine(); pass test engine for testing).
     """
+    config_dict = dict(config_dict)
+
     if engine is None:
         engine = get_engine()
 
@@ -388,7 +390,10 @@ def run_migration_background(
                     return
                 if is_blocked:
                     record.status = "blocked"
-                    record.recommendation_reasoning = str(exc)
+                    record.recommendation_reasoning = (
+                        f"Blocked by preflight: {type(exc).__name__}"
+                    )
+                    logger.debug("Migration %s blocked: %s", migration_id, str(exc))
                     log_audit(session, "migration", migration_id, "blocked")
                 else:
                     record.status = "failed"

@@ -18,5 +18,6 @@ def get_logger(name: str) -> logging.Logger:
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
         logger.addHandler(handler)
+        logger.propagate = False  # prevent double-logging via parent "rosettastone" handler
     logger.setLevel(getattr(logging, LOG_LEVEL, logging.WARN))
     return logger

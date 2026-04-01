@@ -134,6 +134,37 @@ class TestCORSBehavior:
 # ---------------------------------------------------------------------------
 
 
+class TestCSRFCookieSecureFlag:
+    def test_csrf_cookie_secure_flag_set_when_behind_https(self, monkeypatch) -> None:
+        """CSRF cookie must have Secure flag when ROSETTASTONE_BEHIND_HTTPS=true.
+
+        Uses ROSETTASTONE_MULTI_USER (not API key) to enable CSRF without triggering
+        the session-cookie auth flow (which would block the test client over HTTP).
+        """
+        monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
+        monkeypatch.setenv("ROSETTASTONE_JWT_SECRET", "a" * 64)
+        monkeypatch.setenv("ROSETTASTONE_BEHIND_HTTPS", "true")
+        monkeypatch.delenv("ROSETTASTONE_API_KEY", raising=False)
+        client = _make_client(monkeypatch, {})
+        # GET any UI path that is not excluded from CSRF middleware
+        resp = client.get("/ui/alerts")
+        set_cookie = resp.headers.get("set-cookie", "")
+        assert "rosettastone_csrf" in set_cookie
+        assert "secure" in set_cookie.lower()
+
+    def test_csrf_cookie_no_secure_flag_without_https(self, monkeypatch) -> None:
+        """CSRF cookie must NOT have Secure flag when ROSETTASTONE_BEHIND_HTTPS is not set."""
+        monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
+        monkeypatch.setenv("ROSETTASTONE_JWT_SECRET", "a" * 64)
+        monkeypatch.delenv("ROSETTASTONE_BEHIND_HTTPS", raising=False)
+        monkeypatch.delenv("ROSETTASTONE_API_KEY", raising=False)
+        client = _make_client(monkeypatch, {})
+        resp = client.get("/ui/alerts")
+        set_cookie = resp.headers.get("set-cookie", "")
+        if "rosettastone_csrf" in set_cookie:
+            assert "secure" not in set_cookie.lower()
+
+
 class TestSecureCookieFlag:
     def test_cookie_not_secure_without_https_flag(self, monkeypatch) -> None:
         """Session cookie must NOT have the Secure flag unless ROSETTASTONE_BEHIND_HTTPS is set."""

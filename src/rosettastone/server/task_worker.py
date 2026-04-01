@@ -197,8 +197,17 @@ class TaskWorker:
         with Session(self._engine) as sess:
             task = sess.get(TaskQueue, task_id)
             if task:
-                task.status = "failed"
-                task.completed_at = datetime.now(UTC)
-                task.error_message = error_message[:2000]
+                if task.retry_count < task.max_retries:
+                    task.retry_count += 1
+                    task.status = "queued"
+                    task.started_at = None
+                    task.worker_id = None
+                    task.error_message = (
+                        f"Retry {task.retry_count}/{task.max_retries}: {error_message[:200]}"
+                    )
+                else:
+                    task.status = "failed"
+                    task.completed_at = datetime.now(UTC)
+                    task.error_message = error_message[:500]
                 sess.add(task)
                 sess.commit()

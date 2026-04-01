@@ -736,3 +736,50 @@ class TestCheckpointParams:
         assert "optimize" in checkpoint_data
         payload = json.loads(checkpoint_data["optimize"])
         assert payload["stage_output"]["optimized_prompt"] == expected_prompt
+
+
+class TestGEPARegressionWarning:
+    def test_gepa_regression_warning_added(self):
+        """When the optimized validation score < baseline score, a regression warning is added."""
+        config = _make_config(dry_run=False, skip_preflight=True)
+        migrator = Migrator(config)
+
+        pairs = [_make_pair()]
+        # Baseline: all wins (score=1.0)
+        baseline_results = [_make_eval_result(is_win=True) for _ in range(5)]
+        # Validation: all losses (score=0.0) → regression
+        validation_results = [_make_eval_result(is_win=False) for _ in range(5)]
+
+        with (
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data",
+                return_value=(pairs, pairs, pairs),
+            ),
+            patch("rosettastone.core.pipeline.run_pii_scan"),
+            patch(
+                "rosettastone.core.pipeline.evaluate_baseline",
+                return_value=baseline_results,
+            ),
+            patch(
+                "rosettastone.core.pipeline.optimize_prompt",
+                return_value="optimized prompt",
+            ),
+            patch("rosettastone.core.pipeline.run_pii_scan_text"),
+            patch("rosettastone.core.pipeline.run_prompt_audit"),
+            patch(
+                "rosettastone.core.pipeline.evaluate_optimized",
+                return_value=validation_results,
+            ),
+            patch(
+                "rosettastone.core.pipeline.make_recommendation",
+                return_value=("CONDITIONAL", "Below threshold.", {}),
+            ),
+            patch("rosettastone.core.pipeline.generate_report"),
+        ):
+            result = migrator.run()
+
+        regression_warnings = [w for w in result.warnings if "regressed" in w.lower()]
+        assert regression_warnings, (
+            f"Expected a regression warning in result.warnings, got: {result.warnings}"
+        )
+        assert any("GEPA optimization regressed" in w for w in result.warnings)

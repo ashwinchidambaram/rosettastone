@@ -67,7 +67,9 @@ class CompositeEvaluator:
         test_set: list[PromptPair],
         optimized_prompt: str | None = None,
     ) -> list[EvalResult]:
-        results: list[EvalResult] = []
+        # Phase 1: collect LLM completions for all pairs
+        completions: list[tuple[PromptPair, str] | None] = []
+        skipped_count = 0
 
         for i, pair in enumerate(test_set):
             # Build messages from prompt
@@ -79,7 +81,6 @@ class CompositeEvaluator:
             if optimized_prompt:
                 messages = [{"role": "system", "content": optimized_prompt}] + messages
 
-            # Generate response from target model
             try:
                 extra_kwargs: dict[str, object] = (
                     dict(getattr(self.config, "lm_extra_kwargs", None) or {})
@@ -91,24 +92,74 @@ class CompositeEvaluator:
                 )
                 if not response.choices:
                     logger.warning("Pair %d: empty choices in response, skipping", i)
+                    skipped_count += 1
+                    completions.append(None)
                     continue
                 new_response = response.choices[0].message.content or ""
+                completions.append((pair, new_response))
             except Exception as e:
                 logger.warning(
                     "Pair %d: litellm.completion failed (%s), skipping",
                     i,
                     type(e).__name__,  # log only the exception type, not the message
                 )
-                continue
+                skipped_count += 1
+                completions.append(None)
 
-            # Detect output type
+        if skipped_count > 0:
+            logger.warning(
+                "Skipped %d/%d pairs during evaluation due to LLM errors",
+                skipped_count,
+                len(test_set),
+            )
+            if len(test_set) > 0 and skipped_count / len(test_set) > 0.20:
+                logger.error(
+                    "More than 20%% of pairs were skipped (%d/%d); results may be unreliable",
+                    skipped_count,
+                    len(test_set),
+                )
+
+        # Phase 2: batch-compute BERTScore for all free-text pairs (avoids per-pair model calls)
+        bertscore_map: dict[int, float] = {}
+        free_text_indices: list[int] = []
+        free_text_pairs: list[tuple[str, str]] = []  # (actual, expected)
+
+        for idx, entry in enumerate(completions):
+            if entry is None:
+                continue
+            pair, new_response = entry
+            output_type = pair.output_type or detect_output_type(pair.response)
+            if output_type in (OutputType.SHORT_TEXT, OutputType.LONG_TEXT):
+                free_text_indices.append(idx)
+                free_text_pairs.append((new_response, pair.response))
+
+        if free_text_pairs:
+            try:
+                from rosettastone.evaluate.bertscore import batch_compute_bertscore
+
+                batch_scores = batch_compute_bertscore(free_text_pairs)
+                for idx, score in zip(free_text_indices, batch_scores):
+                    bertscore_map[idx] = score
+            except ImportError:
+                pass  # No BERTScore installed; _score_semantic will fall back
+
+        # Phase 3: assemble EvalResult for each successful completion
+        results: list[EvalResult] = []
+
+        for idx, entry in enumerate(completions):
+            if entry is None:
+                continue
+            pair, new_response = entry
             output_type = pair.output_type or detect_output_type(pair.response)
 
-            # Score with prompt kwarg for evaluators that accept it
-            scores = self._score(pair.response, new_response, output_type, prompt=pair.prompt)
+            scores = self._score(
+                pair.response,
+                new_response,
+                output_type,
+                prompt=pair.prompt,
+                bertscore_f1=bertscore_map.get(idx),
+            )
             composite = self._composite_score(scores, output_type)
-
-            # Get threshold for this output type
             threshold = self._get_threshold(output_type)
 
             results.append(
@@ -127,7 +178,7 @@ class CompositeEvaluator:
             )
 
             if self.on_progress:
-                self.on_progress(i + 1, len(test_set))
+                self.on_progress(idx + 1, len(test_set))
 
         return results
 
@@ -144,6 +195,7 @@ class CompositeEvaluator:
         actual: str,
         output_type: OutputType,
         prompt: str | list[dict[str, Any]] | None = None,
+        bertscore_f1: float | None = None,
     ) -> dict[str, float]:
         scores: dict[str, float] = {}
         prompt_str = prompt if isinstance(prompt, str) else None
@@ -162,8 +214,8 @@ class CompositeEvaluator:
         elif output_type == OutputType.CLASSIFICATION:
             scores.update(ExactMatchEvaluator(config=self.config).score(expected, actual))
         else:
-            # Free text — try BERTScore, fall back to embedding, then string sim
-            scores.update(self._score_semantic(expected, actual))
+            # Free text — use pre-computed BERTScore if available, else fall back
+            scores.update(self._score_semantic(expected, actual, bertscore_f1=bertscore_f1))
 
         # LLM judge for long text (and optionally all types) — Phase 2
         if output_type == OutputType.LONG_TEXT and not getattr(self.config, "local_only", False):
@@ -179,8 +231,17 @@ class CompositeEvaluator:
 
         return scores
 
-    def _score_semantic(self, expected: str, actual: str) -> dict[str, float]:
+    def _score_semantic(
+        self,
+        expected: str,
+        actual: str,
+        bertscore_f1: float | None = None,
+    ) -> dict[str, float]:
         local_only = getattr(self.config, "local_only", False)
+
+        # Use pre-computed batch BERTScore if provided
+        if bertscore_f1 is not None:
+            return {"bertscore_f1": bertscore_f1}
 
         try:
             from rosettastone.evaluate.bertscore import BERTScoreEvaluator

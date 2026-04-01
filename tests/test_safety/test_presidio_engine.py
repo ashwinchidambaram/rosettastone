@@ -534,3 +534,62 @@ class TestImportErrorHandling:
                 imported = False
 
         assert imported, "Module should be importable even when presidio is not installed"
+
+
+# ---------------------------------------------------------------------------
+# anonymize_pairs preserves list-of-dicts structure — Fix 3
+# ---------------------------------------------------------------------------
+
+
+class TestAnonymizePairsPreservesListOfDicts:
+    """anonymize_pairs must preserve list-of-dicts prompt structure."""
+
+    def _make_anonymizer_result(self, text: str):
+        """Create a mock AnonymizerResult."""
+        result = MagicMock()
+        result.text = text
+        return result
+
+    def test_anonymize_pairs_preserves_list_of_dicts_structure(self):
+        """Proves that anonymize_pairs does not flatten a list-of-dicts prompt to a string.
+
+        When pair.prompt is a list of message dicts, the returned pair's prompt
+        must still be a list — not a plain string — and the PII inside content
+        fields must be replaced.
+        """
+        mock_analyzer = MagicMock()
+        mock_analyzer.analyze.return_value = [_make_analyzer_result("PHONE_NUMBER", start=10, end=18)]
+
+        mock_anonymizer = MagicMock()
+        mock_anonymizer.anonymize.return_value = self._make_anonymizer_result(
+            "Call me at <PHONE_NUMBER>"
+        )
+
+        pair = PromptPair(
+            prompt=[{"role": "user", "content": "Call me at 555-1234"}],
+            response="Sure",
+            source_model="openai/gpt-4o",
+        )
+
+        with (
+            patch("rosettastone.safety.presidio_engine._get_analyzer", return_value=mock_analyzer),
+            patch(
+                "rosettastone.safety.presidio_engine._get_anonymizer",
+                return_value=mock_anonymizer,
+            ),
+        ):
+            from rosettastone.safety.presidio_engine import anonymize_pairs
+
+            result = anonymize_pairs([pair])
+
+        anon_pair = result[0]
+        # Structure must be preserved as a list — not flattened to a string
+        assert isinstance(anon_pair.prompt, list), (
+            f"Expected list prompt structure, got {type(anon_pair.prompt)}"
+        )
+        # The content field inside the message should have the phone replaced
+        assert len(anon_pair.prompt) == 1
+        assert "content" in anon_pair.prompt[0]
+        assert "<PHONE_NUMBER>" in anon_pair.prompt[0]["content"], (
+            f"Expected phone number replaced in content, got: {anon_pair.prompt[0]['content']}"
+        )

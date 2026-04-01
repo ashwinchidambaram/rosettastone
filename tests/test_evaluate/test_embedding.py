@@ -146,3 +146,19 @@ class TestEmbeddingEvaluator:
             scores = EmbeddingEvaluator().score("a", "b")
 
         assert list(scores.keys()) == ["embedding_sim"]
+
+    def test_compute_embedding_sim_zero_norm_returns_zero(self) -> None:
+        """When a zero vector is returned (e.g. empty string), cosine similarity is 0.0."""
+        # Encode returns zero vector for first input, normal vector for second
+        zero_vector = np.array([0.0, 0.0])
+        normal_vector = np.array([1.0, 0.0])
+        zero_norm_embeddings = np.array([zero_vector, normal_vector])
+        mock_st_module = self._make_mock_st_module(zero_norm_embeddings)
+
+        with patch.dict("sys.modules", {"sentence_transformers": mock_st_module}):
+            self._clear_module_cache()
+            from rosettastone.evaluate.embedding import compute_embedding_sim
+
+            result = compute_embedding_sim("", "hello")
+
+        assert result == 0.0, f"Expected 0.0 for zero-norm vector, got {result}"

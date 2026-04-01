@@ -76,18 +76,21 @@ class TestPreflightReport:
 
     def test_as_dry_run_result_returns_migration_result(self):
         report = PreflightReport(warnings=["w1"], blockers=[])
-        result = report.as_dry_run_result()
+        config = _make_config()
+        result = report.as_dry_run_result(config)
         assert isinstance(result, MigrationResult)
         assert any("DRY RUN" in w for w in result.warnings)
 
     def test_as_dry_run_result_includes_preflight_warnings(self):
         report = PreflightReport(warnings=["low sample count"], blockers=[])
-        result = report.as_dry_run_result()
+        config = _make_config()
+        result = report.as_dry_run_result(config)
         assert "low sample count" in result.warnings
 
     def test_as_dry_run_result_has_zero_scores(self):
         report = PreflightReport(warnings=[], blockers=[])
-        result = report.as_dry_run_result()
+        config = _make_config()
+        result = report.as_dry_run_result(config)
         assert result.confidence_score == 0.0
         assert result.baseline_score == 0.0
         assert result.improvement == 0.0
@@ -163,22 +166,16 @@ class TestRunPiiScan:
 
 class TestRunPiiScanText:
     def test_run_pii_scan_text_respects_config_flag_when_disabled(self):
-        # TODO: this test documents a bug — run_pii_scan_text does NOT check
-        # config.pii_scan before scanning. The function proceeds to scan regardless
-        # of the config flag. When the bug is fixed, this test should be updated to
-        # assert that no scanning occurs when config.pii_scan=False.
+        """When config.pii_scan=False, run_pii_scan_text must return early without scanning."""
         config = _make_config(pii_scan=False)
         ctx = PipelineContext()
         clean_text = "Hello, world!"
 
-        # With current (buggy) behavior: scan_text is still called even with pii_scan=False
-        # because run_pii_scan_text has no pii_scan guard.
         with patch("rosettastone.safety.pii_scanner.scan_text", return_value=[]) as mock_scan:
             run_pii_scan_text(clean_text, ctx, config)
 
-        # BUG: mock_scan is called even though pii_scan=False.
-        # Correct behavior (after bug fix) would be: mock_scan.assert_not_called()
-        mock_scan.assert_called_once()
+        # The early-return guard fires before any scanning occurs.
+        mock_scan.assert_not_called()
 
     def test_run_pii_scan_text_adds_high_severity_warning(self):
         """HIGH-severity PII found in optimized prompt text must be added to ctx."""

@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from typing import Any
 
 from rosettastone.core.types import PromptPair
+
+logger = logging.getLogger(__name__)
 
 MIN_SUBSTRING_LENGTH = 30
 BOILERPLATE_THRESHOLD = 0.1  # 10% of training data
 MAX_BOILERPLATE_LENGTH = 50
+MAX_TEXT_LENGTH = 500  # hard cap to prevent O(N²) memory for large responses
 
 
 @dataclass
@@ -20,13 +25,29 @@ class AuditFinding:
     is_boilerplate: bool
 
 
+def _flatten_prompt(prompt: Any) -> str:
+    """Flatten a prompt (string or list of dicts) to a plain string."""
+    if isinstance(prompt, str):
+        return prompt
+    if isinstance(prompt, list):
+        parts: list[str] = []
+        for item in prompt:
+            if isinstance(item, dict):
+                if "content" in item:
+                    parts.append(str(item["content"]))
+                if "text" in item:
+                    parts.append(str(item["text"]))
+        return " ".join(parts)
+    return str(prompt)
+
+
 def audit_prompt(optimized_prompt: str, training_pairs: list[PromptPair]) -> list[AuditFinding]:
     """
     Audit an optimized prompt for verbatim substrings from training data.
 
     Finds all substrings of length >= MIN_SUBSTRING_LENGTH (30 chars) from
-    training responses that appear in the optimized prompt. Filters out
-    boilerplate (substrings appearing in >10% of training data AND <50 chars).
+    training responses AND prompts that appear in the optimized prompt. Filters
+    out boilerplate (substrings appearing in >10% of training data AND <50 chars).
 
     Args:
         optimized_prompt: The optimized prompt to audit
@@ -40,13 +61,17 @@ def audit_prompt(optimized_prompt: str, training_pairs: list[PromptPair]) -> lis
 
     findings: dict[str, int] = {}  # substring -> count in training data
 
-    # Extract all substrings from training responses
+    # Extract all substrings from training responses and prompts
     for pair in training_pairs:
-        response = pair.response
-        # Generate all substrings of length >= MIN_SUBSTRING_LENGTH
-        for i in range(len(response) - MIN_SUBSTRING_LENGTH + 1):
-            substring = response[i : i + MIN_SUBSTRING_LENGTH]
-            findings[substring] = findings.get(substring, 0) + 1
+        texts_to_scan = [pair.response, _flatten_prompt(pair.prompt)]
+        for raw_text in texts_to_scan:
+            text = raw_text[:MAX_TEXT_LENGTH]
+            if len(raw_text) > MAX_TEXT_LENGTH:
+                logger.debug("Response truncated to 500 chars for audit")
+            # Generate all substrings of length >= MIN_SUBSTRING_LENGTH
+            for i in range(len(text) - MIN_SUBSTRING_LENGTH + 1):
+                substring = text[i : i + MIN_SUBSTRING_LENGTH]
+                findings[substring] = findings.get(substring, 0) + 1
 
     # Check which substrings appear in optimized prompt
     matched_findings = {}

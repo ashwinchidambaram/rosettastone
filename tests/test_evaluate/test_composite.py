@@ -352,3 +352,39 @@ class TestCompositeEvaluatorEvaluate:
         ]
         evaluator.evaluate(pairs)
         assert progress_calls == [(1, 2), (2, 2)]
+
+    def test_evaluate_logs_warning_on_skipped_pairs(self) -> None:
+        """When litellm.completion raises for some pairs, skipped pairs are excluded from
+        results and a warning is logged.
+        """
+        import logging
+        import unittest
+
+        pairs = [
+            make_pair(f"Q{i}", "positive", OutputType.CLASSIFICATION) for i in range(5)
+        ]
+
+        call_count = 0
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            # Fail for pairs 0, 2, 4 (indices 0, 2, 4); succeed for 1 and 3
+            if call_count in (1, 3, 5):
+                raise RuntimeError("Simulated LLM failure")
+            return make_litellm_response("positive")
+
+        tc = unittest.TestCase()
+        tc.maxDiff = None
+        with patch("rosettastone.evaluate.composite.litellm.completion", side_effect=side_effect):
+            with tc.assertLogs("rosettastone.evaluate.composite", level=logging.WARNING) as log_ctx:
+                results = self.evaluator.evaluate(pairs)
+
+        # Only 2 successful completions should produce results
+        assert len(results) == 2, f"Expected 2 results (non-skipped), got {len(results)}"
+
+        # A warning about skipped pairs must have been logged
+        warning_messages = "\n".join(log_ctx.output)
+        assert "skipped" in warning_messages.lower() or "Skipped" in warning_messages, (
+            f"Expected a 'skipped' warning in logs, got: {warning_messages}"
+        )

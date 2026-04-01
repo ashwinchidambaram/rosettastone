@@ -24,11 +24,11 @@ class PreflightReport:
     def has_blockers(self) -> bool:
         return len(self.blockers) > 0
 
-    def as_dry_run_result(self) -> Any:
+    def as_dry_run_result(self, config: MigrationConfig) -> Any:
         from rosettastone.core.types import MigrationResult
 
         return MigrationResult(
-            config={},
+            config=config.model_dump(mode="json"),
             optimized_prompt="",
             baseline_results=[],
             validation_results=[],
@@ -168,7 +168,7 @@ def load_and_split_data(
                 "Install with: uv pip install 'rosettastone[clustering]'"
             )
 
-    return split_data(pairs, config.train_split, config.val_split)
+    return split_data(pairs, config.train_split, config.val_split, seed=config.random_seed)
 
 
 def optimize_prompt(
@@ -267,6 +267,9 @@ def run_pii_scan_text(
     text: str, ctx: PipelineContext, config: MigrationConfig | None = None
 ) -> None:
     """Scan optimized prompt text for HIGH-severity PII (blocker)."""
+    if config is not None and not config.pii_scan:
+        return
+
     from rosettastone.config import PIIEngine
     from rosettastone.core.context import SafetySeverity, SafetyWarning
 
@@ -279,7 +282,7 @@ def run_pii_scan_text(
         from rosettastone.safety.pii_scanner import scan_text
 
         findings = scan_text(text)
-    for pii_type, severity in findings:
+    for pii_type, severity, *_ in findings:
         if severity == "HIGH":
             ctx.safety_warnings.append(
                 SafetyWarning(

@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 
 from rosettastone.server.database import get_session
 from rosettastone.server.models import Alert, MigrationRecord
+from rosettastone.server.rbac import require_role
 
 router = APIRouter()
 
@@ -193,7 +194,7 @@ def _alert_to_template_dict(alert: Alert) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@router.get("/api/v1/alerts")
+@router.get("/api/v1/alerts", dependencies=[Depends(require_role("viewer", "editor", "admin"))])
 async def list_alerts(
     unread_only: bool = False,
     session: Session = Depends(get_session),
@@ -208,14 +209,20 @@ async def list_alerts(
     return [_alert_to_template_dict(a) for a in records]
 
 
-@router.post("/api/v1/alerts/generate")
+@router.post(
+    "/api/v1/alerts/generate",
+    dependencies=[Depends(require_role("editor", "admin"))],
+)
 async def generate_alerts(session: Session = Depends(get_session)) -> dict[str, Any]:
     """Trigger alert generation — scans for new events and creates Alert records."""
     count = _generate_alerts(session)
     return {"generated": count}
 
 
-@router.post("/api/v1/alerts/{alert_id}/read")
+@router.post(
+    "/api/v1/alerts/{alert_id}/read",
+    dependencies=[Depends(require_role("viewer", "editor", "admin"))],
+)
 async def mark_alert_read(
     alert_id: int,
     session: Session = Depends(get_session),
@@ -231,7 +238,10 @@ async def mark_alert_read(
     return _alert_to_template_dict(alert)
 
 
-@router.delete("/api/v1/alerts/{alert_id}")
+@router.delete(
+    "/api/v1/alerts/{alert_id}",
+    dependencies=[Depends(require_role("editor", "admin"))],
+)
 async def delete_alert(
     alert_id: int,
     session: Session = Depends(get_session),

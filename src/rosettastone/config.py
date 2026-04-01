@@ -44,6 +44,10 @@ class MigrationConfig(BaseModel):
     optimizer: OptimizerChoice = OptimizerChoice.GEPA
     train_split: float = Field(default=0.2, ge=0.1, le=0.5)
     val_split: float = Field(default=0.8, ge=0.5, le=0.9)
+    random_seed: int | None = Field(
+        default=None,
+        description="Seed for train/val/test split RNG. Set for reproducible splits.",
+    )
     min_pairs: int = 20
     recommended_pairs: int = 100
 

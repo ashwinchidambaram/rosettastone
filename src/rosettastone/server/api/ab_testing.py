@@ -247,6 +247,7 @@ def get_ab_test(
 )
 def start_ab_test(
     ab_test_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> ABTestDetail:
     """Start an A/B test.
@@ -257,6 +258,7 @@ def start_ab_test(
     ab_test = session.get(ABTest, ab_test_id)
     if not ab_test:
         raise HTTPException(status_code=404, detail=f"A/B test {ab_test_id} not found")
+    check_resource_owner(ab_test.owner_id, request)
 
     if ab_test.status != "draft":
         raise HTTPException(
@@ -354,6 +356,7 @@ def get_ab_test_metrics(
 )
 def conclude_ab_test(
     ab_test_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> ABTestDetail:
     """Conclude an A/B test.
@@ -365,6 +368,7 @@ def conclude_ab_test(
     ab_test = session.get(ABTest, ab_test_id)
     if not ab_test:
         raise HTTPException(status_code=404, detail=f"A/B test {ab_test_id} not found")
+    check_resource_owner(ab_test.owner_id, request)
 
     if ab_test.status != "running":
         raise HTTPException(

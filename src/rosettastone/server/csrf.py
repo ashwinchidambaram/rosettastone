@@ -76,12 +76,13 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         # Set/refresh the CSRF cookie on every response (non-HttpOnly so JS can read it)
+        _https = os.environ.get("ROSETTASTONE_BEHIND_HTTPS", "").lower() == "true"
         response.set_cookie(
             key=_CSRF_COOKIE,
             value=token,
             httponly=False,
             samesite="lax",
-            secure=False,
+            secure=_https,
         )
 
         return response

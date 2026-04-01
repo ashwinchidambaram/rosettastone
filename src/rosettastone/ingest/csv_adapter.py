@@ -75,9 +75,16 @@ class CSVAdapter(DataAdapter):
                 prompt_val = row.get(mapping.prompt_col, "").strip()
                 response_val = row.get(mapping.response_col, "").strip()
 
-                # Skip blank rows (both prompt and response are empty)
+                # Skip rows where either prompt or response is empty
                 if not prompt_val and not response_val:
                     logger.debug("Skipping blank row at row %d", row_num)
+                    continue
+                if not prompt_val or not response_val:
+                    logger.debug(
+                        "Skipping row %d with missing %s",
+                        row_num,
+                        "prompt" if not prompt_val else "response",
+                    )
                     continue
 
                 # Determine source_model

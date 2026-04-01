@@ -4,9 +4,13 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from rosettastone.utils.logging import get_logger
+
 if TYPE_CHECKING:
     from rosettastone.config import MigrationConfig
     from rosettastone.core.types import MigrationResult
+
+logger = get_logger(__name__)
 
 
 class MigrationBlockedError(Exception):
@@ -61,8 +65,8 @@ class Migrator:
             data_json = json.dumps({"stage_output": None})
         try:
             self.checkpoint_callback(stage, data_json)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Checkpoint failed for stage %s: %s", stage, type(e).__name__)
 
     def _persist_preflight_estimate(self, estimated_cost_usd: float) -> None:
         """Store estimated cost to the migration record in DB."""
@@ -175,7 +179,7 @@ class Migrator:
                 if preflight_report.has_blockers:
                     raise MigrationBlockedError(preflight_report)
                 if self.config.dry_run:
-                    return preflight_report.as_dry_run_result()  # type: ignore[no-any-return]
+                    return preflight_report.as_dry_run_result(self.config)  # type: ignore[no-any-return]
 
                 # Store estimated cost and check cost cap
                 if self.migration_id is not None and self.engine is not None:
@@ -271,6 +275,16 @@ class Migrator:
             validation = evaluate_optimized(test, optimized_prompt, self.config)
             ctx.timing["validation_eval"] = time.time() - t0
         self._emit("validation_eval", 1.0, 0.95)
+
+        # Check for GEPA regression: warn if optimized score < baseline score
+        confidence_score = sum(1 for r in validation if r.is_win) / max(len(validation), 1)
+        baseline_score_check = sum(1 for r in baseline if r.is_win) / max(len(baseline), 1)
+        if confidence_score < baseline_score_check:
+            ctx.warnings.append(
+                f"GEPA optimization regressed performance: optimized score "
+                f"{confidence_score:.3f} < baseline {baseline_score_check:.3f}. "
+                f"Consider using the un-optimized prompt."
+            )
 
         # Step 4.5: Recommendation
         t0 = time.time()

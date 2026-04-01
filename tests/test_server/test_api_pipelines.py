@@ -284,7 +284,7 @@ class TestRunPipelineBackground:
         with Session(engine) as session:
             pipeline = session.get(PipelineRecord, pipeline_id)
             assert pipeline is not None
-            assert pipeline.status == "completed"
+            assert pipeline.status == "complete"
 
     def test_run_pipeline_background_not_found_returns_early(self, engine) -> None:
         """pipeline_id=999 returns without error (no exception raised)."""

@@ -291,11 +291,15 @@ class TestPIIScanText:
 
 class TestRecommendationPipeline:
     def test_go_recommendation(self, tmp_path):
-        """All types meeting thresholds produces GO."""
+        """All types meeting thresholds produces GO (requires MIN_RELIABLE_SAMPLES=30).
+
+        Uses long_text output type (threshold=0.75) so that the Wilson CI lower bound
+        for 30/30 wins (~0.887) exceeds the threshold and GO is returned.
+        """
         from rosettastone.core.pipeline import make_recommendation
 
         config = _make_config(tmp_path)
-        results = [_make_eval_result(score=0.95) for _ in range(15)]
+        results = [_make_eval_result(output_type="long_text", score=0.95) for _ in range(30)]
         ctx = PipelineContext()
         rec, reasoning, per_type = make_recommendation(results, ctx, config)
         assert rec == "GO"
