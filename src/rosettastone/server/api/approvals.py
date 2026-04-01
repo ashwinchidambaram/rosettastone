@@ -176,11 +176,22 @@ def submit_approval(
     if workflow.status != "pending":
         raise HTTPException(status_code=400, detail="Workflow is not pending")
 
-    user_id = request.state.user.get("user_id") if request.state.user else None
+    current_user_id = request.state.user.get("user_id") if request.state.user else None
+
+    # Prevent duplicate approve votes from the same user
+    existing_approval = session.exec(
+        select(Approval).where(
+            Approval.workflow_id == workflow.id,  # type: ignore[arg-type]
+            Approval.user_id == current_user_id,
+            Approval.decision == "approve",
+        )
+    ).first()
+    if existing_approval:
+        raise HTTPException(status_code=409, detail="You have already approved this workflow")
 
     approval = Approval(
         workflow_id=workflow.id,
-        user_id=user_id,
+        user_id=current_user_id,
         decision="approve",
         comment=body.comment,
     )

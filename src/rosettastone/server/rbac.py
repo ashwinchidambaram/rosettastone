@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from fastapi import HTTPException, Request
 
-ROLE_HIERARCHY = {"viewer": 0, "editor": 1, "approver": 2, "admin": 3}
 
-
+# Roles are checked by exact membership — not hierarchy.
+# To allow both editors and admins, pass require_role("editor", "admin").
 def require_role(*roles: str):
     """FastAPI dependency factory that requires one of the specified roles.
 

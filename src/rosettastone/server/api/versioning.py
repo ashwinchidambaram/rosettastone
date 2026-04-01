@@ -11,6 +11,7 @@ from sqlmodel import Session, func, select
 from rosettastone.server.api.audit import log_audit
 from rosettastone.server.database import get_session
 from rosettastone.server.models import MigrationRecord, MigrationVersion
+from rosettastone.server.rbac import require_role
 from rosettastone.server.schemas import (
     MigrationVersionDetail,
     MigrationVersionSummary,
@@ -176,6 +177,7 @@ def get_version(
 @router.post(
     "/api/v1/migrations/{migration_id}/versions/{version_id}/rollback",
     response_model=MigrationVersionDetail,
+    dependencies=[Depends(require_role("editor", "admin"))],
 )
 def rollback_version(
     migration_id: int,

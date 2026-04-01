@@ -251,7 +251,8 @@ class ApprovalWorkflow(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     migration_id: int = Field(foreign_key="migrations.id", unique=True, index=True)
     required_approvals: int = Field(default=1)
-    status: str = Field(default="pending")  # pending / approved / rejected
+    # pending / approved  (rejection resets to pending and clears all approvals)
+    status: str = Field(default="pending")
 
 
 class Approval(SQLModel, table=True):
