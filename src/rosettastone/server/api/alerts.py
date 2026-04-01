@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
@@ -25,7 +26,7 @@ def _generate_alerts(session: Session) -> int:
     # Migration completion / failure alerts
     completed = session.exec(
         select(MigrationRecord).where(
-            MigrationRecord.status.in_(["complete", "failed"])  # type: ignore[union-attr]
+            MigrationRecord.status.in_(["complete", "failed"])  # type: ignore[attr-defined]
         )
     ).all()
 
@@ -34,7 +35,7 @@ def _generate_alerts(session: Session) -> int:
         existing = session.exec(
             select(Alert).where(
                 Alert.migration_id == migration.id,
-                Alert.alert_type.in_(["migration_complete", "migration_failed"]),  # type: ignore[union-attr]
+                Alert.alert_type.in_(["migration_complete", "migration_failed"]),  # type: ignore[attr-defined]
             )
         ).first()
 
@@ -93,7 +94,7 @@ def _generate_alerts(session: Session) -> int:
     return count
 
 
-def _alert_to_template_dict(alert: Alert) -> dict:
+def _alert_to_template_dict(alert: Alert) -> dict[str, Any]:
     """Convert an Alert record to the dict shape the template expects."""
     metadata = json.loads(alert.metadata_json)
 
@@ -106,7 +107,7 @@ def _alert_to_template_dict(alert: Alert) -> dict:
         "new_model": "new_model",
     }
 
-    result: dict = {
+    result: dict[str, Any] = {
         "id": alert.id,
         "type": type_mapping.get(alert.alert_type, alert.alert_type),
         "model": alert.model_id or "",
@@ -137,9 +138,9 @@ def _alert_to_template_dict(alert: Alert) -> dict:
 async def list_alerts(
     unread_only: bool = False,
     session: Session = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List all alerts, newest first. Pass ?unread_only=true to filter unread."""
-    stmt = select(Alert).order_by(Alert.created_at.desc()).limit(100)  # type: ignore[union-attr]
+    stmt = select(Alert).order_by(Alert.created_at.desc()).limit(100)  # type: ignore[attr-defined]
     records = list(session.exec(stmt).all())
 
     if unread_only:
@@ -149,7 +150,7 @@ async def list_alerts(
 
 
 @router.post("/api/v1/alerts/generate")
-async def generate_alerts(session: Session = Depends(get_session)) -> dict:
+async def generate_alerts(session: Session = Depends(get_session)) -> dict[str, Any]:
     """Trigger alert generation — scans for new events and creates Alert records."""
     count = _generate_alerts(session)
     return {"generated": count}
@@ -159,7 +160,7 @@ async def generate_alerts(session: Session = Depends(get_session)) -> dict:
 async def mark_alert_read(
     alert_id: int,
     session: Session = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Mark an alert as read."""
     alert = session.get(Alert, alert_id)
     if alert is None:
@@ -175,7 +176,7 @@ async def mark_alert_read(
 async def delete_alert(
     alert_id: int,
     session: Session = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Dismiss/delete an alert."""
     alert = session.get(Alert, alert_id)
     if alert is None:

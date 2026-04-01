@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
@@ -16,10 +18,10 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-def _get_model_info(model_id: str) -> dict:
+def _get_model_info(model_id: str) -> dict[str, Any]:
     """Fetch model metadata from LiteLLM. Returns safe defaults on failure."""
     try:
-        import litellm  # type: ignore[import-untyped]
+        import litellm
 
         info = litellm.get_model_info(model_id)
         context_tokens = info.get("max_input_tokens", 0) or 0
@@ -33,7 +35,7 @@ def _get_model_info(model_id: str) -> dict:
         return {"context": "Unknown", "cost_per_1m": "Unknown", "provider": provider}
 
 
-def _model_to_template_dict(record: RegisteredModel) -> dict:
+def _model_to_template_dict(record: RegisteredModel) -> dict[str, Any]:
     """Convert a RegisteredModel record to the dict shape templates expect."""
     info = _get_model_info(record.model_id)
     return {
@@ -52,18 +54,18 @@ def _model_to_template_dict(record: RegisteredModel) -> dict:
 
 
 @router.get("/api/v1/models")
-async def list_models(session: Session = Depends(get_session)) -> list[dict]:
+async def list_models(session: Session = Depends(get_session)) -> list[dict[str, Any]]:
     """List all registered models with metadata."""
-    stmt = select(RegisteredModel).order_by(RegisteredModel.added_at.desc())  # type: ignore[union-attr]
+    stmt = select(RegisteredModel).order_by(RegisteredModel.added_at.desc())  # type: ignore[attr-defined]
     records = list(session.exec(stmt).all())
     return [_model_to_template_dict(r) for r in records]
 
 
 @router.post("/api/v1/models", status_code=201)
 async def register_model(
-    request_body: dict,
+    request_body: dict[str, Any],
     session: Session = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Register a new model."""
     model_id = request_body.get("model_id", "").strip()
     if not model_id:
@@ -87,7 +89,7 @@ async def register_model(
 async def delete_model(
     model_db_id: int,
     session: Session = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Remove a registered model by its DB id."""
     record = session.get(RegisteredModel, model_db_id)
     if record is None:
@@ -101,7 +103,7 @@ async def delete_model(
 async def get_model_info(
     model_db_id: int,
     session: Session = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Get model metadata (proxied from LiteLLM) by DB id."""
     record = session.get(RegisteredModel, model_db_id)
     if record is None:
@@ -110,7 +112,7 @@ async def get_model_info(
 
 
 @router.post("/api/v1/models/import-from-migrations")
-async def import_from_migrations(session: Session = Depends(get_session)) -> dict:
+async def import_from_migrations(session: Session = Depends(get_session)) -> dict[str, Any]:
     """Auto-register models found in existing migration records."""
     migrations = list(session.exec(select(MigrationRecord)).all())
     candidate_ids: set[str] = set()

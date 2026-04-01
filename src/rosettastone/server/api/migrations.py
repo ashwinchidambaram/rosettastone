@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -234,7 +235,7 @@ DUMMY_MIGRATIONS = [
     },
 ]
 
-DUMMY_ALERTS = [
+DUMMY_ALERTS: list[dict[str, Any]] = [
     {
         "type": "deprecation",
         "model": "gpt-4o-0613",
@@ -283,7 +284,7 @@ DUMMY_COSTS = {
     ],
 }
 
-DUMMY_TEST_CASES: dict[int, dict] = {
+DUMMY_TEST_CASES: dict[int, dict[str, Any]] = {
     42: {
         "tc_id": 42,
         "is_win": False,
@@ -366,9 +367,9 @@ def _format_cost(cost_usd: float) -> str:
     return f"${cost_usd:.2f}"
 
 
-def _migration_to_template_dict(record: MigrationRecord, session: Session) -> dict:
+def _migration_to_template_dict(record: MigrationRecord, session: Session) -> dict[str, Any]:
     """Convert MigrationRecord to the dict shape templates expect."""
-    result: dict = {
+    result: dict[str, Any] = {
         "id": record.id,
         "source": (
             record.source_model.split("/")[-1]
@@ -448,12 +449,12 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
             TestCaseRecord.migration_id == record.id,
             TestCaseRecord.is_win == False,  # noqa: E712
         )
-        .order_by(TestCaseRecord.composite_score.asc())  # type: ignore[union-attr]
+        .order_by(TestCaseRecord.composite_score.asc())  # type: ignore[attr-defined]
         .limit(5)
     )
     regressions = []
     for tc in session.exec(tc_stmt).all():
-        reg: dict = {
+        reg: dict[str, Any] = {
             "tc_id": tc.id,
             "score": round(tc.composite_score, 2),
             "title": (
@@ -486,7 +487,7 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
     return result
 
 
-def _test_case_to_diff_dict(tc: TestCaseRecord, migration: MigrationRecord) -> dict:
+def _test_case_to_diff_dict(tc: TestCaseRecord, migration: MigrationRecord) -> dict[str, Any]:
     """Convert TestCaseRecord to the diff dict shape the template expects."""
     scores = json.loads(tc.scores_json)
     return {
@@ -708,7 +709,7 @@ async def list_migrations(
 
     stmt = (
         select(MigrationRecord)
-        .order_by(MigrationRecord.created_at.desc())  # type: ignore[union-attr]
+        .order_by(MigrationRecord.created_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(limit)
     )
@@ -849,19 +850,19 @@ async def dashboard(
     from rosettastone.server.models import RegisteredModel
 
     # Query registered models ordered by most recent first
-    stmt = select(RegisteredModel).order_by(RegisteredModel.added_at.desc())  # type: ignore[union-attr]
+    stmt = select(RegisteredModel).order_by(RegisteredModel.added_at.desc())  # type: ignore[attr-defined]
     records = list(session.exec(stmt).all())
 
     if not records and empty != "false":
         # No models registered — show empty state
-        return request.app.state.templates.TemplateResponse(
+        return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
             request,
             "models_empty.html",
             {"active_nav": "models"},
         )
 
     models = [_model_to_template_dict(r) for r in records] if records else DUMMY_MODELS
-    return request.app.state.templates.TemplateResponse(
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "models.html",
         {"models": models, "alerts": DUMMY_ALERTS, "active_nav": "models"},
@@ -874,7 +875,7 @@ async def migrations_page(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """Migrations list page."""
-    stmt = select(MigrationRecord).order_by(MigrationRecord.created_at.desc()).limit(50)  # type: ignore[union-attr]
+    stmt = select(MigrationRecord).order_by(MigrationRecord.created_at.desc()).limit(50)  # type: ignore[attr-defined]
     records = list(session.exec(stmt).all())
 
     if records:
@@ -882,7 +883,7 @@ async def migrations_page(
     else:
         migrations = DUMMY_MIGRATIONS  # fallback when DB is empty
 
-    return request.app.state.templates.TemplateResponse(
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "migrations.html",
         {"migrations": migrations, "active_nav": "migrations"},
@@ -898,14 +899,14 @@ async def new_migration_form(
     source: str | None = Query(None),
 ) -> HTMLResponse:
     """Render the new migration form."""
-    return request.app.state.templates.TemplateResponse(
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "migration_new.html",
         {"active_nav": "migrations", "source_model": source or "", "error": None},
     )
 
 
-@router.post("/ui/migrations/new")
+@router.post("/ui/migrations/new", response_model=None)
 async def create_migration_from_form(
     request: Request,
     source_model: str = Form(...),
@@ -917,13 +918,13 @@ async def create_migration_from_form(
     reflection_model: str = Form("openai/gpt-4o"),
     judge_model: str = Form("openai/gpt-4o"),
     session: Session = Depends(get_session),
-):
+) -> HTMLResponse | RedirectResponse:
     """Handle form submission: validate, save file, create record, submit to executor."""
     templates = request.app.state.templates
 
     # Validate file upload
     if data_file is None or data_file.filename == "":
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(  # type: ignore[no-any-return]
             request,
             "migration_new.html",
             {
@@ -938,7 +939,7 @@ async def create_migration_from_form(
     # Check file size
     content = await data_file.read()
     if len(content) > MAX_UPLOAD_SIZE:
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(  # type: ignore[no-any-return]
             request,
             "migration_new.html",
             {
@@ -954,7 +955,7 @@ async def create_migration_from_form(
     try:
         text_content = content.decode("utf-8")
     except UnicodeDecodeError:
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(  # type: ignore[no-any-return]
             request,
             "migration_new.html",
             {
@@ -975,7 +976,7 @@ async def create_migration_from_form(
             break
 
     if not first_line:
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(  # type: ignore[no-any-return]
             request,
             "migration_new.html",
             {
@@ -990,7 +991,7 @@ async def create_migration_from_form(
     try:
         first_obj = json.loads(first_line)
     except json.JSONDecodeError as e:
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(  # type: ignore[no-any-return]
             request,
             "migration_new.html",
             {
@@ -1004,7 +1005,7 @@ async def create_migration_from_form(
 
     # Schema validation — must have prompt and response keys
     if not isinstance(first_obj, dict) or "prompt" not in first_obj or "response" not in first_obj:
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(  # type: ignore[no-any-return]
             request,
             "migration_new.html",
             {
@@ -1081,11 +1082,14 @@ async def migration_detail_page(
         migration = _migration_to_template_dict(record, session)
     else:
         # Fall back to dummy data
-        migration = next((m for m in DUMMY_MIGRATIONS if m["id"] == migration_id), None)
-        if migration is None:
+        _result: dict[str, Any] | None = next(
+            (m for m in DUMMY_MIGRATIONS if m["id"] == migration_id), None
+        )
+        if _result is None:
             raise HTTPException(status_code=404, detail="Migration not found")
+        migration = _result
 
-    return request.app.state.templates.TemplateResponse(
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "migration_detail.html",
         {"migration": migration, "active_nav": "migrations"},
@@ -1104,12 +1108,15 @@ async def executive_report_page(
     if record:
         migration = _migration_to_template_dict(record, session)
     else:
-        migration = next((m for m in DUMMY_MIGRATIONS if m["id"] == migration_id), None)
-        if migration is None:
+        _result: dict[str, Any] | None = next(
+            (m for m in DUMMY_MIGRATIONS if m["id"] == migration_id), None
+        )
+        if _result is None:
             raise HTTPException(status_code=404, detail="Migration not found")
+        migration = _result
 
     report_date = datetime.now(UTC).strftime("%B %-d, %Y")
-    return request.app.state.templates.TemplateResponse(
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "executive_report.html",
         {"migration": migration, "report_date": report_date, "active_nav": "migrations"},
@@ -1125,7 +1132,7 @@ async def costs_page(request: Request, session: Session = Depends(get_session)) 
     if costs is None:
         costs = DUMMY_COSTS  # fallback when no data
 
-    return request.app.state.templates.TemplateResponse(
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "costs.html",
         {"costs": costs, "active_nav": "costs"},
@@ -1142,7 +1149,7 @@ async def alerts_page(request: Request, session: Session = Depends(get_session))
     _generate_alerts(session)
 
     # Fetch all alerts newest first
-    stmt = select(Alert).order_by(Alert.created_at.desc()).limit(50)  # type: ignore[union-attr]
+    stmt = select(Alert).order_by(Alert.created_at.desc()).limit(50)  # type: ignore[attr-defined]
     records = list(session.exec(stmt).all())
 
     if records:
@@ -1150,7 +1157,7 @@ async def alerts_page(request: Request, session: Session = Depends(get_session))
     else:
         alerts = DUMMY_ALERTS  # fallback when DB is empty
 
-    return request.app.state.templates.TemplateResponse(
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "alerts.html",
         {"alerts": alerts, "active_nav": "alerts"},
@@ -1216,7 +1223,7 @@ async def test_case_fragment(
             DUMMY_TEST_CASES[42],  # default fallback
         )
 
-    return request.app.state.templates.TemplateResponse(
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "fragments/test_case_detail.html",
         {"tc": tc},
@@ -1251,7 +1258,7 @@ async def test_cases_table_fragment(
     stmt = (
         select(TestCaseRecord)
         .where(*conditions)
-        .order_by(TestCaseRecord.composite_score.asc())  # type: ignore[union-attr]
+        .order_by(TestCaseRecord.composite_score.asc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(page_size)
     )
@@ -1271,7 +1278,7 @@ async def test_cases_table_fragment(
             }
         )
 
-    return request.app.state.templates.TemplateResponse(
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "fragments/test_cases_table.html",
         {
@@ -1303,9 +1310,12 @@ async def executive_summary_fragment(
     if record:
         migration = _migration_to_template_dict(record, session)
     else:
-        migration = next((m for m in DUMMY_MIGRATIONS if m["id"] == migration_id), None)
-        if migration is None:
+        _result: dict[str, Any] | None = next(
+            (m for m in DUMMY_MIGRATIONS if m["id"] == migration_id), None
+        )
+        if _result is None:
             raise HTTPException(status_code=404, detail="Migration not found")
+        migration = _result
 
     # Truncate reasoning to first paragraph, max 500 chars
     reasoning = migration.get("reasoning", "") or ""
@@ -1313,7 +1323,7 @@ async def executive_summary_fragment(
     if len(narrative) > 500:
         narrative = narrative[:497] + "\u2026"
 
-    return request.app.state.templates.TemplateResponse(
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "fragments/executive_summary.html",
         {"migration": migration, "narrative": narrative},

@@ -49,14 +49,14 @@ async def annotations_page(
     if multi_user:
         stmt = (
             select(Annotation)
-            .order_by(Annotation.created_at.desc())  # type: ignore[union-attr]
+            .order_by(Annotation.created_at.desc())  # type: ignore[attr-defined]
             .limit(200)
         )
         annotations = list(session.exec(stmt).all())
     else:
         annotations = []
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "annotations.html",
         {"active_nav": "annotations", "annotations": annotations, "multi_user": multi_user},
@@ -84,8 +84,8 @@ def list_annotations(
 
     stmt = (
         select(Annotation)
-        .where(Annotation.migration_id == migration_id)  # type: ignore[arg-type]
-        .order_by(Annotation.created_at.desc())  # type: ignore[union-attr]
+        .where(Annotation.migration_id == migration_id)
+        .order_by(Annotation.created_at.desc())  # type: ignore[attr-defined]
     )
     records = list(session.exec(stmt).all())
     return [_annotation_to_summary(r) for r in records]
@@ -177,14 +177,14 @@ def get_annotation_queue(
     if user_role == "admin":
         stmt = (
             select(Annotation)
-            .order_by(Annotation.created_at.desc())  # type: ignore[union-attr]
+            .order_by(Annotation.created_at.desc())  # type: ignore[attr-defined]
             .limit(100)
         )
     else:
         stmt = (
             select(Annotation)
-            .where(Annotation.annotator_id == user_id)  # type: ignore[arg-type]
-            .order_by(Annotation.created_at.desc())  # type: ignore[union-attr]
+            .where(Annotation.annotator_id == user_id)
+            .order_by(Annotation.created_at.desc())  # type: ignore[attr-defined]
         )
 
     records = list(session.exec(stmt).all())
