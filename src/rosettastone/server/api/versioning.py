@@ -114,9 +114,7 @@ def list_versions(
     count_stmt = (
         select(func.count())
         .select_from(MigrationVersion)
-        .where(
-            MigrationVersion.migration_id == migration_id
-        )
+        .where(MigrationVersion.migration_id == migration_id)
     )
     total = session.exec(count_stmt).one()
 

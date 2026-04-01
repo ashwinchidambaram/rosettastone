@@ -265,9 +265,7 @@ def submit_rejection(
 
     # Reset logic: delete all Approval rows for this workflow and reset status
     existing_approvals = list(
-        session.exec(
-            select(Approval).where(Approval.workflow_id == workflow.id)
-        ).all()
+        session.exec(select(Approval).where(Approval.workflow_id == workflow.id)).all()
     )
     for a in existing_approvals:
         session.delete(a)

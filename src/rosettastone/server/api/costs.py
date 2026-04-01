@@ -18,7 +18,9 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-def _generate_opportunities(model_costs: dict[str, float], session: Session) -> list[dict[str, Any]]:
+def _generate_opportunities(
+    model_costs: dict[str, float], session: Session
+) -> list[dict[str, Any]]:
     """Generate cost optimization suggestions based on migration data."""
     opportunities = []
 

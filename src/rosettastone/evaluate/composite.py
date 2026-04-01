@@ -130,7 +130,10 @@ class CompositeEvaluator:
 
     def _get_threshold(self, output_type: OutputType) -> float:
         thresholds = getattr(self.config, "win_thresholds", DEFAULT_WIN_THRESHOLDS)
-        return cast(float, thresholds.get(output_type.value, DEFAULT_WIN_THRESHOLDS.get(output_type.value, 0.8)))
+        return cast(
+            float,
+            thresholds.get(output_type.value, DEFAULT_WIN_THRESHOLDS.get(output_type.value, 0.8)),
+        )
 
     def _score(
         self,

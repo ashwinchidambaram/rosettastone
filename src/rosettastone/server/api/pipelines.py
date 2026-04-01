@@ -86,7 +86,7 @@ def create_pipeline(
     target_model). Returns the created PipelineSummary with status 201.
     Returns 422 if the YAML is invalid or missing required fields.
     """
-    import yaml  # type: ignore[import-untyped]
+    import yaml
     from pydantic import ValidationError
 
     from rosettastone.optimize.pipeline_config import PipelineConfig
@@ -164,9 +164,7 @@ def get_pipeline_status(
 
     stages = list(
         session.exec(
-            select(PipelineStageRecord).where(
-                PipelineStageRecord.pipeline_id == pipeline_id
-            )
+            select(PipelineStageRecord).where(PipelineStageRecord.pipeline_id == pipeline_id)
         ).all()
     )
 
@@ -188,9 +186,7 @@ def get_pipeline_modules(
 
     stages = list(
         session.exec(
-            select(PipelineStageRecord).where(
-                PipelineStageRecord.pipeline_id == pipeline_id
-            )
+            select(PipelineStageRecord).where(PipelineStageRecord.pipeline_id == pipeline_id)
         ).all()
     )
 
@@ -235,9 +231,7 @@ async def pipeline_detail_page(
 
     stages = list(
         session.exec(
-            select(PipelineStageRecord).where(
-                PipelineStageRecord.pipeline_id == pipeline_id
-            )
+            select(PipelineStageRecord).where(PipelineStageRecord.pipeline_id == pipeline_id)
         ).all()
     )
 
@@ -262,9 +256,7 @@ async def pipeline_stages_fragment(
 
     stages = list(
         session.exec(
-            select(PipelineStageRecord).where(
-                PipelineStageRecord.pipeline_id == pipeline_id
-            )
+            select(PipelineStageRecord).where(PipelineStageRecord.pipeline_id == pipeline_id)
         ).all()
     )
 

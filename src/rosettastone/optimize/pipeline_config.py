@@ -32,7 +32,7 @@ class PipelineConfig(BaseModel):
 
 def load_pipeline_config(path: Path) -> PipelineConfig:
     """Load and validate a pipeline config from a YAML file."""
-    import yaml  # type: ignore[import-untyped]
+    import yaml
 
     with open(path) as f:
         raw = yaml.safe_load(f)

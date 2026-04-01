@@ -300,9 +300,7 @@ def get_ab_test_metrics(
 
     # Cache miss — compute from DB (single query).
     results = list(
-        session.exec(
-            select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)
-        ).all()
+        session.exec(select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)).all()
     )
     metrics = _build_metrics_from_results(results)
 
@@ -360,9 +358,7 @@ def conclude_ab_test(
         )
 
     results = list(
-        session.exec(
-            select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)
-        ).all()
+        session.exec(select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)).all()
     )
     result_dicts = [
         {

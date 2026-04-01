@@ -43,7 +43,7 @@ class BatchResult:
 
 def load_manifest(path: Path) -> BatchManifest:
     """Load and validate a batch YAML manifest, applying defaults to each entry."""
-    import yaml  # type: ignore[import-untyped]
+    import yaml
 
     raw = yaml.safe_load(path.read_text())
     manifest = BatchManifest.model_validate(raw)

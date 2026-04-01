@@ -232,7 +232,9 @@ class PromptClusterer:
         n = self._n_clusters or min(5, len(embeddings))
         # Cap n_clusters to number of samples
         n = min(n, len(embeddings))
-        return cast(np.ndarray[Any, Any], KMeans(n_clusters=n, n_init="auto").fit_predict(embeddings))
+        return cast(
+            np.ndarray[Any, Any], KMeans(n_clusters=n, n_init="auto").fit_predict(embeddings)
+        )
 
     # ------------------------------------------------------------------
     # Result building

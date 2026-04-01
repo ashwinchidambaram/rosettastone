@@ -41,7 +41,7 @@ def run_pipeline_background(pipeline_id: int, engine: Any = None) -> None:
         config_yaml = pipeline.config_yaml
 
     try:
-        import yaml  # type: ignore[import-untyped]
+        import yaml
 
         from rosettastone.optimize.pipeline_config import PipelineConfig
 
