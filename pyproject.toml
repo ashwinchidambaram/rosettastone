@@ -1,10 +1,21 @@
 [project]
-name = "rosettastone"
+name = "rosettastone-llm"
 version = "0.1.0"
-description = "Automated LLM model migration using production data and GEPA optimization"
+description = "Automated LLM model migration tool"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.11,<3.14"
+authors = [{name = "RosettaStone Contributors"}]
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "dspy>=2.6",
     "litellm>=1.50",
@@ -63,18 +74,22 @@ auth = [
     "pyjwt>=2.8.0",
 ]
 all = [
-    "rosettastone[eval,redis,braintrust,langsmith,safety,clustering,web,postgres,auth,metrics]",
+    "rosettastone-llm[eval,redis,braintrust,langsmith,safety,clustering,web,postgres,auth,metrics,sentry]",
 ]
 e2e = [
-    "rosettastone[eval,redis,braintrust,langsmith,safety,clustering,web]",
+    "rosettastone-llm[eval,redis,braintrust,langsmith,safety,clustering,web]",
 ]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "mypy>=1.8",
     "ruff>=0.3",
-    "rosettastone[web]",
+    "rosettastone-llm[web]",
 ]
+
+[project.urls]
+"Homepage" = "https://github.com/ashwinchidambaram/rosettastone"
+"Bug Tracker" = "https://github.com/ashwinchidambaram/rosettastone/issues"
 
 [project.scripts]
 rosettastone = "rosettastone.cli.main:app"
@@ -85,6 +100,13 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rosettastone"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/rosettastone/server/templates" = "rosettastone/server/templates"
+"src/rosettastone/server/static" = "rosettastone/server/static"
+"src/rosettastone/server_stitch/templates" = "rosettastone/server_stitch/templates"
+"src/rosettastone/server_stitch/static" = "rosettastone/server_stitch/static"
+"src/rosettastone/report/templates" = "rosettastone/report/templates"
 
 [tool.ruff]
 target-version = "py311"
