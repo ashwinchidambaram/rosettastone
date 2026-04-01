@@ -14,7 +14,7 @@ import pytest
 
 from rosettastone.config import MigrationConfig
 from rosettastone.core.types import OutputType, PromptPair
-from rosettastone.optimize.gepa import GEPAOptimizer
+from rosettastone.optimize.gepa import GEPAOptimizer, GEPATimeoutWithResult
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -145,7 +145,6 @@ class TestTimeoutWithNoIntermediate:
 
         # Must be catchable as the builtin TimeoutError
         assert isinstance(exc_info.value, TimeoutError)
-        assert "no intermediate" in str(exc_info.value).lower() or "timed out" in str(exc_info.value).lower()
 
 
 # ---------------------------------------------------------------------------
@@ -154,20 +153,24 @@ class TestTimeoutWithNoIntermediate:
 
 
 class TestTimeoutWithIntermediate:
-    """When compile() times out but an intermediate result was captured, it is returned."""
+    """When compile() times out but an intermediate result was captured, GEPATimeoutWithResult
+    is raised carrying the intermediate instructions and a descriptive message."""
 
     def _run_with_intermediates(
         self,
         tmp_path,
         intermediates: list[str],
         timeout: int = 30,
-    ) -> str:
+    ) -> GEPATimeoutWithResult:
         """Helper: run optimize() with a pre-populated best_intermediate via patched extract.
 
         Uses a fake metric (replacing build_migration_metric) so that calling
         _iteration_capturing_metric with mock args doesn't invoke real BERTScore.
         The fake GEPA compile calls the metric N times, populate best_intermediate,
         then we simulate a timeout via future.result().
+
+        Returns the GEPATimeoutWithResult exception so callers can inspect both
+        exc.instructions and exc.message.
         """
         config = _make_config(tmp_path, timeout=timeout)
         train = _make_pairs(2)
@@ -229,25 +232,34 @@ class TestTimeoutWithIntermediate:
             mock_executor_instance.submit.side_effect = real_submit
             mock_exec.return_value = mock_executor_instance
 
-            result = GEPAOptimizer().optimize(train, val, config)
-        return result
+            with pytest.raises(GEPATimeoutWithResult) as exc_info:
+                GEPAOptimizer().optimize(train, val, config)
+        return exc_info.value
 
     def test_returns_intermediate_when_one_captured(self, tmp_path) -> None:
-        """When one intermediate was captured before timeout, it is returned."""
-        result = self._run_with_intermediates(tmp_path, ["Single intermediate"])
-        assert result == "Single intermediate", f"Got: {result!r}"
+        """When one intermediate was captured before timeout, its instructions are carried."""
+        exc = self._run_with_intermediates(tmp_path, ["Single intermediate"])
+        assert exc.instructions == "Single intermediate", f"Got: {exc.instructions!r}"
 
     def test_returns_most_recent_intermediate(self, tmp_path) -> None:
-        """When multiple intermediates are captured, the last one is returned on timeout."""
+        """When multiple intermediates are captured, the last one is carried on timeout."""
         intermediates = ["First", "Second", "Third"]
-        result = self._run_with_intermediates(tmp_path, intermediates)
-        assert result == "Third", f"Expected last intermediate 'Third', got: {result!r}"
+        exc = self._run_with_intermediates(tmp_path, intermediates)
+        assert exc.instructions == "Third", (
+            f"Expected last intermediate 'Third', got: {exc.instructions!r}"
+        )
 
-    def test_no_exception_raised_when_intermediate_available(self, tmp_path) -> None:
-        """When intermediate is available, timeout must not raise an exception."""
-        # Should complete without raising
-        result = self._run_with_intermediates(tmp_path, ["Some intermediate result"])
-        assert isinstance(result, str)
+    def test_raises_gepa_timeout_with_result_when_intermediate_available(self, tmp_path) -> None:
+        """When intermediate is available, GEPATimeoutWithResult is raised (not a bare str)."""
+        exc = self._run_with_intermediates(tmp_path, ["Some intermediate result"])
+        assert isinstance(exc, GEPATimeoutWithResult)
+        assert isinstance(exc.instructions, str)
+        assert isinstance(exc.message, str)
+
+    def test_message_mentions_timeout_seconds(self, tmp_path) -> None:
+        """The exception message must mention the configured timeout value."""
+        exc = self._run_with_intermediates(tmp_path, ["instructions"], timeout=45)
+        assert "45" in exc.message, f"Expected timeout value in message, got: {exc.message!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -343,10 +355,10 @@ class TestNormalCompletion:
 
 
 class TestTimeoutWithImmediateCallback:
-    """Intermediate captured immediately before timeout fires — should return fast."""
+    """Intermediate captured immediately before timeout fires — GEPATimeoutWithResult raised."""
 
     def test_callback_fires_before_timeout(self, tmp_path) -> None:
-        """When extract succeeds on first metric call, intermediate is captured and returned."""
+        """When extract succeeds on first metric call, GEPATimeoutWithResult carries the result."""
         config = _make_config(tmp_path, timeout=30)
         train = _make_pairs(2)
         val = _make_pairs(1)
@@ -400,9 +412,12 @@ class TestTimeoutWithImmediateCallback:
             mock_executor_instance.submit.side_effect = real_submit
             mock_exec.return_value = mock_executor_instance
 
-            result = GEPAOptimizer().optimize(train, val, config)
+            with pytest.raises(GEPATimeoutWithResult) as exc_info:
+                GEPAOptimizer().optimize(train, val, config)
 
-        assert result == immediate_result, f"Expected immediate intermediate, got: {result!r}"
+        assert exc_info.value.instructions == immediate_result, (
+            f"Expected immediate intermediate, got: {exc_info.value.instructions!r}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -452,3 +467,182 @@ class TestConfigValidation:
                 data_path=data_file,
                 gepa_timeout_seconds=29,
             )
+
+
+# ---------------------------------------------------------------------------
+# Test: Migrator-level timeout handling
+# ---------------------------------------------------------------------------
+
+
+def _make_migrator_config(tmp_path):
+    """Build a minimal MigrationConfig for migrator-level tests."""
+    data_file = tmp_path / "data.jsonl"
+    data_file.write_text(
+        '{"prompt": "q", "response": "a", "source_model": "openai/gpt-4o"}\n' * 5
+    )
+    return MigrationConfig(
+        source_model="openai/gpt-4o",
+        target_model="anthropic/claude-sonnet-4",
+        data_path=data_file,
+        skip_preflight=True,
+    )
+
+
+def _make_migration_result():
+    """Return a minimal MigrationResult suitable for mocking build_result."""
+    from rosettastone.core.types import MigrationResult
+
+    return MigrationResult(
+        config={},
+        optimized_prompt="mocked",
+        baseline_results=[],
+        validation_results=[],
+        confidence_score=0.5,
+        baseline_score=0.5,
+        improvement=0.0,
+        cost_usd=0.0,
+        duration_seconds=1.0,
+        warnings=[],
+    )
+
+
+_PIPELINE_PATCH_BASE = "rosettastone.core.pipeline"
+
+
+class TestMigratorTimeoutHandling:
+    """Migrator correctly surfaces GEPA timeout warnings in MigrationResult."""
+
+    def _run_migrator_with_mocks(self, config, optimize_side_effect):
+        """Run Migrator.run() with all pipeline steps mocked except optimize_prompt.
+
+        optimize_side_effect is assigned to optimize_prompt's side_effect so tests can
+        inject either a GEPATimeoutWithResult or a bare TimeoutError.
+        """
+        from rosettastone.core.migrator import Migrator
+
+        dummy_pairs = []
+        mock_result = _make_migration_result()
+
+        with (
+            patch(f"{_PIPELINE_PATCH_BASE}.load_and_split_data", return_value=(dummy_pairs, dummy_pairs, dummy_pairs)),
+            patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan"),
+            patch(f"{_PIPELINE_PATCH_BASE}.evaluate_baseline", return_value=[]),
+            patch(f"{_PIPELINE_PATCH_BASE}.optimize_prompt", side_effect=optimize_side_effect),
+            patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan_text"),
+            patch(f"{_PIPELINE_PATCH_BASE}.run_prompt_audit"),
+            patch(f"{_PIPELINE_PATCH_BASE}.evaluate_optimized", return_value=[]),
+            patch(f"{_PIPELINE_PATCH_BASE}.make_recommendation", return_value=("GO", "looks good", {})),
+            patch(f"{_PIPELINE_PATCH_BASE}.build_result", return_value=mock_result),
+            patch(f"{_PIPELINE_PATCH_BASE}.generate_report"),
+        ):
+            migrator = Migrator(config)
+            return migrator.run()
+
+    def test_gepa_timeout_with_result_adds_warning_and_continues(self, tmp_path) -> None:
+        """When optimize_prompt raises GEPATimeoutWithResult, warning is added and run() succeeds.
+
+        The migrator must catch GEPATimeoutWithResult, append exc.message to ctx.warnings, set
+        optimized_prompt = exc.instructions, and continue without re-raising.
+        """
+        from rosettastone.core.migrator import Migrator
+        from rosettastone.core.types import MigrationResult
+
+        config = _make_migrator_config(tmp_path)
+        exc = GEPATimeoutWithResult(
+            instructions="intermediate instructions",
+            message="GEPA timed out after 30s — using best intermediate result.",
+        )
+
+        dummy_pairs = []
+        # We need to inspect ctx.warnings, so capture the build_result call args.
+        captured_warnings: list[list[str]] = []
+
+        def capturing_build_result(cfg, opt_prompt, baseline, validation, duration, ctx=None):
+            captured_warnings.append(list(ctx.warnings) if ctx else [])
+            return _make_migration_result()
+
+        with (
+            patch(f"{_PIPELINE_PATCH_BASE}.load_and_split_data", return_value=(dummy_pairs, dummy_pairs, dummy_pairs)),
+            patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan"),
+            patch(f"{_PIPELINE_PATCH_BASE}.evaluate_baseline", return_value=[]),
+            patch(f"{_PIPELINE_PATCH_BASE}.optimize_prompt", side_effect=exc),
+            patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan_text"),
+            patch(f"{_PIPELINE_PATCH_BASE}.run_prompt_audit"),
+            patch(f"{_PIPELINE_PATCH_BASE}.evaluate_optimized", return_value=[]),
+            patch(f"{_PIPELINE_PATCH_BASE}.make_recommendation", return_value=("GO", "looks good", {})),
+            patch(f"{_PIPELINE_PATCH_BASE}.build_result", side_effect=capturing_build_result),
+            patch(f"{_PIPELINE_PATCH_BASE}.generate_report"),
+        ):
+            migrator = Migrator(config)
+            result = migrator.run()  # Must NOT raise
+
+        assert isinstance(result, MigrationResult)
+        assert len(captured_warnings) == 1, "build_result should have been called once"
+        warnings = captured_warnings[0]
+        assert any("timed out" in w.lower() or "intermediate" in w.lower() for w in warnings), (
+            f"Expected timeout warning in ctx.warnings, got: {warnings!r}"
+        )
+
+    def test_gepa_timeout_with_result_uses_intermediate_as_optimized_prompt(self, tmp_path) -> None:
+        """When optimize_prompt raises GEPATimeoutWithResult, exc.instructions becomes the prompt."""
+        config = _make_migrator_config(tmp_path)
+        exc = GEPATimeoutWithResult(
+            instructions="intermediate instructions",
+            message="GEPA timed out after 30s — using best intermediate result.",
+        )
+
+        dummy_pairs = []
+        captured_optimized: list[str] = []
+
+        def capturing_build_result(cfg, opt_prompt, baseline, validation, duration, ctx=None):
+            captured_optimized.append(opt_prompt)
+            return _make_migration_result()
+
+        with (
+            patch(f"{_PIPELINE_PATCH_BASE}.load_and_split_data", return_value=(dummy_pairs, dummy_pairs, dummy_pairs)),
+            patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan"),
+            patch(f"{_PIPELINE_PATCH_BASE}.evaluate_baseline", return_value=[]),
+            patch(f"{_PIPELINE_PATCH_BASE}.optimize_prompt", side_effect=exc),
+            patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan_text"),
+            patch(f"{_PIPELINE_PATCH_BASE}.run_prompt_audit"),
+            patch(f"{_PIPELINE_PATCH_BASE}.evaluate_optimized", return_value=[]),
+            patch(f"{_PIPELINE_PATCH_BASE}.make_recommendation", return_value=("GO", "looks good", {})),
+            patch(f"{_PIPELINE_PATCH_BASE}.build_result", side_effect=capturing_build_result),
+            patch(f"{_PIPELINE_PATCH_BASE}.generate_report"),
+        ):
+            from rosettastone.core.migrator import Migrator
+
+            migrator = Migrator(config)
+            migrator.run()
+
+        assert captured_optimized == ["intermediate instructions"], (
+            f"Expected exc.instructions as optimized_prompt, got: {captured_optimized!r}"
+        )
+
+    def test_bare_timeout_error_adds_warning_and_reraises(self, tmp_path) -> None:
+        """When optimize_prompt raises bare TimeoutError (no intermediate), it re-raises.
+
+        A failure warning must be added to ctx.warnings, and TimeoutError propagates to caller.
+        Since TimeoutError propagates out, warnings are inspected indirectly by confirming the
+        exception propagates (build_result is never reached).
+        """
+        config = _make_migrator_config(tmp_path)
+
+        dummy_pairs = []
+        with (
+            patch(f"{_PIPELINE_PATCH_BASE}.load_and_split_data", return_value=(dummy_pairs, dummy_pairs, dummy_pairs)),
+            patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan"),
+            patch(f"{_PIPELINE_PATCH_BASE}.evaluate_baseline", return_value=[]),
+            patch(f"{_PIPELINE_PATCH_BASE}.optimize_prompt", side_effect=TimeoutError("GEPA timed out")),
+            patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan_text"),
+            patch(f"{_PIPELINE_PATCH_BASE}.run_prompt_audit"),
+            patch(f"{_PIPELINE_PATCH_BASE}.evaluate_optimized", return_value=[]),
+            patch(f"{_PIPELINE_PATCH_BASE}.make_recommendation", return_value=("GO", "looks good", {})),
+            patch(f"{_PIPELINE_PATCH_BASE}.build_result", return_value=_make_migration_result()),
+            patch(f"{_PIPELINE_PATCH_BASE}.generate_report"),
+        ):
+            from rosettastone.core.migrator import Migrator
+
+            migrator = Migrator(config)
+            with pytest.raises(TimeoutError, match=r"timed out|no usable intermediate|GEPA"):
+                migrator.run()

@@ -21,7 +21,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Re-export for backward compatibility — callers import InstructionExtractionError from gepa.py
-__all__ = ["GEPAOptimizer", "InstructionExtractionError"]
+__all__ = ["GEPAOptimizer", "GEPATimeoutWithResult", "InstructionExtractionError"]
+
+
+class GEPATimeoutWithResult(Exception):  # noqa: N818
+    """Raised when GEPA times out but has a usable intermediate result."""
+
+    def __init__(self, instructions: str, message: str) -> None:
+        self.instructions = instructions
+        self.message = message
+        super().__init__(message)
 
 
 class GEPAOptimizer(Optimizer):
@@ -120,9 +129,21 @@ class GEPAOptimizer(Optimizer):
             except concurrent.futures.TimeoutError:
                 if best_intermediate:
                     logger.warning(
-                        "GEPA timed out after %ds — returning best intermediate result.", timeout
+                        "GEPA timed out after %ds — using best intermediate result.", timeout
                     )
-                    return best_intermediate[-1]
+                    # best_intermediate is appended inside _iteration_capturing_metric which runs in
+                    # the GEPA thread.  The GIL protects the list.append() itself, but reads of
+                    # program state inside extract_optimized_instructions are best-effort snapshots
+                    # (not a guaranteed consistent state of the compiled program).
+                    instructions = best_intermediate[-1]
+                    raise GEPATimeoutWithResult(
+                        instructions=instructions,
+                        message=(
+                            f"GEPA timed out after {timeout}s — using best intermediate result. "
+                            f"Consider increasing gepa_timeout_seconds or reducing gepa_auto "
+                            f"complexity."
+                        ),
+                    )
                 raise TimeoutError(
                     f"GEPA timed out after {timeout}s with no intermediate result"
                 )

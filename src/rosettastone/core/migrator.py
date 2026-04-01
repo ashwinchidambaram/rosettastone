@@ -229,6 +229,8 @@ class Migrator:
             self._checkpoint("baseline_eval", {"baseline_score": baseline_score})
         self._emit("baseline_eval", 1.0, 0.50)
 
+        from rosettastone.optimize.gepa import GEPATimeoutWithResult
+
         # Step 3: Optimize — restore optimized prompt from checkpoint if available
         if _already_done("optimize"):
             # Try to recover the optimized prompt from checkpoint data
@@ -240,9 +242,20 @@ class Migrator:
             # Fall back to re-running optimize if checkpoint didn't preserve the prompt
             if not optimized_prompt:
                 t0 = time.time()
-                optimized_prompt = optimize_prompt(
-                    train, val, self.config, self._gepa_iteration_callback
-                )
+                try:
+                    optimized_prompt = optimize_prompt(
+                        train, val, self.config, self._gepa_iteration_callback
+                    )
+                except GEPATimeoutWithResult as exc:
+                    ctx.warnings.append(exc.message)
+                    optimized_prompt = exc.instructions
+                except TimeoutError:
+                    timeout = getattr(self.config, "gepa_timeout_seconds", 600)
+                    ctx.warnings.append(
+                        f"GEPA timed out after {timeout}s with no usable intermediate result. "
+                        f"Migration failed."
+                    )
+                    raise
                 ctx.timing["optimize"] = time.time() - t0
             else:
                 ctx.timing["optimize"] = 0.0
@@ -252,11 +265,14 @@ class Migrator:
                 optimized_prompt = optimize_prompt(
                     train, val, self.config, self._gepa_iteration_callback
                 )
+            except GEPATimeoutWithResult as exc:
+                ctx.warnings.append(exc.message)
+                optimized_prompt = exc.instructions
             except TimeoutError:
                 timeout = getattr(self.config, "gepa_timeout_seconds", 600)
                 ctx.warnings.append(
-                    f"GEPA timed out after {timeout}s — using best intermediate result. "
-                    f"Consider increasing gepa_timeout_seconds or reducing gepa_auto complexity."
+                    f"GEPA timed out after {timeout}s with no usable intermediate result. "
+                    f"Migration failed."
                 )
                 raise
             ctx.timing["optimize"] = time.time() - t0
