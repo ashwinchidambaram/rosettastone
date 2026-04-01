@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import Any
 
 from sqlmodel import Session
 
 logger = logging.getLogger(__name__)
 
 
-def run_pipeline_background(pipeline_id: int, engine=None) -> None:
+def run_pipeline_background(pipeline_id: int, engine: Any = None) -> None:
     """Background task: parse YAML, run GEPA on pipeline, persist per-module results.
 
     Args:
@@ -40,7 +41,7 @@ def run_pipeline_background(pipeline_id: int, engine=None) -> None:
         config_yaml = pipeline.config_yaml
 
     try:
-        import yaml
+        import yaml  # type: ignore[import-untyped]
 
         from rosettastone.optimize.pipeline_config import PipelineConfig
 
@@ -50,7 +51,7 @@ def run_pipeline_background(pipeline_id: int, engine=None) -> None:
         # Load training data
         from pathlib import Path
 
-        train_set: list = []
+        train_set: list[Any] = []
         if config.data_path:
             from rosettastone.ingest.jsonl import JSONLAdapter
 

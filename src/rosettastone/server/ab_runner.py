@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlmodel import Session, select
 
@@ -26,7 +27,7 @@ BATCH_SIZE = 50  # Commit results every N rows for partial failure resilience
 def run_ab_test_background(
     ab_test_id: int,
     simulation: bool = True,
-    engine=None,
+    engine: Any = None,
 ) -> None:
     """Run an A/B test in a background thread.
 
@@ -78,7 +79,7 @@ def _run_simulation(
     ab_test_id: int,
     migration_id: int,
     traffic_split: float,
-    engine,
+    engine: Any,
 ) -> None:
     """Simulation mode: compare cached validation scores."""
     with Session(engine) as session:
@@ -125,7 +126,7 @@ def _run_live(
     version_a: MigrationVersion,
     version_b: MigrationVersion,
     traffic_split: float,
-    engine,
+    engine: Any,
 ) -> None:
     """Live mode: re-evaluate test cases through both prompt versions."""
     prompt_a = version_a.optimized_prompt or ""
@@ -199,7 +200,7 @@ def _evaluate_with_prompt(prompt_text: str, optimized_prompt: str) -> float:
         return 0.5
 
 
-def _commit_results(results: list[ABTestResult], engine) -> None:
+def _commit_results(results: list[ABTestResult], engine: Any) -> None:
     """Batch-commit a list of ABTestResult rows."""
     with Session(engine) as session:
         for r in results:
@@ -207,7 +208,7 @@ def _commit_results(results: list[ABTestResult], engine) -> None:
         session.commit()
 
 
-def _conclude_test(ab_test_id: int, engine) -> None:
+def _conclude_test(ab_test_id: int, engine: Any) -> None:
     """Compute significance and update ABTest with winner."""
     with Session(engine) as session:
         ab_test = session.get(ABTest, ab_test_id)
@@ -252,7 +253,7 @@ def _conclude_test(ab_test_id: int, engine) -> None:
         session.commit()
 
 
-def _mark_failed(ab_test_id: int, engine, reason: str) -> None:
+def _mark_failed(ab_test_id: int, engine: Any, reason: str) -> None:
     """Mark an A/B test as failed."""
     try:
         with Session(engine) as session:

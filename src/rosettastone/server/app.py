@@ -15,7 +15,8 @@ try:
     from fastapi.staticfiles import StaticFiles
     from fastapi.templating import Jinja2Templates
     from starlette.exceptions import HTTPException as StarletteHTTPException
-    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+    from starlette.responses import Response
 except ImportError:
     raise ImportError("Web dependencies required. Install with: uv pip install 'rosettastone[web]'")
 
@@ -30,7 +31,7 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers to all responses."""
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
@@ -154,7 +155,7 @@ def create_app() -> FastAPI:
 
     # --- Error handlers ---
     @app.exception_handler(StarletteHTTPException)
-    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> Response:
         # JSON for /api/ routes
         if request.url.path.startswith("/api/"):
             return JSONResponse(
@@ -183,7 +184,7 @@ def create_app() -> FastAPI:
         )
 
     @app.exception_handler(Exception)
-    async def unhandled_exception_handler(request: Request, exc: Exception):
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> Response:
         if request.url.path.startswith("/api/"):
             return JSONResponse(
                 status_code=500,

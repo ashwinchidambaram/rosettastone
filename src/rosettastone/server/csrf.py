@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import secrets
 
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -27,7 +27,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     Skipped for /api/ routes (API uses Bearer tokens, not cookies).
     """
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if not _csrf_enabled():
             request.state.csrf_token = ""
             return await call_next(request)
@@ -62,7 +62,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                 content_type = request.headers.get("content-type", "")
                 if "form" in content_type:
                     form = await request.form()
-                    submitted = form.get(_CSRF_FORM_FIELD, "")
+                    submitted = str(form.get(_CSRF_FORM_FIELD) or "")
 
             cookie_token = request.cookies.get(_CSRF_COOKIE, "")
             if not cookie_token or not submitted or submitted != cookie_token:

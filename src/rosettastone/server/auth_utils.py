@@ -8,7 +8,7 @@ def hash_password(plain: str) -> str:
     from passlib.context import CryptContext
 
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    return pwd_context.hash(plain)
+    return str(pwd_context.hash(plain))
 
 
 def verify_password(plain: str, hashed: str) -> bool:
@@ -16,7 +16,7 @@ def verify_password(plain: str, hashed: str) -> bool:
     from passlib.context import CryptContext
 
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    return pwd_context.verify(plain, hashed)
+    return bool(pwd_context.verify(plain, hashed))
 
 
 def create_jwt(user_id: int, role: str, secret: str, expires_in_seconds: int = 3600) -> str:
@@ -28,14 +28,14 @@ def create_jwt(user_id: int, role: str, secret: str, expires_in_seconds: int = 3
         "role": role,
         "exp": datetime.now(UTC) + timedelta(seconds=expires_in_seconds),
     }
-    return jwt.encode(payload, secret, algorithm="HS256")
+    return str(jwt.encode(payload, secret, algorithm="HS256"))
 
 
-def decode_jwt(token: str, secret: str) -> dict:
+def decode_jwt(token: str, secret: str) -> dict[str, object]:
     """Decode and validate a JWT token.
 
     Raises jwt.ExpiredSignatureError or jwt.InvalidTokenError on failure.
     """
     import jwt
 
-    return jwt.decode(token, secret, algorithms=["HS256"])
+    return dict(jwt.decode(token, secret, algorithms=["HS256"]))

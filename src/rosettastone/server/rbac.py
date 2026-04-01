@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Coroutine
+from typing import Any
+
 from fastapi import HTTPException, Request
 
 
 # Roles are checked by exact membership — not hierarchy.
 # To allow both editors and admins, pass require_role("editor", "admin").
-def require_role(*roles: str):
+def require_role(*roles: str) -> Callable[[Request], Coroutine[Any, Any, None]]:
     """FastAPI dependency factory that requires one of the specified roles.
 
     When ROSETTASTONE_MULTI_USER is not set, this is a no-op (all requests pass).
@@ -38,6 +41,6 @@ def require_role(*roles: str):
     return _check
 
 
-async def get_current_user(request: Request) -> dict | None:
+async def get_current_user(request: Request) -> dict[str, Any] | None:
     """Return the current user from request.state, or None in legacy mode."""
     return getattr(request.state, "user", None)
