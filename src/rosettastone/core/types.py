@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -29,6 +29,18 @@ class EvalResult(BaseModel):
     details: dict[str, Any] = {}
 
 
+class PromptRegression(BaseModel):
+    prompt_index: int
+    output_type: str
+    baseline_score: float
+    optimized_score: float
+    delta: float  # optimized_score - baseline_score
+    baseline_is_win: bool
+    optimized_is_win: bool
+    status: Literal["improved", "stable", "regressed", "at_risk"]
+    metric_deltas: dict[str, float] = {}  # per-metric delta
+
+
 class MigrationResult(BaseModel):
     config: dict[str, Any]
     optimized_prompt: str
@@ -50,3 +62,8 @@ class MigrationResult(BaseModel):
     # Cost tracking
     cost_breakdown: dict[str, float] = {}
     estimated_cost_usd: float = 0.0
+
+    # T3: Per-prompt regression analysis
+    prompt_regressions: list[PromptRegression] = []
+    regression_count: int = 0
+    at_risk_count: int = 0

@@ -377,6 +377,63 @@ def build_result(
     if ctx and ctx.cluster_summary:
         config_dict["cluster_summary"] = ctx.cluster_summary
 
+    # T3: Per-prompt regression analysis
+    from rosettastone.core.types import PromptRegression
+    from rosettastone.decision.recommendation import DEFAULT_THRESHOLDS
+
+    win_thresholds = dict(getattr(config, "win_thresholds", DEFAULT_THRESHOLDS) or {})
+    prompt_regressions: list[PromptRegression] = []
+
+    for idx, (base_r, val_r) in enumerate(zip(baseline, validation)):
+        b_score = base_r.composite_score
+        v_score = val_r.composite_score
+        delta = v_score - b_score
+        out_type = (
+            val_r.details.get("output_type")
+            or base_r.details.get("output_type")
+            or "unknown"
+        )
+        threshold = win_thresholds.get(out_type, DEFAULT_THRESHOLDS.get(out_type, 0.80))
+
+        if delta >= 0.05:
+            status = "improved"
+        elif delta >= -0.05:
+            status = "stable"
+        elif v_score >= threshold:
+            status = "regressed"  # got worse but still above threshold
+        else:
+            status = "at_risk"  # got worse AND below threshold
+
+        # Per-metric deltas
+        metric_deltas: dict[str, float] = {}
+        for metric in base_r.scores:
+            if metric in val_r.scores:
+                metric_deltas[metric] = val_r.scores[metric] - base_r.scores[metric]
+
+        prompt_regressions.append(
+            PromptRegression(
+                prompt_index=idx,
+                output_type=out_type,
+                baseline_score=b_score,
+                optimized_score=v_score,
+                delta=delta,
+                baseline_is_win=base_r.is_win,
+                optimized_is_win=val_r.is_win,
+                status=status,
+                metric_deltas=metric_deltas,
+            )
+        )
+
+    # Sort: at_risk first (delta ascending), then regressed (delta ascending), rest after
+    def _sort_key(r: PromptRegression) -> tuple[int, float]:
+        order = {"at_risk": 0, "regressed": 1, "stable": 2, "improved": 3}
+        return (order[r.status], r.delta)
+
+    prompt_regressions.sort(key=_sort_key)
+
+    regression_count = sum(1 for r in prompt_regressions if r.status == "regressed")
+    at_risk_count = sum(1 for r in prompt_regressions if r.status == "at_risk")
+
     return MigrationResult(
         config=config_dict,
         optimized_prompt=optimized_prompt,
@@ -393,6 +450,9 @@ def build_result(
         recommendation_reasoning=recommendation_reasoning,
         per_type_scores=per_type_scores,
         cost_breakdown=cost_breakdown,
+        prompt_regressions=prompt_regressions,
+        regression_count=regression_count,
+        at_risk_count=at_risk_count,
     )
 
 

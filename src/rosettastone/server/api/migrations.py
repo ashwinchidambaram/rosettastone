@@ -897,6 +897,92 @@ async def get_test_case(
     return _test_case_to_detail(tc)
 
 
+@router.get("/api/v1/migrations/{migration_id}/regressions")
+async def get_migration_regressions(
+    migration_id: int,
+    session: Session = Depends(get_session),
+    _user_id: str = Depends(get_current_user_id),
+) -> dict[str, Any]:
+    """Return per-prompt regression analysis for a migration.
+
+    Computes regressions by zipping baseline and validation TestCaseRecords
+    (ordered by insertion ID, which matches the original result list indices).
+    """
+    from rosettastone.decision.recommendation import DEFAULT_THRESHOLDS
+
+    _get_migration_or_404(migration_id, session)
+
+    # Query baseline and validation rows in insertion order
+    baseline_stmt = (
+        select(TestCaseRecord)
+        .where(TestCaseRecord.migration_id == migration_id)
+        .where(TestCaseRecord.phase == "baseline")
+        .order_by(TestCaseRecord.id)  # type: ignore[attr-defined]
+    )
+    validation_stmt = (
+        select(TestCaseRecord)
+        .where(TestCaseRecord.migration_id == migration_id)
+        .where(TestCaseRecord.phase == "validation")
+        .order_by(TestCaseRecord.id)  # type: ignore[attr-defined]
+    )
+    baseline_tcs = list(session.exec(baseline_stmt).all())
+    validation_tcs = list(session.exec(validation_stmt).all())
+
+    prompt_regressions = []
+    for idx, (base_tc, val_tc) in enumerate(zip(baseline_tcs, validation_tcs)):
+        b_score = base_tc.composite_score
+        v_score = val_tc.composite_score
+        delta = v_score - b_score
+        out_type = val_tc.output_type or base_tc.output_type or "unknown"
+        threshold = DEFAULT_THRESHOLDS.get(out_type, 0.80)
+
+        if delta >= 0.05:
+            status = "improved"
+        elif delta >= -0.05:
+            status = "stable"
+        elif v_score >= threshold:
+            status = "regressed"
+        else:
+            status = "at_risk"
+
+        base_scores = json.loads(base_tc.scores_json) if base_tc.scores_json else {}
+        val_scores = json.loads(val_tc.scores_json) if val_tc.scores_json else {}
+        metric_deltas: dict[str, float] = {
+            m: val_scores[m] - base_scores[m]
+            for m in base_scores
+            if m in val_scores
+        }
+
+        prompt_regressions.append(
+            {
+                "prompt_index": idx,
+                "output_type": out_type,
+                "baseline_score": b_score,
+                "optimized_score": v_score,
+                "delta": delta,
+                "baseline_is_win": base_tc.is_win,
+                "optimized_is_win": val_tc.is_win,
+                "status": status,
+                "metric_deltas": metric_deltas,
+            }
+        )
+
+    # Sort: at_risk first (delta ascending), then regressed, then stable, then improved
+    _status_order = {"at_risk": 0, "regressed": 1, "stable": 2, "improved": 3}
+    prompt_regressions.sort(key=lambda r: (_status_order[r["status"]], r["delta"]))
+
+    regression_count = sum(1 for r in prompt_regressions if r["status"] == "regressed")
+    at_risk_count = sum(1 for r in prompt_regressions if r["status"] == "at_risk")
+
+    return {
+        "migration_id": migration_id,
+        "prompt_regressions": prompt_regressions,
+        "regression_count": regression_count,
+        "at_risk_count": at_risk_count,
+        "total_analyzed": len(prompt_regressions),
+    }
+
+
 @router.get(
     "/api/v1/migrations/{migration_id}/stream",
     response_class=None,  # streaming response

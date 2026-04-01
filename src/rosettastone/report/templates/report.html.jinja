@@ -323,6 +323,7 @@
             <li><a href="#score-distribution">Score Distribution</a></li>
             <li><a href="#per-case-results">Per-Case Results</a></li>
             {% if validation_results %}<li><a href="#worst-regressions">Worst Regressions</a></li>{% endif %}
+            {% if prompt_regressions %}<li><a href="#regression-analysis">Regression Analysis</a></li>{% endif %}
             {% if safety_warnings %}<li><a href="#safety-findings">Safety Findings</a></li>{% endif %}
             {% if warnings %}<li><a href="#warnings">Warnings</a></li>{% endif %}
             <li><a href="#cost-summary">Cost Summary</a></li>
@@ -516,6 +517,56 @@
                 </table>
             </div>
             {% endfor %}
+        </details>
+    </section>
+    {% endif %}
+
+    {% if prompt_regressions %}
+    <section id="regression-analysis">
+        <details>
+            <summary>Per-Prompt Regression Analysis <span style="font-size: 0.85em; font-weight: normal; color: var(--color-text-muted);">{{ at_risk_count }} at-risk &middot; {{ regression_count }} regressed</span></summary>
+            {% set at_risk_list = prompt_regressions | selectattr('status', 'eq', 'at_risk') | list %}
+            {% set regressed_list = prompt_regressions | selectattr('status', 'eq', 'regressed') | list %}
+            {% if at_risk_list %}
+            <h3 style="color: var(--color-red, #dc3545); margin: 16px 0 8px;">At Risk &mdash; Below Threshold After Optimization</h3>
+            <table>
+                <tr><th>#</th><th>Type</th><th>Baseline</th><th>Optimized</th><th>Delta</th><th>Win Before</th><th>Win After</th></tr>
+                {% for r in at_risk_list %}
+                <tr style="background: rgba(220,53,69,0.08)">
+                    <td>{{ r.prompt_index }}</td>
+                    <td>{{ r.output_type }}</td>
+                    <td>{{ "%.3f" | format(r.baseline_score) }}</td>
+                    <td class="score-red">{{ "%.3f" | format(r.optimized_score) }}</td>
+                    <td class="score-red">{{ "%+.3f" | format(r.delta) }}</td>
+                    <td>{{ "yes" if r.baseline_is_win else "no" }}</td>
+                    <td>{{ "yes" if r.optimized_is_win else "no" }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% endif %}
+            {% if regressed_list %}
+            <h3 style="color: var(--color-yellow, #ffc107); margin: 16px 0 8px;">Regressed &mdash; Score Dropped, Still Above Threshold</h3>
+            <table>
+                <tr><th>#</th><th>Type</th><th>Baseline</th><th>Optimized</th><th>Delta</th><th>Win Before</th><th>Win After</th></tr>
+                {% for r in regressed_list[:10] %}
+                <tr style="background: rgba(255,193,7,0.08)">
+                    <td>{{ r.prompt_index }}</td>
+                    <td>{{ r.output_type }}</td>
+                    <td>{{ "%.3f" | format(r.baseline_score) }}</td>
+                    <td class="score-yellow">{{ "%.3f" | format(r.optimized_score) }}</td>
+                    <td class="score-yellow">{{ "%+.3f" | format(r.delta) }}</td>
+                    <td>{{ "yes" if r.baseline_is_win else "no" }}</td>
+                    <td>{{ "yes" if r.optimized_is_win else "no" }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% if regressed_list | length > 10 %}
+            <p style="color: var(--color-text-muted); margin-top: 8px;">...and {{ regressed_list | length - 10 }} more.</p>
+            {% endif %}
+            {% endif %}
+            {% if not at_risk_list and not regressed_list %}
+            <p>No regressions detected &mdash; all prompts improved or remained stable.</p>
+            {% endif %}
         </details>
     </section>
     {% endif %}

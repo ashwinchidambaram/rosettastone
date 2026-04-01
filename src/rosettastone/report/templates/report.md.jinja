@@ -78,6 +78,43 @@ _No validation results available._
 
 ---
 
+## Per-Prompt Regression Analysis
+
+{% if prompt_regressions %}
+{% set at_risk_list = prompt_regressions | selectattr('status', 'eq', 'at_risk') | list %}
+{% set regressed_list = prompt_regressions | selectattr('status', 'eq', 'regressed') | list %}
+
+**Summary:** {{ at_risk_count }} at-risk, {{ regression_count }} regressed out of {{ prompt_regressions | length }} analyzed.
+
+{% if at_risk_list %}
+### At Risk (Below Threshold After Optimization)
+
+| # | Output Type | Baseline | Optimized | Delta | Win Before | Win After |
+|---|-------------|----------|-----------|-------|------------|-----------|
+{% for r in at_risk_list -%}
+| {{ r.prompt_index }} | {{ r.output_type }} | {{ "%.3f" | format(r.baseline_score) }} | {{ "%.3f" | format(r.optimized_score) }} | {{ "%+.3f" | format(r.delta) }} | {{ "yes" if r.baseline_is_win else "no" }} | {{ "yes" if r.optimized_is_win else "no" }} |
+{% endfor %}
+{% endif %}
+
+{% if regressed_list %}
+### Regressed (Score Dropped, Still Above Threshold)
+
+| # | Output Type | Baseline | Optimized | Delta | Win Before | Win After |
+|---|-------------|----------|-----------|-------|------------|-----------|
+{% for r in regressed_list[:10] -%}
+| {{ r.prompt_index }} | {{ r.output_type }} | {{ "%.3f" | format(r.baseline_score) }} | {{ "%.3f" | format(r.optimized_score) }} | {{ "%+.3f" | format(r.delta) }} | {{ "yes" if r.baseline_is_win else "no" }} | {{ "yes" if r.optimized_is_win else "no" }} |
+{% endfor %}
+{% if regressed_list | length > 10 %}
+_...and {{ regressed_list | length - 10 }} more regressed prompts not shown._
+{% endif %}
+{% endif %}
+
+{% else %}
+_No regression analysis available (requires both baseline and validation results)._
+{% endif %}
+
+---
+
 ## Safety Findings
 
 {% if safety_warnings %}
