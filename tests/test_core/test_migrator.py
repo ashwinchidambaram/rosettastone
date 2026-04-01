@@ -5,6 +5,7 @@ All pipeline subsystems are mocked — no real LLM calls are made.
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -20,8 +21,8 @@ from rosettastone.core.types import EvalResult, MigrationResult, OutputType, Pro
 _PIPELINE_MODULE = "rosettastone.core.migrator"
 
 
-def _make_config(**kwargs) -> MigrationConfig:
-    defaults = dict(
+def _make_config(**kwargs: Any) -> MigrationConfig:
+    defaults: dict[str, Any] = dict(
         source_model="openai/gpt-4o",
         target_model="anthropic/claude-sonnet-4",
     )
