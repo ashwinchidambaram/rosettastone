@@ -7,6 +7,7 @@ import logging
 import statistics
 import time
 from pathlib import Path
+from typing import Any
 
 from sqlmodel import Session
 
@@ -18,13 +19,13 @@ from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningR
 logger = logging.getLogger(__name__)
 
 
-def _sample_latency(result, config) -> dict | None:
+def _sample_latency(result: Any, config: Any) -> dict[str, Any] | None:
     """Sample latency by calling source and target models with a few prompts."""
     try:
         import litellm
 
         # Take up to 5 prompts from validation results
-        prompts = []
+        prompts: list[Any] = []
         for er in result.validation_results[:5]:
             prompt = er.prompt_pair.prompt
             if isinstance(prompt, str):
@@ -75,7 +76,7 @@ def _sample_latency(result, config) -> dict | None:
         return None
 
 
-def _estimate_per_call_cost(config) -> dict | None:
+def _estimate_per_call_cost(config: Any) -> dict[str, Any] | None:
     """Estimate per-call cost using litellm model pricing."""
     try:
         import litellm
@@ -101,8 +102,8 @@ def _estimate_per_call_cost(config) -> dict | None:
 
 def run_migration_background(
     migration_id: int,
-    config_dict: dict,
-    engine=None,
+    config_dict: dict[str, Any],
+    engine: Any = None,
 ) -> None:
     """Run a migration in a background thread.
 
