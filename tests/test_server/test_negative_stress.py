@@ -63,7 +63,7 @@ def session(engine):
 
 @pytest.fixture
 def client(engine):
-    """Test client with mocked executor to prevent real background tasks."""
+    """Test client with mocked task worker to prevent real background tasks."""
     app = create_app()
 
     def override_session():
@@ -71,8 +71,8 @@ def client(engine):
             yield session
 
     app.dependency_overrides[get_session] = override_session
-    mock_executor = MagicMock()
-    app.state.executor = mock_executor
+    mock_task_worker = MagicMock()
+    app.state.task_worker = mock_task_worker
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -287,12 +287,12 @@ class TestFileUploadAbuse:
 
 
 class TestConcurrentMigrationStress:
-    """P1: Verify the single-worker ThreadPoolExecutor serializes correctly."""
+    """P1: Verify the task queue serializes correctly."""
 
     # --- 2a. Submit 10 migrations rapidly --- P1
     def test_ten_rapid_submissions_all_queued(self, client: TestClient, engine) -> None:
         """Submit 10 migrations rapidly; verify all create separate records
-        and the executor.submit is called 10 times.
+        and the task_worker.enqueue is called 10 times.
         """
         for i in range(10):
             data = f'{{"prompt": "q{i}", "response": "a{i}"}}\n'.encode()
@@ -304,7 +304,7 @@ class TestConcurrentMigrationStress:
             )
             assert resp.status_code == 303
 
-        assert client.app.state.executor.submit.call_count == 10
+        assert client.app.state.task_worker.enqueue.call_count == 10
 
         with Session(engine) as session:
             records = list(session.exec(select(MigrationRecord)).all())

@@ -49,9 +49,9 @@ def client(engine):
 
     app.dependency_overrides[get_session] = override_session
 
-    # Mock the executor to prevent actual background task running
-    mock_executor = MagicMock()
-    app.state.executor = mock_executor
+    # Mock the task worker to prevent actual background task running
+    mock_task_worker = MagicMock()
+    app.state.task_worker = mock_task_worker
 
     return TestClient(app)
 
@@ -129,8 +129,8 @@ class TestFormSubmission:
             assert records[0].target_model == "anthropic/claude-sonnet-4"
             assert records[0].status == "pending"
 
-        # Verify the executor was called
-        assert client.app.state.executor.submit.called
+        # Verify the task worker was called
+        assert client.app.state.task_worker.enqueue.called
 
     def test_submit_without_file_returns_422(self, client: TestClient) -> None:
         form_data = {
@@ -167,9 +167,9 @@ class TestFormSubmission:
         )
         assert resp.status_code == 303
 
-        # Verify the executor was called with dry_run in config
-        call_args = client.app.state.executor.submit.call_args
-        config_dict = call_args[0][2]  # Third positional arg
+        # Verify the task worker was called with dry_run in config
+        call_args = client.app.state.task_worker.enqueue.call_args
+        config_dict = call_args[0][2]  # Third positional arg: payload
         assert config_dict["dry_run"] is True
 
 

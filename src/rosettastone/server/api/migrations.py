@@ -1070,11 +1070,8 @@ async def create_migration_from_form(
         "judge_model": judge_model,
     }
 
-    # Submit to background executor
-    from rosettastone.server.api.tasks import run_migration_background
-
-    executor = request.app.state.executor
-    executor.submit(run_migration_background, migration_id, config_dict)
+    # Enqueue in DB-backed task queue
+    request.app.state.task_worker.enqueue("migration", migration_id, config_dict)
 
     # Redirect to the migration detail page (303 See Other)
     return RedirectResponse(

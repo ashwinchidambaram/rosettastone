@@ -43,8 +43,8 @@ _INVALID_YAML = "pipeline: { name: [not, a, string"  # malformed
 class TestCreatePipeline:
     def test_create_pipeline_valid_yaml(self, client, engine) -> None:
         """POST with valid YAML returns 201 and PipelineSummary."""
-        mock_executor = MagicMock()
-        client.app.state.executor = mock_executor
+        mock_task_worker = MagicMock()
+        client.app.state.task_worker = mock_task_worker
 
         resp = client.post(
             "/api/v1/pipelines/migrate",
@@ -63,12 +63,12 @@ class TestCreatePipeline:
         assert data["status"] == "pending"
         assert "id" in data
         # Background task should have been submitted
-        mock_executor.submit.assert_called_once()
+        mock_task_worker.enqueue.assert_called_once()
 
     def test_create_pipeline_invalid_yaml(self, client, engine) -> None:
         """POST with malformed YAML returns 422."""
-        mock_executor = MagicMock()
-        client.app.state.executor = mock_executor
+        mock_task_worker = MagicMock()
+        client.app.state.task_worker = mock_task_worker
 
         resp = client.post(
             "/api/v1/pipelines/migrate",
@@ -83,8 +83,8 @@ class TestCreatePipeline:
 
     def test_create_pipeline_missing_required_fields_in_yaml(self, client, engine) -> None:
         """POST with YAML missing required pipeline fields returns 422."""
-        mock_executor = MagicMock()
-        client.app.state.executor = mock_executor
+        mock_task_worker = MagicMock()
+        client.app.state.task_worker = mock_task_worker
 
         bad_yaml = textwrap.dedent("""\
             pipeline:
@@ -115,8 +115,8 @@ class TestListPipelines:
 
     def test_list_pipelines_returns_items(self, client, engine) -> None:
         """After creating a pipeline, GET returns it in the list."""
-        mock_executor = MagicMock()
-        client.app.state.executor = mock_executor
+        mock_task_worker = MagicMock()
+        client.app.state.task_worker = mock_task_worker
 
         client.post(
             "/api/v1/pipelines/migrate",

@@ -117,11 +117,8 @@ def create_pipeline(
     session.commit()
     session.refresh(pipeline)
 
-    # Submit to background executor
-    from rosettastone.server.pipeline_runner import run_pipeline_background
-
-    executor = request.app.state.executor
-    executor.submit(run_pipeline_background, pipeline.id)
+    # Enqueue in DB-backed task queue
+    request.app.state.task_worker.enqueue("pipeline", pipeline.id, {})
 
     return _pipeline_to_summary(pipeline)
 

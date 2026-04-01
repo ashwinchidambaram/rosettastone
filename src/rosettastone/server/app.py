@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import AsyncGenerator
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -132,20 +131,24 @@ def _check_model_deprecations() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Initialize database and executor on startup."""
+    """Initialize database and task worker on startup."""
+    from rosettastone.server.task_worker import TaskWorker
+
     init_db()
     _recover_orphaned_migrations()
     _check_model_deprecations()
     _check_jwt_secret()
 
-    # Single-worker executor — serializes all migrations (DSPy thread-safety)
-    executor = ThreadPoolExecutor(max_workers=1)
-    app.state.executor = executor
+    # DB-backed task worker — durable, survives server restarts
+    task_worker = TaskWorker(get_engine())
+    task_worker.recover_stale_tasks()
+    task_worker.start()
+    app.state.task_worker = task_worker
 
     yield
 
-    # Graceful shutdown: wait up to 30s for in-progress tasks to complete
-    executor.shutdown(wait=True, cancel_futures=False)
+    # Graceful shutdown: stop polling (current in-flight task completes naturally)
+    task_worker.stop(wait=True, timeout=30.0)
 
 
 def create_app() -> FastAPI:
