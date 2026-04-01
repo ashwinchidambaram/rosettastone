@@ -43,8 +43,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline' fonts.googleapis.com; "
             "font-src 'self' fonts.gstatic.com; "
             "img-src 'self' data:; "
-            "connect-src 'self'"
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'; "
+            "object-src 'none'"
         )
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         return response
 
 
@@ -90,18 +95,18 @@ _SERVER_LOGGER = logging.getLogger("rosettastone.server")
 
 
 def _check_jwt_secret() -> None:
-    """Warn when multi-user mode is active with an insecure JWT secret."""
+    """Enforce JWT secret strength in multi-user mode; raise on default dev secret."""
     multi_user = os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
     if not multi_user:
         return
 
     secret = os.environ.get(_JWT_SECRET_ENV, _JWT_SECRET_DEFAULT)
     if secret == _JWT_SECRET_DEFAULT:
-        _SERVER_LOGGER.warning(
-            "ROSETTASTONE_JWT_SECRET is set to the default dev value"
-            " — set a strong secret before deploying to production"
+        raise RuntimeError(
+            "ROSETTASTONE_JWT_SECRET is set to the insecure default dev value. "
+            "Set a strong secret (>= 32 bytes) before running in multi-user mode."
         )
-    elif len(secret) < _JWT_SECRET_MIN_BYTES:
+    if len(secret) < _JWT_SECRET_MIN_BYTES:
         _SERVER_LOGGER.warning(
             "ROSETTASTONE_JWT_SECRET is %d bytes"
             " — minimum recommended length is 32 bytes for HS256",
@@ -154,9 +159,22 @@ def create_app() -> FastAPI:
 
     # Middleware order: outermost first in add_middleware calls.
     # Starlette wraps them so the LAST added runs first (innermost).
-    # Execution order: SecurityHeaders → Auth → CSRF → route handler
+    # Execution order: SecurityHeaders → CORS → Auth → CSRF → route handler
+    from fastapi.middleware.cors import CORSMiddleware
+
     from rosettastone.server.api.auth import AuthMiddleware
     from rosettastone.server.csrf import CSRFMiddleware
+
+    cors_origins_env = os.environ.get("ROSETTASTONE_CORS_ORIGINS", "")
+    cors_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+            allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+        )
 
     app.add_middleware(CSRFMiddleware)
     app.add_middleware(AuthMiddleware)

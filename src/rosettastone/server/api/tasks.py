@@ -100,6 +100,27 @@ def _estimate_per_call_cost(config: Any) -> dict[str, Any] | None:
         return None
 
 
+def _make_progress_writer(migration_id: int, engine: Any) -> Any:
+    """Return a callback that writes stage progress to the DB."""
+
+    def _write_progress(stage: str, stage_pct: float, overall_pct: float) -> None:
+        try:
+            with Session(engine) as sess:
+                record = sess.get(MigrationRecord, migration_id)
+                if record is not None:
+                    record.current_stage = stage
+                    record.stage_progress = stage_pct
+                    record.overall_progress = overall_pct
+                    sess.add(record)
+                    sess.commit()
+        except Exception as exc:
+            logger.warning(
+                "Failed to write stage progress for migration %d: %s", migration_id, exc
+            )
+
+    return _write_progress
+
+
 def run_migration_background(
     migration_id: int,
     config_dict: dict[str, Any],
@@ -136,7 +157,8 @@ def run_migration_background(
         config_dict["output_dir"] = str(output_dir)
         config = MigrationConfig(**config_dict)
 
-        result = Migrator(config).run()
+        progress_cb = _make_progress_writer(migration_id, engine)
+        result = Migrator(config, progress_callback=progress_cb).run()
 
         # Latency sampling — measure first 5 prompts against source and target
         latency_data = _sample_latency(result, config)

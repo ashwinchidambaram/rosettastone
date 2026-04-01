@@ -368,6 +368,86 @@ class TestResultShape:
         assert result.optimized_prompt == expected_prompt
 
 
+class TestProgressCallback:
+    def test_progress_callback_invoked(self):
+        """progress_callback must be called after each pipeline stage."""
+        config = _make_config(dry_run=False, skip_preflight=False)
+        calls = []
+
+        def capture(stage, stage_pct, overall_pct):
+            calls.append((stage, stage_pct, overall_pct))
+
+        migrator = Migrator(config, progress_callback=capture)
+
+        pairs = [_make_pair()]
+        preflight_report = _make_preflight_report()
+        eval_results = [_make_eval_result(is_win=True)]
+
+        with (
+            patch("rosettastone.core.pipeline.run_preflight", return_value=preflight_report),
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data",
+                return_value=(pairs, pairs, pairs),
+            ),
+            patch("rosettastone.core.pipeline.run_pii_scan"),
+            patch("rosettastone.core.pipeline.evaluate_baseline", return_value=eval_results),
+            patch("rosettastone.core.pipeline.optimize_prompt", return_value="opt"),
+            patch("rosettastone.core.pipeline.run_pii_scan_text"),
+            patch("rosettastone.core.pipeline.run_prompt_audit"),
+            patch("rosettastone.core.pipeline.evaluate_optimized", return_value=eval_results),
+            patch(
+                "rosettastone.core.pipeline.make_recommendation",
+                return_value=("GO", "ok", {}),
+            ),
+            patch("rosettastone.core.pipeline.generate_report"),
+        ):
+            migrator.run()
+
+        stage_names = [c[0] for c in calls]
+        assert "preflight" in stage_names
+        assert "optimize" in stage_names
+        assert "report" in stage_names
+        # All calls have valid progress values
+        for stage, stage_pct, overall_pct in calls:
+            assert 0.0 <= stage_pct <= 1.0
+            assert 0.0 <= overall_pct <= 1.0
+
+    def test_progress_callback_exception_does_not_abort(self):
+        """A throwing progress_callback must not abort the migration."""
+        config = _make_config(dry_run=False, skip_preflight=False)
+
+        def bad_callback(stage, stage_pct, overall_pct):
+            raise RuntimeError("callback broke")
+
+        migrator = Migrator(config, progress_callback=bad_callback)
+
+        pairs = [_make_pair()]
+        preflight_report = _make_preflight_report()
+        eval_results = [_make_eval_result(is_win=True)]
+
+        with (
+            patch("rosettastone.core.pipeline.run_preflight", return_value=preflight_report),
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data",
+                return_value=(pairs, pairs, pairs),
+            ),
+            patch("rosettastone.core.pipeline.run_pii_scan"),
+            patch("rosettastone.core.pipeline.evaluate_baseline", return_value=eval_results),
+            patch("rosettastone.core.pipeline.optimize_prompt", return_value="opt"),
+            patch("rosettastone.core.pipeline.run_pii_scan_text"),
+            patch("rosettastone.core.pipeline.run_prompt_audit"),
+            patch("rosettastone.core.pipeline.evaluate_optimized", return_value=eval_results),
+            patch(
+                "rosettastone.core.pipeline.make_recommendation",
+                return_value=("GO", "ok", {}),
+            ),
+            patch("rosettastone.core.pipeline.generate_report"),
+        ):
+            result = migrator.run()  # must not raise
+
+        assert isinstance(result, MigrationResult)
+
+
 class TestSkipPreflight:
     def test_skip_preflight_bypasses_checks(self):
         """With skip_preflight=True, run_preflight must never be called."""

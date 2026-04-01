@@ -160,12 +160,13 @@ async def login_submit(request: Request, api_key: str = Form(...)) -> Response:
 
     token = _create_session_token(expected)
     response = RedirectResponse(url="/ui/", status_code=302)
+    behind_https = os.environ.get("ROSETTASTONE_BEHIND_HTTPS", "").lower() in ("1", "true", "yes")
     response.set_cookie(
         key="rosettastone_session",
         value=token,
         httponly=True,
         samesite="lax",
-        secure=False,  # set to True behind HTTPS in production
+        secure=behind_https,
     )
     return response
 

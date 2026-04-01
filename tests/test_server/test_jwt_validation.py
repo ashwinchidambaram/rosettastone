@@ -21,15 +21,15 @@ def _call_check(monkeypatch, *, multi_user: str, secret: str | None) -> None:
     _check_jwt_secret()
 
 
-def test_default_secret_warns_when_multi_user_enabled(monkeypatch, caplog):
-    with caplog.at_level(logging.WARNING, logger="rosettastone.server"):
-        _call_check(monkeypatch, multi_user="true", secret=None)
+def test_default_secret_raises_when_multi_user_enabled(monkeypatch):
+    """Default JWT secret must raise RuntimeError in multi-user mode (not just warn)."""
+    monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
+    monkeypatch.delenv("ROSETTASTONE_JWT_SECRET", raising=False)
 
-    assert any(
-        "default dev value" in record.message
-        for record in caplog.records
-        if record.name == "rosettastone.server"
-    )
+    from rosettastone.server.app import _check_jwt_secret
+
+    with pytest.raises(RuntimeError, match="insecure default"):
+        _check_jwt_secret()
 
 
 def test_short_custom_secret_warns_when_multi_user_enabled(monkeypatch, caplog):
@@ -79,12 +79,12 @@ def test_no_warning_when_multi_user_disabled_short_secret(monkeypatch, caplog):
 
 
 @pytest.mark.parametrize("truthy", ["1", "true", "yes", "True", "YES"])
-def test_multi_user_truthy_variants_all_warn_with_default(monkeypatch, caplog, truthy):
-    with caplog.at_level(logging.WARNING, logger="rosettastone.server"):
-        _call_check(monkeypatch, multi_user=truthy, secret=None)
+def test_multi_user_truthy_variants_all_raise_with_default(monkeypatch, truthy):
+    """All truthy values of ROSETTASTONE_MULTI_USER must trigger RuntimeError with default secret."""
+    monkeypatch.setenv("ROSETTASTONE_MULTI_USER", truthy)
+    monkeypatch.delenv("ROSETTASTONE_JWT_SECRET", raising=False)
 
-    assert any(
-        "default dev value" in record.message
-        for record in caplog.records
-        if record.name == "rosettastone.server"
-    ), f"Expected warning for ROSETTASTONE_MULTI_USER={truthy!r}"
+    from rosettastone.server.app import _check_jwt_secret
+
+    with pytest.raises(RuntimeError):
+        _check_jwt_secret()

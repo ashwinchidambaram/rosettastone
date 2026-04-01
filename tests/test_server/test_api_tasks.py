@@ -366,6 +366,54 @@ class TestRunMigrationBackground:
             record = session.get(MigrationRecord, mid)
             assert record.status == "dry_run_complete"
 
+    def test_progress_callback_passed_to_migrator(self, engine, tmp_path, monkeypatch) -> None:
+        """run_migration_background must pass a progress callback to Migrator."""
+        from rosettastone.core.types import MigrationResult
+
+        with Session(engine) as sess:
+            record = MigrationRecord(source_model="a/b", target_model="c/d")
+            sess.add(record)
+            sess.commit()
+            sess.refresh(record)
+            mid = record.id
+
+        mock_result = MigrationResult(
+            config={},
+            optimized_prompt="x",
+            baseline_results=[],
+            validation_results=[],
+            confidence_score=0.9,
+            baseline_score=0.8,
+            improvement=0.1,
+            cost_usd=0.0,
+            duration_seconds=0.0,
+            warnings=[],
+            recommendation="GO",
+            recommendation_reasoning="ok",
+            per_type_scores={},
+        )
+
+        received_callbacks = []
+
+        class FakeMigrator:
+            def __init__(self, config, progress_callback=None):
+                received_callbacks.append(progress_callback)
+
+            def run(self):
+                return mock_result
+
+        with patch("rosettastone.core.migrator.Migrator", FakeMigrator):
+            from rosettastone.server.api.tasks import run_migration_background
+
+            run_migration_background(
+                mid,
+                {"source_model": "a/b", "target_model": "c/d"},
+                engine=engine,
+            )
+
+        assert len(received_callbacks) == 1
+        assert callable(received_callbacks[0]), "progress_callback must be a callable"
+
     def test_running_status_set_before_migrator(self, engine) -> None:
         """Verify the status transitions through 'running' before completion."""
         from rosettastone.core.types import MigrationResult
