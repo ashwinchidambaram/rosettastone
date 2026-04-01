@@ -35,6 +35,8 @@ EXPECTED_APP_TABLES: set[str] = {
     "annotations",
     "approval_workflows",
     "approvals",
+    "task_queue",
+    "user_budgets",
 }
 
 
@@ -273,6 +275,27 @@ def test_migrations_table_exists_after_upgrade(upgraded_db):
         f"alembic_version contains '{recorded_revision}' "
         f"but expected head revision '{head_revision}'"
     )
+
+
+def test_new_migrations_columns_exist_after_upgrade(upgraded_db):
+    """After upgrade head, the 8 production-readiness columns must exist on migrations table."""
+    engine = sqlalchemy.create_engine(f"sqlite:///{upgraded_db}")
+    inspector = sqlalchemy.inspect(engine)
+    columns = {col["name"] for col in inspector.get_columns("migrations")}
+    engine.dispose()
+
+    expected_new_cols = {
+        "checkpoint_stage",
+        "checkpoint_data_json",
+        "current_stage",
+        "stage_progress",
+        "overall_progress",
+        "max_cost_usd",
+        "estimated_cost_usd",
+        "owner_id",
+    }
+    missing = expected_new_cols - columns
+    assert not missing, f"Missing columns on migrations table after upgrade: {missing}"
 
 
 # ---------------------------------------------------------------------------

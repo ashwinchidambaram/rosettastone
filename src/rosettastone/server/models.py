@@ -54,6 +54,16 @@ class MigrationRecord(SQLModel, table=True):
     warnings_json: str = "[]"  # serialized warnings list
     safety_warnings_json: str = "[]"  # serialized SafetyWarning list
 
+    # Production readiness additions
+    checkpoint_stage: str | None = None
+    checkpoint_data_json: str | None = None
+    current_stage: str | None = None
+    stage_progress: float | None = None
+    overall_progress: float | None = None
+    max_cost_usd: float | None = None
+    estimated_cost_usd: float | None = None
+    owner_id: int | None = None
+
     test_cases: list["TestCaseRecord"] = Relationship(back_populates="migration")
     warning_records: list["WarningRecord"] = Relationship(back_populates="migration")
 
@@ -154,6 +164,7 @@ class ABTest(SQLModel, table=True):
     end_time: datetime | None = None
     winner: str | None = None  # "a", "b", or "inconclusive"
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    owner_id: int | None = None
 
 
 class ABTestResult(SQLModel, table=True):
@@ -180,6 +191,9 @@ class PipelineRecord(SQLModel, table=True):
     target_model: str
     status: str = "pending"  # pending / running / complete / failed
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    owner_id: int | None = None
+    overall_progress: float | None = None
+    current_module: str | None = None
 
 
 class PipelineStageRecord(SQLModel, table=True):
@@ -266,3 +280,37 @@ class Approval(SQLModel, table=True):
     decision: str  # "approve" / "reject"
     comment: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+# ---------------------------------------------------------------------------
+# Production Readiness — Task Queue + User Budget
+# ---------------------------------------------------------------------------
+
+
+class TaskQueue(SQLModel, table=True):
+    __tablename__ = "task_queue"
+
+    id: int | None = Field(default=None, primary_key=True)
+    task_type: str  # "migration" | "pipeline" | "ab_test"
+    resource_id: int | None = None  # ID of the related resource
+    payload_json: str = "{}"  # serialized task arguments
+    status: str = Field(default="queued")  # queued / running / complete / failed / cancelled
+    priority: int = Field(default=0)  # higher = more urgent
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    worker_id: str | None = None  # identifier of worker that claimed this task
+    retry_count: int = Field(default=0)
+    max_retries: int = Field(default=3)
+    error_message: str | None = None
+    correlation_id: str | None = None  # links task to originating request
+
+
+class UserBudget(SQLModel, table=True):
+    __tablename__ = "user_budgets"
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id")
+    monthly_limit_usd: float = Field(default=0.0)  # 0 = unlimited
+    current_month_spend_usd: float = Field(default=0.0)
+    budget_month: str = Field(default="")  # YYYY-MM format; reset when month changes
