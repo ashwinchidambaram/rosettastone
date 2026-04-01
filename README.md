@@ -5,20 +5,19 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+" /></a>
-  <img src="https://img.shields.io/badge/build_status-in_progress-orange.svg" alt="Build Status: In Progress" />
+  <img src="https://img.shields.io/badge/tests-1414_passing-brightgreen.svg" alt="Tests: 1414 passing" />
 </p>
 
 <p align="center">
   <a href="#overview">Overview</a> &nbsp;&nbsp;|&nbsp;&nbsp;
   <a href="#get-started">Get Started</a> &nbsp;&nbsp;|&nbsp;&nbsp;
   <a href="#under-the-hood">Under the Hood</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+  <a href="#web-dashboard">Web Dashboard</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+  <a href="#docker">Docker</a> &nbsp;&nbsp;|&nbsp;&nbsp;
   <a href="#architecture">Architecture</a> &nbsp;&nbsp;|&nbsp;&nbsp;
   <a href="#glossary">Glossary</a> &nbsp;&nbsp;|&nbsp;&nbsp;
-  <a href="#roadmap">Roadmap</a> &nbsp;&nbsp;|&nbsp;&nbsp;
   <a href="DEVLOG.md">Dev Log</a>
 </p>
-
-> **Note:** This project is actively under development and not yet production-ready. See the [Roadmap](#roadmap) for current progress and the [Dev Log](DEVLOG.md) for build updates.
 
 ---
 
@@ -60,8 +59,7 @@ pip install rosettastone
 
 pip install "rosettastone[eval]"   # adds BERTScore & sentence-transformers
 pip install "rosettastone[web]"    # adds FastAPI web dashboard
-pip install "rosettastone[all]"    # includes everything (redis, eval, web, etc.)
-pip install "rosettastone[e2e]"    # E2E testing dependencies (eval + redis + web)
+pip install "rosettastone[all]"    # includes everything (redis, eval, web, auth, postgres, etc.)
 ```
 
 ### Configuration
@@ -114,6 +112,15 @@ rosettastone migrate \
   --from openai/gpt-4o \
   --to anthropic/claude-sonnet-4 \
   --local-only
+
+# migrate a multi-step pipeline / agent workflow
+rosettastone migrate \
+  --pipeline pipeline_config.yaml \
+  --from openai/gpt-4o \
+  --to anthropic/claude-sonnet-4
+
+# run multiple migrations from a manifest file
+rosettastone batch --manifest migrations.yaml --output ./batch_output
 ```
 
 **Python Library**
@@ -248,6 +255,7 @@ Input is a JSONL file with one prompt/response pair per line. Prompts can be pla
 | `source_model` | yes | LiteLLM model identifier (e.g. `openai/gpt-4o`) |
 | `metadata` | | Arbitrary key-value pairs |
 | `feedback` | | Known issues with this particular response (used by optimizer) |
+| `known_issue` | | `true` if this pair is a known regression — optimizer weights it 2× harder |
 | `input_tokens` | | Token count for the prompt |
 | `output_tokens` | | Token count for the response |
 | `timestamp` | | When this pair was generated |
@@ -267,6 +275,53 @@ rosettastone migrate \
 
 The adapter uses `SCAN` (non-blocking), auto-detects the cache format by sampling keys, and handles mixed/unparseable entries gracefully. Requires the `redis` Python package.
 
+### Other Adapters
+
+| Adapter | Flag | Notes |
+|:---|:---|:---|
+| LangSmith | `--adapter langsmith` | Ingests runs from a LangSmith project |
+| Braintrust | `--adapter braintrust` | Ingests logs from a Braintrust project |
+| OpenTelemetry | `--adapter otel` | Ingests spans from an OTLP export file |
+
+---
+
+## Batch Runner
+
+Migrate multiple models at once from a YAML manifest:
+
+```yaml
+# migrations.yaml
+version: 1
+defaults:
+  gepa_auto: light
+  output_dir: ./batch_output
+
+migrations:
+  - name: gpt4o-to-sonnet
+    source_model: openai/gpt-4o
+    target_model: anthropic/claude-sonnet-4
+    data_path: data/gpt4o_pairs.jsonl
+
+  - name: gpt4o-mini-to-haiku
+    source_model: openai/gpt-4o-mini
+    target_model: anthropic/claude-haiku-4-5
+    data_path: data/mini_pairs.jsonl
+    gepa_auto: medium
+```
+
+```bash
+rosettastone batch --manifest migrations.yaml --output ./batch_output
+```
+
+Results are printed as a markdown table:
+
+```
+| Name              | Source → Target                      | Status   | Recommendation | Confidence |
+|-------------------|--------------------------------------|----------|----------------|------------|
+| gpt4o-to-sonnet   | openai/gpt-4o → anthropic/claude-... | COMPLETE | GO             | 89%        |
+| gpt4o-mini-to-haiku | openai/gpt-4o-mini → anthropic/... | COMPLETE | CONDITIONAL    | 74%        |
+```
+
 ---
 
 ## Estimated Cost & Performance
@@ -283,7 +338,164 @@ For 100 prompt/response pairs using default settings (`--auto light`):
 Optimization intensity is configurable via `--auto`: `light` (default), `medium`, or `heavy`.
 Higher intensity = more API calls, better results.
 
-> Use `--dry-run` to get a cost estimate before committing. Cost estimates now include LLM judge calls and MIPROv2 overhead when applicable.
+> Use `--dry-run` to get a cost estimate before committing. Cost estimates include LLM judge calls and MIPROv2 overhead when applicable.
+
+---
+
+## Web Dashboard
+
+RosettaStone includes a full-featured web UI for exploring migration results, running A/B tests, managing approvals, and collaborating with your team.
+
+```bash
+# install web dependencies
+pip install "rosettastone[web]"
+
+# start the dashboard (single-user, no auth)
+uvicorn rosettastone.server.app:create_app --factory --port 8000
+
+# start with API key auth
+ROSETTASTONE_API_KEY=your-key uvicorn rosettastone.server.app:create_app --factory --port 8000
+
+# start with full multi-user auth (JWT + RBAC)
+ROSETTASTONE_MULTI_USER=true \
+ROSETTASTONE_JWT_SECRET=your-32-byte-secret \
+uvicorn rosettastone.server.app:create_app --factory --port 8000
+
+# open http://localhost:8000/ui/
+```
+
+### Pages
+
+| Page | URL | Description |
+|:---|:---|:---|
+| Models | `/ui/` | Active models, deprecation warnings, model explorer |
+| Migrations | `/ui/migrations` | Migration history with go/no-go recommendations |
+| Migration Detail | `/ui/migrations/{id}` | Answer-first layout: recommendation, KPIs, per-type breakdown, regressions with diff view, score charts, version timeline |
+| Executive View | toggle on detail page | Compact card for stakeholders: confidence score, one-line recommendation, cost summary |
+| Costs | `/ui/costs` | Spend breakdown by model, optimization opportunities |
+| Alerts | `/ui/alerts` | Deprecation warnings, price changes, new model availability |
+| Pipelines | `/ui/pipelines` | Multi-step pipeline migration status |
+| Pipeline Detail | `/ui/pipelines/{id}` | Per-module optimization progress |
+| A/B Tests | `/ui/ab-tests` | Compare two migration versions with statistical significance |
+| A/B Test Detail | `/ui/ab-tests/{id}` | Win rate bars, p-value badge, score distributions |
+| Audit Log | `/ui/audit-log` | Filterable history of all user actions |
+| Users | `/ui/users` | User management (admin only) |
+| Teams | `/ui/teams` | Team and membership management |
+| Annotations | `/ui/annotations` | Annotation queue for test case review |
+
+### Authentication
+
+| Mode | How to enable | Who can use it |
+|:---|:---|:---|
+| No auth (default) | Don't set any auth env vars | Anyone with network access |
+| API key | `ROSETTASTONE_API_KEY=secret` | Bearer token or UI login |
+| Multi-user JWT + RBAC | `ROSETTASTONE_MULTI_USER=true` + `ROSETTASTONE_JWT_SECRET=...` | Individual user accounts with roles |
+
+**Roles:** `viewer` (read-only) → `editor` (create/edit) → `approver` (editor + approve migrations) → `admin` (all + user management). The first registered user is automatically assigned the `admin` role.
+
+### A/B Testing
+
+Compare two versions of a migrated prompt to measure which performs better:
+
+1. Run a migration and let it create Version A
+2. Rollback or modify to create Version B
+3. Create an A/B test, set your traffic split, and click Start
+4. RosettaStone re-evaluates your test cases deterministically across both versions
+5. View win rates, score distributions, and chi-squared significance
+
+### Approval Workflows
+
+Require sign-off before a migration is marked production-ready:
+
+```http
+POST /api/v1/migrations/{id}/approval-workflow
+{ "required_approvals": 2 }
+
+POST /api/v1/migrations/{id}/approve
+{ "comment": "Looks good — JSON outputs are clean" }
+```
+
+The workflow auto-approves when the required approval count is reached.
+
+---
+
+## Docker
+
+Run the full stack with Docker Compose:
+
+```bash
+# SQLite (default) — single container, data persisted to a Docker volume
+docker compose up
+
+# with PostgreSQL
+docker compose --profile postgres up
+
+# with Redis (for cache ingestion)
+docker compose --profile redis up
+```
+
+Environment variables (set in `.env` or `docker-compose.yml`):
+
+| Variable | Default | Description |
+|:---|:---|:---|
+| `DATABASE_URL` | SQLite | PostgreSQL connection string (e.g. `postgresql://user:pass@db/rosettastone`) |
+| `REDIS_URL` | none | Redis connection string |
+| `ROSETTASTONE_API_KEY` | none | Enables API key auth |
+| `ROSETTASTONE_MULTI_USER` | `false` | Enables multi-user JWT auth |
+| `ROSETTASTONE_JWT_SECRET` | dev default | **Set a strong secret in production** |
+| `OPENAI_API_KEY` | required | For optimization and LLM judge |
+| `ANTHROPIC_API_KEY` | optional | If migrating to Anthropic models |
+
+**Production deployment:** The entrypoint runs `alembic upgrade head` before starting the server — schema migrations are applied automatically on container start.
+
+```bash
+# build and run manually
+docker build -t rosettastone .
+docker run -p 8000:8000 \
+  -e OPENAI_API_KEY=sk-... \
+  -e ROSETTASTONE_API_KEY=your-secret \
+  rosettastone
+```
+
+---
+
+## Pipeline Migration
+
+Migrate multi-step LLM chains or agent workflows in a single pass. Define your pipeline as a YAML DAG:
+
+```yaml
+# pipeline_config.yaml
+pipeline:
+  name: customer-support-pipeline
+  source_model: openai/gpt-4o
+  target_model: anthropic/claude-sonnet-4
+  data_path: data/support_pairs.jsonl
+
+  modules:
+    - name: classify_intent
+      prompt_template: "Classify the customer's intent..."
+      input_fields: [customer_message]
+      output_fields: [intent, urgency]
+
+    - name: draft_response
+      prompt_template: "Draft a support response..."
+      input_fields: [customer_message, intent, urgency]
+      output_fields: [response_draft]
+      depends_on: [classify_intent]
+
+    - name: quality_check
+      prompt_template: "Review this response for quality..."
+      input_fields: [response_draft]
+      output_fields: [final_response, quality_score]
+      depends_on: [draft_response]
+```
+
+```bash
+rosettastone migrate --pipeline pipeline_config.yaml \
+  --from openai/gpt-4o --to anthropic/claude-sonnet-4
+```
+
+Each module is optimized independently (teacher/student), and per-module results are tracked in the dashboard. Circular dependencies are caught at parse time.
 
 ---
 
@@ -293,7 +505,7 @@ Higher intensity = more API calls, better results.
 src/rosettastone/
 │
 ├── cli/
-│   ├── main.py           Typer CLI — migrate, preflight, evaluate
+│   ├── main.py           Typer CLI — migrate, preflight, batch
 │   └── display.py        Rich progress bars, summary tables, recommendation panels
 │
 ├── core/
@@ -304,79 +516,82 @@ src/rosettastone/
 │
 ├── config.py             MigrationConfig (Pydantic v2)
 ├── preflight/            Capability checks, token budgets, cost estimation
-├── ingest/               DataAdapter interface — JSONL + Redis adapters
-├── optimize/             GEPA + MIPROv2 wrappers, feedback utilities, DSPy metric
-├── evaluate/             BERTScore, embeddings, exact match, JSON validation,
-│                         JSON structural similarity, LLM-as-judge
+├── ingest/               DataAdapter interface — JSONL, Redis, LangSmith, Braintrust, OTel
+├── optimize/             GEPA + MIPROv2 wrappers, pipeline optimizer, teacher/student,
+│                         feedback utilities, DSPy metric, pipeline config parser
+├── evaluate/             BERTScore, embeddings (lru_cache), exact match, JSON validation,
+│                         JSON structural similarity, LLM-as-judge, composite evaluator
 ├── safety/               PII scanner (regex), prompt auditor (leakage detection)
-├── decision/             Recommendation engine, Wilson CI statistics
-├── report/               Jinja2 markdown report generation (10-section template)
-├── server/               Web UI — FastAPI + Jinja2 + HTMX + Tailwind
-│                         SQLite persistence, JSON API, template rendering
-├── testing/              E2E test harness — synthetic data generation,
-│                         Redis population, scenario configs
-└── utils/                Logging (never logs prompt content), LiteLLM helpers
+├── decision/             Recommendation engine, Wilson CI statistics, A/B stats engine
+├── report/               Jinja2 markdown report generation, HTML report with Chart.js
+│
+├── batch.py              Batch migration runner (YAML manifest → multiple migrations)
+│
+└── server/               Web UI — FastAPI + Jinja2 + HTMX + Tailwind CSS
+    ├── app.py            create_app() factory, executor, startup/shutdown hooks
+    ├── models.py         SQLModel table definitions (18 tables)
+    ├── database.py       Engine + session factory; SQLite WAL / PostgreSQL support
+    ├── schemas.py        Pydantic request/response schemas
+    ├── auth_utils.py     bcrypt password hashing, JWT encode/decode
+    ├── rbac.py           require_role() FastAPI dependency
+    ├── csrf.py           CSRF middleware (HMAC tokens)
+    ├── ab_runner.py      A/B test background runner (simulation + live modes)
+    ├── pipeline_runner.py Pipeline background runner
+    └── api/              API routers: migrations, tasks, versioning, ab_testing,
+                          pipelines, annotations, approvals, teams, users, auth,
+                          audit, alerts, costs, comparisons, reports, …
 ```
 
-**Design Principles:**
+**Design principles:**
 
 - **Provider-agnostic** — supports 100+ models through [LiteLLM](https://github.com/BerriAI/litellm)
-- **Pluggable** — abstract base classes for data adapters, optimizers, and evaluators. Adding a new data source or metric means implementing one interface.
-- **CLI = Library** — both paths construct a `MigrationConfig` and call `Migrator.run()`. No divergent code paths.
-- **Lazy optional deps** — `bert-score`, `sentence-transformers`, and `redis` only load when called, with graceful fallbacks.
-- **PII-safe by default** — prompt content is never logged at any level. Reports show structural metrics only. PII scanning runs automatically.
-- **Additive phases** — each phase adds new files without rewriting existing ones. Phase 1 code stays stable through Phase 5.
-
----
-
-## Web Dashboard
-
-RosettaStone includes a web UI for exploring migration results visually.
-
-```bash
-# install web dependencies
-pip install "rosettastone[web]"
-
-# start the dashboard
-uvicorn rosettastone.server.app:create_app --factory --port 8000
-
-# open http://localhost:8000/ui/
-```
-
-**Pages:**
-
-| Page | URL | Description |
-|:---|:---|:---|
-| Models | `/ui/` | Active models, deprecation warnings, model explorer |
-| Migrations | `/ui/migrations` | Migration history with go/no-go recommendations |
-| Migration Detail | `/ui/migrations/{id}` | Answer-first layout: recommendation, KPIs, per-type breakdown, regressions with diff view |
-| Costs | `/ui/costs` | Spend breakdown by model, optimization opportunities |
-| Alerts | `/ui/alerts` | Deprecation warnings, price changes, new model availability |
-| Executive Report | `/ui/migrations/{id}/executive` | Print-ready one-page summary for stakeholders |
-
-**Design philosophy:** "Designing for decisions, not data." The UI answers questions first ("Should we ship this?") with evidence behind a click. Human language ("Safe to ship" / "Needs review" / "Do not ship") instead of jargon.
-
-**Tech stack:** FastAPI + Jinja2 + HTMX + Tailwind CSS + Material Symbols. Dark mode default with light mode toggle. All migrations data is live from the SQLite database; models, costs, and alerts use placeholder data pending backend integration.
+- **Pluggable** — abstract base classes for data adapters, optimizers, and evaluators
+- **CLI = Library** — both paths construct a `MigrationConfig` and call `Migrator.run()`
+- **Lazy optional deps** — `bert-score`, `sentence-transformers`, and `redis` load on demand with graceful fallbacks
+- **PII-safe by default** — prompt content is never logged at any level
+- **Database** — SQLite (WAL mode, default) or PostgreSQL via `DATABASE_URL`. Schema managed by Alembic; `alembic upgrade head` runs automatically on container start.
 
 ---
 
 ## CLI Reference
 
+### `rosettastone migrate`
+
 | Flag | Default | Description |
 |:---|:---|:---|
-| `--data`, `-d` | required | Path to JSONL file |
+| `--data`, `-d` | | Path to JSONL file |
 | `--from` | required | Source model (LiteLLM identifier) |
 | `--to` | required | Target model (LiteLLM identifier) |
 | `--output`, `-o` | `./migration_output` | Output directory |
 | `--auto` | `light` | GEPA intensity: `light` / `medium` / `heavy` |
 | `--dry-run` | `false` | Estimate cost without running |
-| `--redis-url` | none | Redis URL for cache ingestion (replaces `--data`) |
+| `--redis-url` | | Redis URL for cache ingestion (replaces `--data`) |
+| `--adapter` | `jsonl` | Data adapter: `jsonl` / `redis` / `langsmith` / `braintrust` / `otel` |
 | `--optimizer` | `gepa` | Optimizer: `gepa` or `mipro` |
-| `--mipro-auto` | none | MIPROv2 preset: `light` / `medium` / `heavy` |
+| `--mipro-auto` | | MIPROv2 preset: `light` / `medium` / `heavy` |
 | `--judge-model` | `openai/gpt-4o` | Model for LLM-as-judge evaluation |
+| `--reflection-model` | `openai/gpt-4o` | Model GEPA uses to reflect on failures |
 | `--local-only` | `false` | Skip external API calls for evaluation |
 | `--no-pii-scan` | `false` | Disable PII scanning |
 | `--no-prompt-audit` | `false` | Disable prompt leakage auditing |
+| `--pipeline` | | YAML pipeline config for multi-step migration |
+| `--known-issue-weight` | `2.0` | Score divisor applied to `known_issue=true` pairs during optimization |
+| `--skip-preflight` | `false` | Skip pre-flight checks |
+
+### `rosettastone batch`
+
+| Flag | Default | Description |
+|:---|:---|:---|
+| `--manifest`, `-m` | required | Path to batch YAML manifest |
+| `--output`, `-o` | `./batch_output` | Base output directory |
+
+### `rosettastone preflight`
+
+| Flag | Default | Description |
+|:---|:---|:---|
+| `--data`, `-d` | required | Path to JSONL file |
+| `--from` | required | Source model |
+| `--to` | required | Target model |
 
 ---
 
@@ -387,37 +602,9 @@ uvicorn rosettastone.server.app:create_app --factory --port 8000
 | **1** | CLI + Python library, JSONL ingestion, GEPA optimization, multi-strategy evaluation, markdown reports | ✅ Complete |
 | **2** | Redis ingestion, LLM-as-judge evaluation, MIPROv2 optimizer, PII detection, prompt auditing, decision engine (GO/NO_GO), Rich CLI, per-output-type statistics | ✅ Complete |
 | **3** | Web UI (FastAPI + HTMX + Tailwind), side-by-side diffs, executive reports, decision-first dashboard | ✅ Complete |
-| **4** | LangSmith / Braintrust / OpenTelemetry adapters, CI/CD integration | ⏳ Planned |
-| **5** | Multi-step pipeline migration, A/B testing, versioning, enterprise features | ⏳ Planned |
-
----
-
-## Glossary
-
-| Term | Definition |
-|:---|:---|
-| **GEPA** | Genetic-Pareto prompt optimizer ([ICLR 2026 Oral](https://arxiv.org/abs/2507.19457)). Instead of brute-forcing prompt variations, it reflects on *why* outputs diverge and proposes targeted fixes. ~35x fewer API calls than previous methods. |
-| **MIPROv2** | Alternative DSPy optimizer. Used as a fallback when GEPA is not suitable. Runs in zero-shot mode (no production data in demos) for PII safety. |
-| **DSPy** | Framework for programming language models as optimizable modules — handles the training loop, caching, and program compilation. [dspy.ai](https://dspy.ai) |
-| **LiteLLM** | Universal API wrapper providing a single interface to 100+ LLM providers. |
-| **BERTScore** | Semantic similarity metric computed locally (no API calls). More meaningful than string matching for evaluating free-text responses. |
-| **LLM-as-Judge** | Uses a separate model (default: GPT-4o) to rate behavioral equivalence on a 1–5 Likert scale. Bidirectional (scores both orderings) to reduce position bias. |
-| **Behavioral equivalence** | The migration objective — outputs from the new model should match the old model's intent, structure, and quality. Not word-for-word identical, but functionally equivalent. |
-| **Pairwise win rate** | The confidence metric. 92% means the optimized prompt on the new model matched or exceeded the old model's output in 92 of 100 test cases. |
-| **Wilson score interval** | Statistical confidence interval for win rates. Accounts for small sample sizes better than naive percentage calculations. Used to determine whether results are statistically reliable. |
-| **PII scanner** | Regex-based detection of personally identifiable information (emails, phone numbers, SSNs, credit cards, IP addresses). High-severity PII in an optimized prompt is a migration blocker. |
-| **Prompt auditor** | Checks if the optimized prompt contains verbatim substrings (30+ chars) from training data — a sign of data leakage. Filters out common boilerplate. |
-| **Tokenizer inflation** | The same text produces different token counts across models. Moving from tiktoken (OpenAI) to SentencePiece (Anthropic) typically inflates token count by 15–20%. |
-| **Reflection model** | The model GEPA uses to analyze failures and propose improvements. Defaults to GPT-4o, always separate from the migration target. |
-| **Pre-flight checks** | Safety validation before the migration runs. Catches context window overflow, missing capabilities, and high cost estimates before any API spend. |
-
----
-
-## References
-
-- **[GEPA paper](https://arxiv.org/abs/2507.19457)** (ICLR 2026 Oral) — The core optimization algorithm behind RosettaStone. Introduces reflective prompt evolution that outperforms MIPROv2 by 10%+ while using ~35x fewer API calls.
-- **[Dropbox — DSPy + GEPA in production](https://dropbox.tech/machine-learning/optimizing-dropbox-dash-relevance-judge-with-dspy)** — Production case study validating that GEPA + DSPy can optimize real-world LLM systems at scale, not just benchmarks.
-- **[AWS — Prompt migration with DSPy MIPROv2](https://aws.amazon.com/blogs/machine-learning/improve-amazon-nova-migration-performance-with-data-aware-prompt-optimization/)** — AWS's reference architecture for data-aware prompt migration. Demonstrates the general pattern RosettaStone builds on, using the previous-generation optimizer.
+| **4** | LangSmith / Braintrust / OpenTelemetry adapters, batch runner, CI/CD integration | ✅ Complete |
+| **5** | Docker deployment, version history, A/B testing, multi-step pipeline migration, team collaboration (RBAC, annotations, approvals) | ✅ Complete |
+| **6** | Score charts, filterable test case grid, persona toggle (engineer/executive), known-issue GEPA weighting | ✅ Complete |
 
 ---
 
@@ -428,11 +615,12 @@ git clone https://github.com/ashwinchidambaram/rosettastone.git
 cd rosettastone
 uv sync --dev --all-extras
 
-uv run pytest tests/ -v                      # run all unit tests (938 tests)
-uv run pytest tests/ -k "not playwright and not e2e"  # skip browser & E2E tests
-uv run ruff check src/ tests/                # lint
-uv run ruff format src/ tests/               # format
-uv run mypy src/rosettastone/                # type check
+uv run pytest tests/ -v --ignore=tests/test_e2e   # 1414 unit/integration tests
+uv run pytest tests/test_e2e/ -m playwright        # browser UI tests (requires server)
+uv run ruff check src/ tests/                      # lint
+uv run ruff format src/ tests/                     # format
+uv run mypy src/rosettastone/                      # type check (0 errors, strict mode)
+uv run alembic upgrade head                        # apply DB migrations
 ```
 
 ### E2E Testing
@@ -461,6 +649,37 @@ uv run rosettastone batch --manifest e2e_manifests/smoke.yaml --output ./e2e_out
 | Model downgrade | `gpt-4o` → `gpt-4o-mini`, `claude-sonnet-4` → `claude-3-5-haiku` | CONDITIONAL or NO_GO |
 
 Synthetic test data covers 6 domains (JSON extraction, classification, short Q&A, long explanation, code generation, rewriting) with 44 prompt/response pairs generated from the source model.
+
+---
+
+## Glossary
+
+| Term | Definition |
+|:---|:---|
+| **GEPA** | Genetic-Pareto prompt optimizer ([ICLR 2026 Oral](https://arxiv.org/abs/2507.19457)). Instead of brute-forcing prompt variations, it reflects on *why* outputs diverge and proposes targeted fixes. ~35x fewer API calls than previous methods. |
+| **MIPROv2** | Alternative DSPy optimizer. Used as a fallback when GEPA is not suitable. Runs in zero-shot mode (no production data in demos) for PII safety. |
+| **DSPy** | Framework for programming language models as optimizable modules — handles the training loop, caching, and program compilation. [dspy.ai](https://dspy.ai) |
+| **LiteLLM** | Universal API wrapper providing a single interface to 100+ LLM providers. |
+| **BERTScore** | Semantic similarity metric computed locally (no API calls). More meaningful than string matching for evaluating free-text responses. |
+| **LLM-as-Judge** | Uses a separate model (default: GPT-4o) to rate behavioral equivalence on a 1–5 Likert scale. Bidirectional (scores both orderings) to reduce position bias. |
+| **Behavioral equivalence** | The migration objective — outputs from the new model should match the old model's intent, structure, and quality. Not word-for-word identical, but functionally equivalent. |
+| **Pairwise win rate** | The confidence metric. 92% means the optimized prompt on the new model matched or exceeded the old model's output in 92 of 100 test cases. |
+| **Wilson score interval** | Statistical confidence interval for win rates. Accounts for small sample sizes better than naive percentage calculations. Used to determine whether results are statistically reliable. |
+| **PII scanner** | Regex-based detection of personally identifiable information (emails, phone numbers, SSNs, credit cards, IP addresses). High-severity PII in an optimized prompt is a migration blocker. |
+| **Prompt auditor** | Checks if the optimized prompt contains verbatim substrings (30+ chars) from training data — a sign of data leakage. Filters out common boilerplate. |
+| **Tokenizer inflation** | The same text produces different token counts across models. Moving from tiktoken (OpenAI) to SentencePiece (Anthropic) typically inflates token count by 15–20%. |
+| **Reflection model** | The model GEPA uses to analyze failures and propose improvements. Defaults to GPT-4o, always separate from the migration target. |
+| **Pre-flight checks** | Safety validation before the migration runs. Catches context window overflow, missing capabilities, and high cost estimates before any API spend. |
+| **Known-issue weight** | Score divisor applied to `known_issue=true` training pairs. Default 2.0 — halves the composite score, telling GEPA to prioritize fixing these examples. |
+| **Teacher/student** | Pipeline optimization mode. The source model acts as teacher (generating demonstrations); GEPA optimizes the student (target model) using teacher outputs as the reference. |
+
+---
+
+## References
+
+- **[GEPA paper](https://arxiv.org/abs/2507.19457)** (ICLR 2026 Oral) — The core optimization algorithm behind RosettaStone. Introduces reflective prompt evolution that outperforms MIPROv2 by 10%+ while using ~35x fewer API calls.
+- **[Dropbox — DSPy + GEPA in production](https://dropbox.tech/machine-learning/optimizing-dropbox-dash-relevance-judge-with-dspy)** — Production case study validating that GEPA + DSPy can optimize real-world LLM systems at scale, not just benchmarks.
+- **[AWS — Prompt migration with DSPy MIPROv2](https://aws.amazon.com/blogs/machine-learning/improve-amazon-nova-migration-performance-with-data-aware-prompt-optimization/)** — AWS's reference architecture for data-aware prompt migration. Demonstrates the general pattern RosettaStone builds on, using the previous-generation optimizer.
 
 ---
 
