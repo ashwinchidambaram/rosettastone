@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -20,6 +21,7 @@ except ImportError:
     raise ImportError("Web dependencies required. Install with: uv pip install 'rosettastone[web]'")
 
 from rosettastone.server.database import get_engine, init_db
+from rosettastone.server.logging_config import configure_logging, set_request_id
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,18 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "object-src 'none'"
         )
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        return response
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Attach a UUID4 request ID to each request and surface it as a response header."""
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        request_id = str(uuid.uuid4())
+        request.state.request_id = request_id
+        set_request_id(request_id)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
         return response
 
 
@@ -153,6 +167,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    configure_logging()
+
     app = FastAPI(
         title="RosettaStone",
         description="LLM Migration Dashboard",
@@ -162,7 +178,7 @@ def create_app() -> FastAPI:
 
     # Middleware order: outermost first in add_middleware calls.
     # Starlette wraps them so the LAST added runs first (innermost).
-    # Execution order: SecurityHeaders → CORS → Auth → CSRF → route handler
+    # Execution order: RequestID → SecurityHeaders → CORS → Auth → CSRF → route handler
     from fastapi.middleware.cors import CORSMiddleware
 
     from rosettastone.server.api.auth import AuthMiddleware
@@ -182,6 +198,7 @@ def create_app() -> FastAPI:
     app.add_middleware(CSRFMiddleware)
     app.add_middleware(AuthMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RequestIDMiddleware)
 
     # Configure Jinja2 templates
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -271,5 +288,23 @@ def create_app() -> FastAPI:
     @app.get("/api/v1/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/metrics")
+    async def prometheus_metrics() -> Response:
+        """Prometheus metrics endpoint. Returns 404 if prometheus_client not installed."""
+        from rosettastone.server.metrics import is_available, metrics_response
+
+        if not is_available():
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "detail": (
+                        "prometheus_client not installed. "
+                        "Install with: uv add 'rosettastone[metrics]'"
+                    )
+                },
+            )
+        data, content_type = metrics_response()
+        return Response(content=data, media_type=content_type)
 
     return app

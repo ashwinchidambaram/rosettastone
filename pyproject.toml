@@ -41,6 +41,9 @@ clustering = [
 postgres = [
     "psycopg[binary]>=3.1",
 ]
+metrics = [
+    "prometheus-client>=0.20",
+]
 web = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
@@ -53,7 +56,7 @@ auth = [
     "pyjwt>=2.8.0",
 ]
 all = [
-    "rosettastone[eval,redis,braintrust,langsmith,safety,clustering,web,postgres,auth]",
+    "rosettastone[eval,redis,braintrust,langsmith,safety,clustering,web,postgres,auth,metrics]",
 ]
 e2e = [
     "rosettastone[eval,redis,braintrust,langsmith,safety,clustering,web]",

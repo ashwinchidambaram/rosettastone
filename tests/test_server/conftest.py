@@ -17,15 +17,26 @@ from rosettastone.server.models import MigrationRecord, TestCaseRecord
 
 @pytest.fixture
 def engine():
-    """Create an in-memory SQLite engine with StaticPool for cross-thread access."""
-    engine = create_engine(
-        "sqlite://",
-        echo=False,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    SQLModel.metadata.create_all(engine)
-    return engine
+    """Create a test engine.
+
+    When DATABASE_URL is set (e.g. in PostgreSQL CI), uses that URL.
+    Otherwise falls back to an in-memory SQLite engine with StaticPool.
+    """
+    import os
+
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        eng = create_engine(database_url, echo=False)
+    else:
+        eng = create_engine(
+            "sqlite://",
+            echo=False,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+    SQLModel.metadata.create_all(eng)
+    yield eng
+    SQLModel.metadata.drop_all(eng)
 
 
 @pytest.fixture

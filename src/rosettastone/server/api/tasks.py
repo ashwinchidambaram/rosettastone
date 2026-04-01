@@ -14,6 +14,7 @@ from sqlmodel import Session
 from rosettastone.server.api.audit import log_audit
 from rosettastone.server.api.versioning import create_version
 from rosettastone.server.database import get_engine
+from rosettastone.server.logging_config import set_request_id
 from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningRecord
 
 logger = logging.getLogger(__name__)
@@ -135,6 +136,10 @@ def run_migration_background(
     """
     if engine is None:
         engine = get_engine()
+
+    # Propagate the migration ID as the correlation ID for structured logging
+    # in this background thread so all log lines are traceable.
+    set_request_id(f"migration-{migration_id}")
 
     with Session(engine) as session:
         record = session.get(MigrationRecord, migration_id)
@@ -305,7 +310,12 @@ def run_migration_background(
                 session.add(record)
                 session.commit()
         except Exception as commit_err:
-            logger.error("Failed to update migration %d status: %s", migration_id, commit_err)
+            logger.error(
+                "Failed to update migration %d status: %s",
+                migration_id,
+                commit_err,
+                exc_info=True,
+            )
 
     finally:
         # Clean up temp uploaded data file (keep output dir for reports)
