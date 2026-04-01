@@ -403,6 +403,7 @@ class TestRunMigrationBackground:
                 migration_id=None,
                 engine=None,
                 gepa_iteration_callback=None,
+                **kwargs,
             ):
                 received_callbacks.append(progress_callback)
 

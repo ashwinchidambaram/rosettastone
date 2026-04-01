@@ -165,9 +165,19 @@ function showPersonaView(view) {
     <p class="text-on-surface-variant max-w-2xl leading-relaxed mb-6">
         {{ migration.reasoning|default('An error occurred during the migration process.') }}
     </p>
-    <a href="/ui/migrations/new?source={{ migration.source_full|default(migration.source) }}" class="px-6 py-2.5 bg-[#D4745E] text-white font-bold rounded-lg hover:brightness-110 transition-all active:scale-95 shadow-lg inline-block">
-        Retry migration
-    </a>
+    <div class="flex flex-wrap gap-3">
+        {% if migration.checkpoint_stage %}
+        <form method="post" action="/ui/migrations/{{ migration.id }}/resume">
+            {% if request.state.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}">{% endif %}
+            <button type="submit" class="px-6 py-2.5 bg-[#D4A574] text-[#1C1C1E] font-bold rounded-lg hover:brightness-110 transition-all active:scale-95 shadow-lg">
+                Resume from {{ migration.checkpoint_stage }}
+            </button>
+        </form>
+        {% endif %}
+        <a href="/ui/migrations/new?source={{ migration.source_full|default(migration.source) }}" class="px-6 py-2.5 bg-[#D4745E] text-white font-bold rounded-lg hover:brightness-110 transition-all active:scale-95 shadow-lg inline-block">
+            Retry migration
+        </a>
+    </div>
 </div>
 
 {% elif migration.status == 'blocked' %}

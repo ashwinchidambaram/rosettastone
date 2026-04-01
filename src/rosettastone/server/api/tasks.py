@@ -102,6 +102,29 @@ def _estimate_per_call_cost(config: Any) -> dict[str, Any] | None:
         return None
 
 
+def _make_checkpoint_writer(migration_id: int, engine: Any) -> Callable[[str, str], None]:
+    """Return a callback that persists a checkpoint after each pipeline stage."""
+
+    def write_checkpoint(stage: str, data_json: str) -> None:
+        try:
+            with Session(engine) as sess:
+                record = sess.get(MigrationRecord, migration_id)
+                if record is not None:
+                    record.checkpoint_stage = stage
+                    record.checkpoint_data_json = data_json
+                    sess.add(record)
+                    sess.commit()
+        except Exception as exc:
+            logger.warning(
+                "Failed to write checkpoint for migration %d at stage %s: %s",
+                migration_id,
+                stage,
+                exc,
+            )
+
+    return write_checkpoint
+
+
 def _make_gepa_callback(migration_id: int) -> Callable[[int, int, float], None]:
     """Return a callback that emits SSE gepa_iteration events from the GEPA optimizer thread."""
 
@@ -192,18 +215,26 @@ def run_migration_background(
         from rosettastone.config import MigrationConfig  # noqa: I001
         from rosettastone.core.migrator import Migrator, MigrationBlockedError
 
+        # Extract resume / checkpoint params (not part of MigrationConfig)
+        resume_from = config_dict.pop("_resume_from", None)
+        checkpoint_data = config_dict.pop("_checkpoint_data", None)
+
         # Build config — override output_dir to per-migration directory
         config_dict["output_dir"] = str(output_dir)
         config = MigrationConfig(**config_dict)
 
         progress_cb = _make_progress_writer(migration_id, engine)
         gepa_cb = _make_gepa_callback(migration_id)
+        checkpoint_cb = _make_checkpoint_writer(migration_id, engine)
         result = Migrator(
             config,
             progress_callback=progress_cb,
             migration_id=migration_id,
             engine=engine,
             gepa_iteration_callback=gepa_cb,
+            checkpoint_callback=checkpoint_cb,
+            resume_checkpoint_stage=resume_from,
+            resume_checkpoint_data=checkpoint_data,
         ).run()
 
         # Latency sampling — measure first 5 prompts against source and target

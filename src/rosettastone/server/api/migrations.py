@@ -410,6 +410,9 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
     result["projected_source_cost_per_call"] = record.projected_source_cost_per_call
     result["projected_target_cost_per_call"] = record.projected_target_cost_per_call
 
+    # Checkpoint info
+    result["checkpoint_stage"] = record.checkpoint_stage
+
     # Test case count
     count_stmt = (
         select(func.count())
@@ -973,6 +976,45 @@ async def stream_migration_progress(
 
 
 # ---------------------------------------------------------------------------
+# Resume endpoint
+# ---------------------------------------------------------------------------
+
+
+@router.post("/api/v1/migrations/{migration_id}/resume", response_model=MigrationSummary)
+def resume_migration(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> MigrationSummary:
+    """Re-enqueue a failed migration from its last checkpoint."""
+    record = _get_migration_or_404(migration_id, session)
+    check_resource_owner(record.owner_id, request)
+
+    if record.status != "failed":
+        raise HTTPException(status_code=409, detail="Migration is not in failed state")
+    if not record.checkpoint_stage:
+        raise HTTPException(status_code=409, detail="No checkpoint available for this migration")
+
+    record.status = "pending"
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+
+    # Re-enqueue with checkpoint info injected into the payload
+    config = json.loads(record.config_json or "{}")
+    request.app.state.task_worker.enqueue(
+        "migration",
+        migration_id,
+        {
+            **config,
+            "_resume_from": record.checkpoint_stage,
+            "_checkpoint_data": record.checkpoint_data_json,
+        },
+    )
+    return _migration_to_summary(record)
+
+
+# ---------------------------------------------------------------------------
 # HTMX / UI endpoints
 # ---------------------------------------------------------------------------
 
@@ -1464,3 +1506,41 @@ async def executive_summary_fragment(
         "fragments/executive_summary.html",
         {"migration": migration, "narrative": narrative},
     )
+
+
+# ---------------------------------------------------------------------------
+# UI resume route
+# ---------------------------------------------------------------------------
+
+
+@router.post("/ui/migrations/{migration_id}/resume", response_class=None)
+async def ui_resume_migration(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> RedirectResponse:
+    """Handle Resume button POST from migration detail page."""
+    record = _get_migration_or_404(migration_id, session)
+    check_resource_owner(record.owner_id, request)
+
+    if record.status != "failed":
+        raise HTTPException(status_code=409, detail="Migration is not in failed state")
+    if not record.checkpoint_stage:
+        raise HTTPException(status_code=409, detail="No checkpoint available for this migration")
+
+    record.status = "pending"
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+
+    config = json.loads(record.config_json or "{}")
+    request.app.state.task_worker.enqueue(
+        "migration",
+        migration_id,
+        {
+            **config,
+            "_resume_from": record.checkpoint_stage,
+            "_checkpoint_data": record.checkpoint_data_json,
+        },
+    )
+    return RedirectResponse(url=f"/ui/migrations/{migration_id}", status_code=303)

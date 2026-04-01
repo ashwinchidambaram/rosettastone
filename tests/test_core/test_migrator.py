@@ -605,3 +605,134 @@ class TestMaxCostUsdGuardrail:
 
         # Should complete successfully
         assert isinstance(result, MigrationResult)
+
+
+class TestCheckpointParams:
+    """Tests that Migrator correctly stores and uses checkpoint/resume parameters."""
+
+    def test_checkpoint_callback_stored(self):
+        """checkpoint_callback kwarg is stored on the Migrator instance."""
+        config = _make_config()
+        cb = MagicMock()
+        migrator = Migrator(config, checkpoint_callback=cb)
+        assert migrator.checkpoint_callback is cb
+
+    def test_resume_params_stored(self):
+        """resume_checkpoint_stage and resume_checkpoint_data are stored."""
+        config = _make_config()
+        migrator = Migrator(
+            config,
+            resume_checkpoint_stage="baseline_eval",
+            resume_checkpoint_data='{"stage_output": {"score": 0.8}}',
+        )
+        assert migrator.resume_checkpoint_stage == "baseline_eval"
+        assert migrator.resume_checkpoint_data == '{"stage_output": {"score": 0.8}}'
+
+    def test_checkpoint_callback_invoked_after_ingest(self):
+        """checkpoint_callback is called with 'ingest' after data is loaded."""
+        config = _make_config(skip_preflight=True)
+        checkpoints: list[str] = []
+
+        def cb(stage: str, data: str) -> None:
+            checkpoints.append(stage)
+
+        migrator = Migrator(config, checkpoint_callback=cb)
+        pairs = [_make_pair()]
+        eval_results = [_make_eval_result()]
+
+        with (
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data",
+                return_value=(pairs, pairs, pairs),
+            ),
+            patch("rosettastone.core.pipeline.run_pii_scan"),
+            patch("rosettastone.core.pipeline.evaluate_baseline", return_value=eval_results),
+            patch("rosettastone.core.pipeline.optimize_prompt", return_value="opt"),
+            patch("rosettastone.core.pipeline.run_pii_scan_text"),
+            patch("rosettastone.core.pipeline.run_prompt_audit"),
+            patch("rosettastone.core.pipeline.evaluate_optimized", return_value=eval_results),
+            patch(
+                "rosettastone.core.pipeline.make_recommendation",
+                return_value=("GO", "ok", {}),
+            ),
+            patch("rosettastone.core.pipeline.generate_report"),
+        ):
+            migrator.run()
+
+        assert "ingest" in checkpoints
+
+    def test_checkpoint_callback_invoked_after_optimize(self):
+        """checkpoint_callback is called with 'optimize' after optimization."""
+        config = _make_config(skip_preflight=True)
+        checkpoints: list[str] = []
+
+        def cb(stage: str, data: str) -> None:
+            checkpoints.append(stage)
+
+        migrator = Migrator(config, checkpoint_callback=cb)
+        pairs = [_make_pair()]
+        eval_results = [_make_eval_result()]
+
+        with (
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data",
+                return_value=(pairs, pairs, pairs),
+            ),
+            patch("rosettastone.core.pipeline.run_pii_scan"),
+            patch("rosettastone.core.pipeline.evaluate_baseline", return_value=eval_results),
+            patch("rosettastone.core.pipeline.optimize_prompt", return_value="my optimized prompt"),
+            patch("rosettastone.core.pipeline.run_pii_scan_text"),
+            patch("rosettastone.core.pipeline.run_prompt_audit"),
+            patch("rosettastone.core.pipeline.evaluate_optimized", return_value=eval_results),
+            patch(
+                "rosettastone.core.pipeline.make_recommendation",
+                return_value=("GO", "ok", {}),
+            ),
+            patch("rosettastone.core.pipeline.generate_report"),
+        ):
+            migrator.run()
+
+        assert "optimize" in checkpoints
+        # The checkpoint was called but we only stored stage names here; to inspect
+        # the actual JSON data see test_checkpoint_data_contains_optimized_prompt.
+
+    def test_checkpoint_data_contains_optimized_prompt(self):
+        """'optimize' checkpoint data JSON contains the optimized prompt string."""
+        import json
+
+        config = _make_config(skip_preflight=True)
+        checkpoint_data: dict[str, str] = {}
+
+        def cb(stage: str, data: str) -> None:
+            checkpoint_data[stage] = data
+
+        migrator = Migrator(config, checkpoint_callback=cb)
+        pairs = [_make_pair()]
+        eval_results = [_make_eval_result()]
+        expected_prompt = "my specifically optimized prompt"
+
+        with (
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data",
+                return_value=(pairs, pairs, pairs),
+            ),
+            patch("rosettastone.core.pipeline.run_pii_scan"),
+            patch("rosettastone.core.pipeline.evaluate_baseline", return_value=eval_results),
+            patch(
+                "rosettastone.core.pipeline.optimize_prompt",
+                return_value=expected_prompt,
+            ),
+            patch("rosettastone.core.pipeline.run_pii_scan_text"),
+            patch("rosettastone.core.pipeline.run_prompt_audit"),
+            patch("rosettastone.core.pipeline.evaluate_optimized", return_value=eval_results),
+            patch(
+                "rosettastone.core.pipeline.make_recommendation",
+                return_value=("GO", "ok", {}),
+            ),
+            patch("rosettastone.core.pipeline.generate_report"),
+        ):
+            migrator.run()
+
+        assert "optimize" in checkpoint_data
+        payload = json.loads(checkpoint_data["optimize"])
+        assert payload["stage_output"]["optimized_prompt"] == expected_prompt

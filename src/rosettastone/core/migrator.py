@@ -23,12 +23,18 @@ class Migrator:
         migration_id: int | None = None,
         engine: object | None = None,
         gepa_iteration_callback: Callable[[int, int, float], None] | None = None,
+        checkpoint_callback: Callable[[str, str], None] | None = None,
+        resume_checkpoint_stage: str | None = None,
+        resume_checkpoint_data: str | None = None,
     ) -> None:
         self.config = config
         self._progress_callback = progress_callback
         self.migration_id = migration_id
         self.engine = engine
         self._gepa_iteration_callback = gepa_iteration_callback
+        self.checkpoint_callback = checkpoint_callback
+        self.resume_checkpoint_stage = resume_checkpoint_stage
+        self.resume_checkpoint_data = resume_checkpoint_data
 
     def _emit(self, stage: str, stage_pct: float, overall_pct: float) -> None:
         """Invoke progress_callback if set; swallow any exception it raises."""
@@ -37,6 +43,26 @@ class Migrator:
                 self._progress_callback(stage, stage_pct, overall_pct)
             except Exception:
                 pass
+
+    def _checkpoint(self, stage: str, data: object) -> None:
+        """Persist a checkpoint after a pipeline stage completes.
+
+        Serializes ``data`` to JSON and calls checkpoint_callback if set.
+        Swallows serialization and callback errors to avoid aborting the migration.
+        """
+        if self.checkpoint_callback is None:
+            return
+        import json
+
+        try:
+            data_json = json.dumps({"stage_output": data})
+        except (TypeError, ValueError):
+            # Fall back to stage-name-only checkpoint if data isn't serializable
+            data_json = json.dumps({"stage_output": None})
+        try:
+            self.checkpoint_callback(stage, data_json)
+        except Exception:
+            pass
 
     def _persist_preflight_estimate(self, estimated_cost_usd: float) -> None:
         """Store estimated cost to the migration record in DB."""
@@ -76,6 +102,8 @@ class Migrator:
             pass  # Silently swallow DB errors
 
     def run(self) -> MigrationResult:
+        import json
+
         from rosettastone.core.context import PipelineContext
         from rosettastone.core.pipeline import (
             build_result,
@@ -109,41 +137,71 @@ class Migrator:
                 recommendation_reasoning="Dry run — no migration performed.",
             )
 
+        # Determine which stage to resume from (if any)
+        resume_stage = self.resume_checkpoint_stage
+        resume_data: dict = {}
+        if resume_stage and self.resume_checkpoint_data:
+            try:
+                resume_data = json.loads(self.resume_checkpoint_data)
+            except (json.JSONDecodeError, ValueError):
+                resume_data = {}
+
+        # Stage ordering used to decide which stages to skip on resume
+        stage_order = [
+            "preflight",
+            "ingest",
+            "baseline_eval",
+            "optimize",
+            "validation_eval",
+        ]
+
+        def _already_done(stage: str) -> bool:
+            """Return True if this stage was completed in the saved checkpoint."""
+            if not resume_stage:
+                return False
+            try:
+                return stage_order.index(stage) <= stage_order.index(resume_stage)
+            except ValueError:
+                return False
+
         start = time.time()
         ctx = PipelineContext()
 
         # Step 0: Pre-flight
         if not self.config.skip_preflight:
-            preflight_report = run_preflight(self.config)
-            ctx.warnings.extend(preflight_report.warnings)
-            if preflight_report.has_blockers:
-                raise MigrationBlockedError(preflight_report)
-            if self.config.dry_run:
-                return preflight_report.as_dry_run_result()  # type: ignore[no-any-return]
+            if not _already_done("preflight"):
+                preflight_report = run_preflight(self.config)
+                ctx.warnings.extend(preflight_report.warnings)
+                if preflight_report.has_blockers:
+                    raise MigrationBlockedError(preflight_report)
+                if self.config.dry_run:
+                    return preflight_report.as_dry_run_result()  # type: ignore[no-any-return]
 
-            # Store estimated cost and check cost cap
-            if self.migration_id is not None and self.engine is not None:
-                self._persist_preflight_estimate(preflight_report.estimated_cost_usd)
+                # Store estimated cost and check cost cap
+                if self.migration_id is not None and self.engine is not None:
+                    self._persist_preflight_estimate(preflight_report.estimated_cost_usd)
 
-            # Check cost cap against estimated cost
-            if self.config.max_cost_usd is not None:
-                estimated_cost = preflight_report.estimated_cost_usd
-                if estimated_cost > self.config.max_cost_usd:
-                    # Update migration record status to failed
-                    msg = (
-                        f"Estimated cost ${estimated_cost:.4f} exceeds "
-                        f"max_cost_usd cap of ${self.config.max_cost_usd:.4f}"
-                    )
-                    if self.migration_id is not None and self.engine is not None:
-                        self._update_migration_failed(msg)
-                    raise ValueError(msg)
+                # Check cost cap against estimated cost
+                if self.config.max_cost_usd is not None:
+                    estimated_cost = preflight_report.estimated_cost_usd
+                    if estimated_cost > self.config.max_cost_usd:
+                        msg = (
+                            f"Estimated cost ${estimated_cost:.4f} exceeds "
+                            f"max_cost_usd cap of ${self.config.max_cost_usd:.4f}"
+                        )
+                        if self.migration_id is not None and self.engine is not None:
+                            self._update_migration_failed(msg)
+                        raise ValueError(msg)
 
+                self._checkpoint("preflight", {"warnings": preflight_report.warnings})
             self._emit("preflight", 1.0, 0.12)
 
-        # Step 1: Ingest
+        # Step 1: Ingest — always re-ingest on resume (fast and needed for data)
         t0 = time.time()
         train, val, test = load_and_split_data(self.config, ctx)
         ctx.timing["ingest"] = time.time() - t0
+        if not _already_done("ingest"):
+            self._checkpoint("ingest", {"pair_count": len(train) + len(val) + len(test)})
         self._emit("data_load", 1.0, 0.25)
 
         # Step 1.5: PII scan on ingested data
@@ -152,16 +210,45 @@ class Migrator:
         ctx.timing["pii_scan"] = time.time() - t0
         self._emit("pii_scan", 1.0, 0.37)
 
-        # Step 2: Baseline
-        t0 = time.time()
-        baseline = evaluate_baseline(test, self.config)
-        ctx.timing["baseline_eval"] = time.time() - t0
+        # Step 2: Baseline — restore from checkpoint or run
+        if _already_done("baseline_eval"):
+            # We don't try to reconstruct full EvalResult objects; re-run is acceptable
+            # but we skip re-checkpointing since we're just passing through
+            t0 = time.time()
+            baseline = evaluate_baseline(test, self.config)
+            ctx.timing["baseline_eval"] = time.time() - t0
+        else:
+            t0 = time.time()
+            baseline = evaluate_baseline(test, self.config)
+            ctx.timing["baseline_eval"] = time.time() - t0
+            baseline_score = sum(1 for r in baseline if r.is_win) / max(len(baseline), 1)
+            self._checkpoint("baseline_eval", {"baseline_score": baseline_score})
         self._emit("baseline_eval", 1.0, 0.50)
 
-        # Step 3: Optimize
-        t0 = time.time()
-        optimized_prompt = optimize_prompt(train, val, self.config, self._gepa_iteration_callback)
-        ctx.timing["optimize"] = time.time() - t0
+        # Step 3: Optimize — restore optimized prompt from checkpoint if available
+        if _already_done("optimize"):
+            # Try to recover the optimized prompt from checkpoint data
+            saved_prompt = resume_data.get("stage_output", {})
+            if isinstance(saved_prompt, dict):
+                optimized_prompt = saved_prompt.get("optimized_prompt", "")
+            else:
+                optimized_prompt = ""
+            # Fall back to re-running optimize if checkpoint didn't preserve the prompt
+            if not optimized_prompt:
+                t0 = time.time()
+                optimized_prompt = optimize_prompt(
+                    train, val, self.config, self._gepa_iteration_callback
+                )
+                ctx.timing["optimize"] = time.time() - t0
+            else:
+                ctx.timing["optimize"] = 0.0
+        else:
+            t0 = time.time()
+            optimized_prompt = optimize_prompt(
+                train, val, self.config, self._gepa_iteration_callback
+            )
+            ctx.timing["optimize"] = time.time() - t0
+            self._checkpoint("optimize", {"optimized_prompt": optimized_prompt})
         self._emit("optimize", 1.0, 0.75)
 
         # Step 3.5: Safety checks on optimized prompt
@@ -173,9 +260,16 @@ class Migrator:
         self._emit("prompt_audit", 1.0, 0.85)
 
         # Step 4: Validate
-        t0 = time.time()
-        validation = evaluate_optimized(test, optimized_prompt, self.config)
-        ctx.timing["validation_eval"] = time.time() - t0
+        if not _already_done("validation_eval"):
+            t0 = time.time()
+            validation = evaluate_optimized(test, optimized_prompt, self.config)
+            ctx.timing["validation_eval"] = time.time() - t0
+            val_score = sum(1 for r in validation if r.is_win) / max(len(validation), 1)
+            self._checkpoint("validation_eval", {"validation_score": val_score})
+        else:
+            t0 = time.time()
+            validation = evaluate_optimized(test, optimized_prompt, self.config)
+            ctx.timing["validation_eval"] = time.time() - t0
         self._emit("validation_eval", 1.0, 0.95)
 
         # Step 4.5: Recommendation
