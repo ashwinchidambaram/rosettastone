@@ -52,6 +52,18 @@ services:
       timeout: 5s
       retries: 5
 
+  rq-worker:
+    build: .
+    profiles:
+      - redis
+    command: uv run rq worker rosettastone --url redis://redis:6379
+    environment:
+      REDIS_URL: "redis://redis:6379"
+      DATABASE_URL: "${DATABASE_URL:-}"
+    depends_on:
+      redis:
+        condition: service_healthy
+
 volumes:
   rosettastone-data:
   pgdata:

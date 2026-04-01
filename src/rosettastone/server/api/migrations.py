@@ -1333,7 +1333,7 @@ async def alerts_page(request: Request, session: Session = Depends(get_session))
     if records:
         alerts = [_alert_to_template_dict(a) for a in records]
     else:
-        alerts = DUMMY_ALERTS  # fallback when DB is empty
+        alerts = []  # fallback when DB is empty
 
     return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,

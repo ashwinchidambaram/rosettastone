@@ -364,13 +364,11 @@ class TestUIEndpoints:
 
     def test_alerts_page(self, client: TestClient) -> None:
         # /ui/alerts now requires a DB session; use the in-memory client.
-        # With no migrations in the DB it falls back to DUMMY_ALERTS.
+        # With no migrations in the DB it renders an empty alerts list.
         resp = client.get("/ui/alerts")
         assert resp.status_code == 200
         body = resp.text
         assert "Alerts" in body
-        assert "gpt-4o-0613" in body
-        assert "ACTION REQUIRED" in body
 
     def test_executive_report(self, ui_client: TestClient) -> None:
         resp = ui_client.get("/ui/migrations/1/executive")

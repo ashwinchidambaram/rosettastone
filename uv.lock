@@ -535,6 +535,18 @@ wheels = [
 ]
 
 [[package]]
+name = "croniter"
+version = "6.2.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/df/de/5832661ed55107b8a09af3f0a2e71e0957226a59eb1dcf0a445cce6daf20/croniter-6.2.2.tar.gz", hash = "sha256:ba60832a5ec8e12e51b8691c3309a113d1cf6526bdf1a48150ce8ec7a532d0ab", size = 113762, upload-time = "2026-03-15T08:43:48.112Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/39/783980e78cb92c2d7bdb1fc7dbc86e94ccc6d58224d76a7f1f51b6c51e30/croniter-6.2.2-py3-none-any.whl", hash = "sha256:a5d17b1060974d36251ea4faf388233eca8acf0d09cbd92d35f4c4ac8f279960", size = 45422, upload-time = "2026-03-15T08:43:46.626Z" },
+]
+
+[[package]]
 name = "cryptography"
 version = "46.0.6"
 source = { registry = "https://pypi.org/simple" }
@@ -2952,6 +2964,10 @@ redis = [
     { name = "redis", extra = ["hiredis"] },
     { name = "redisvl" },
 ]
+rq = [
+    { name = "redis" },
+    { name = "rq" },
+]
 safety = [
     { name = "presidio-analyzer" },
     { name = "presidio-anonymizer" },
@@ -2996,12 +3012,14 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
     { name = "python-multipart", specifier = ">=0.0.22" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "redis", marker = "extra == 'rq'", specifier = ">=5.0" },
     { name = "redis", extras = ["hiredis"], marker = "extra == 'redis'", specifier = ">=5.0" },
     { name = "redisvl", marker = "extra == 'redis'", specifier = ">=0.3" },
     { name = "rich", specifier = ">=13.0" },
     { name = "rosettastone", extras = ["eval", "redis", "braintrust", "langsmith", "safety", "clustering", "web"], marker = "extra == 'e2e'" },
     { name = "rosettastone", extras = ["eval", "redis", "braintrust", "langsmith", "safety", "clustering", "web", "postgres", "auth", "metrics"], marker = "extra == 'all'" },
     { name = "rosettastone", extras = ["web"], marker = "extra == 'dev'" },
+    { name = "rq", marker = "extra == 'rq'", specifier = ">=1.16" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3" },
     { name = "scikit-learn", marker = "extra == 'clustering'", specifier = ">=1.0" },
     { name = "sentence-transformers", marker = "extra == 'eval'", specifier = ">=3.0" },
@@ -3010,7 +3028,7 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'web'", specifier = ">=0.27" },
 ]
-provides-extras = ["eval", "redis", "braintrust", "langsmith", "safety", "clustering", "postgres", "metrics", "sentry", "web", "auth", "all", "e2e", "dev"]
+provides-extras = ["eval", "redis", "rq", "braintrust", "langsmith", "safety", "clustering", "postgres", "metrics", "sentry", "web", "auth", "all", "e2e", "dev"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -3096,6 +3114,20 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/13/64/b4d76f227d5c45a7e0b796c674fd81b0a6c4fbd48dc29271857d8219571c/rpds_py-0.30.0-pp311-pypy311_pp73-musllinux_1_2_aarch64.whl", hash = "sha256:dff13836529b921e22f15cb099751209a60009731a68519630a24d61f0b1b30a", size = 573981, upload-time = "2025-11-30T20:24:32.934Z" },
     { url = "https://files.pythonhosted.org/packages/20/91/092bacadeda3edf92bf743cc96a7be133e13a39cdbfd7b5082e7ab638406/rpds_py-0.30.0-pp311-pypy311_pp73-musllinux_1_2_i686.whl", hash = "sha256:1b151685b23929ab7beec71080a8889d4d6d9fa9a983d213f07121205d48e2c4", size = 599782, upload-time = "2025-11-30T20:24:35.169Z" },
     { url = "https://files.pythonhosted.org/packages/d1/b7/b95708304cd49b7b6f82fdd039f1748b66ec2b21d6a45180910802f1abf1/rpds_py-0.30.0-pp311-pypy311_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:ac37f9f516c51e5753f27dfdef11a88330f04de2d564be3991384b2f3535d02e", size = 562191, upload-time = "2025-11-30T20:24:36.853Z" },
+]
+
+[[package]]
+name = "rq"
+version = "2.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "croniter" },
+    { name = "redis" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c5/9b/93b7180220fe462b4128425e687665bcdeffddc51683d41e7fbe509c2d2e/rq-2.7.0.tar.gz", hash = "sha256:c2156fc7249b5d43dda918c4355cfbf8d0d299a5cdd3963918e9c8daf4b1e0c0", size = 679396, upload-time = "2026-02-22T11:10:50.775Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0d/1a/3b64696bc0c33aa1d86d3e6add03c4e0afe51110264fd41208bd95c2665c/rq-2.7.0-py3-none-any.whl", hash = "sha256:4b320e95968208d2e249fa0d3d90ee309478e2d7ea60a116f8ff9aa343a4c117", size = 115728, upload-time = "2026-02-22T11:10:48.401Z" },
 ]
 
 [[package]]

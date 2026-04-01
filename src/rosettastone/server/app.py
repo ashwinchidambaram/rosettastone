@@ -163,6 +163,7 @@ def _init_sentry() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize database and task worker on startup."""
+    from rosettastone.server.task_dispatch import TaskDispatcher
     from rosettastone.server.task_worker import TaskWorker
 
     init_db()
@@ -173,13 +174,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # DB-backed task worker — durable, survives server restarts
     task_worker = TaskWorker(get_engine())
     task_worker.recover_stale_tasks()
-    task_worker.start()
-    app.state.task_worker = task_worker
+
+    # Dispatcher: uses RQ when REDIS_URL is set and Redis responds, falls back to DB queue
+    dispatcher = TaskDispatcher()
+    dispatcher.setup(task_worker)
+    dispatcher.start()
+    app.state.task_worker = dispatcher
 
     yield
 
     # Graceful shutdown: stop polling (current in-flight task completes naturally)
-    task_worker.stop(wait=True, timeout=30.0)
+    dispatcher.stop()
 
 
 def create_app() -> FastAPI:

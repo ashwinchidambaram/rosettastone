@@ -86,14 +86,22 @@ def check_deprecations(session: Session) -> int:
 
         severity = "critical" if days_until <= 30 else "warning"
 
+        if days_until < 0:
+            message = (
+                f"Already deprecated (retired on {dep_info['date']}). "
+                f"Recommended replacement: {dep_info['replacement']}"
+            )
+        else:
+            message = (
+                f"Retiring in {days_until} days (on {dep_info['date']}). "
+                f"Recommended replacement: {dep_info['replacement']}"
+            )
+
         alert = Alert(
             alert_type="deprecation",
             model_id=model.model_id,
             title=f"Model deprecation: {model.model_id}",
-            message=(
-                f"Retiring in {days_until} days (on {dep_info['date']}). "
-                f"Recommended replacement: {dep_info['replacement']}"
-            ),
+            message=message,
             action=f"Migrate to {dep_info['replacement']}",
             severity=severity,
             metadata_json=json.dumps(

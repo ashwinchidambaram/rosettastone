@@ -37,8 +37,10 @@ def _get_model_info(model_id: str) -> dict[str, Any]:
 
 def _model_to_template_dict(record: RegisteredModel) -> dict[str, Any]:
     """Convert a RegisteredModel record to the dict shape templates expect."""
+    from rosettastone.core.deprecations import check_model_deprecation
+
     info = _get_model_info(record.model_id)
-    return {
+    result: dict[str, Any] = {
         "id": record.model_id,
         "db_id": record.id,
         "provider": info["provider"],
@@ -46,6 +48,16 @@ def _model_to_template_dict(record: RegisteredModel) -> dict[str, Any]:
         "context": info["context"],
         "cost_per_1m": info["cost_per_1m"],
     }
+
+    # Add deprecation info if available
+    dep = check_model_deprecation(record.model_id)
+    if dep:
+        result["retirement_date"] = dep["retirement_date"]
+        result["replacement"] = dep["replacement"]
+        result["days_until_retirement"] = dep["days_until_retirement"]
+        result["is_deprecated"] = True
+
+    return result
 
 
 # ---------------------------------------------------------------------------

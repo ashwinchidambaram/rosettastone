@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 
 def run_all_checks(config: MigrationConfig) -> PreflightReport:
+    from rosettastone.core.deprecations import check_model_deprecation
     from rosettastone.core.pipeline import PreflightReport
     from rosettastone.preflight.capabilities import check_capabilities
     from rosettastone.preflight.cost_estimator import estimate_cost
@@ -31,6 +32,38 @@ def run_all_checks(config: MigrationConfig) -> PreflightReport:
     # Cost estimation
     cost_warnings, estimated_cost_usd = estimate_cost(config)
     warnings.extend(cost_warnings)
+
+    # Deprecation checks
+    for model_id in [config.source_model, config.target_model]:
+        dep = check_model_deprecation(model_id)
+        if not dep:
+            continue
+
+        if dep["already_retired"]:
+            # Target model already retired is a blocker
+            if model_id == config.target_model:
+                blockers.append(
+                    f"Target model '{model_id}' was already retired on "
+                    f"{dep['retirement_date']}. Use '{dep['replacement']}' instead."
+                )
+            # Source model already retired is a warning
+            else:
+                warnings.append(
+                    f"Source model '{model_id}' was already retired on "
+                    f"{dep['retirement_date']}. Consider migrating to '{dep['replacement']}'."
+                )
+        elif dep["days_until_retirement"] <= 30:
+            # Within 30 days is critical
+            warnings.append(
+                f"Model '{model_id}' will retire in {dep['days_until_retirement']} days "
+                f"(on {dep['retirement_date']}). Recommended replacement: '{dep['replacement']}'."
+            )
+        else:
+            # Beyond 30 days is a warning
+            warnings.append(
+                f"Model '{model_id}' will retire in {dep['days_until_retirement']} days "
+                f"(on {dep['retirement_date']}). Recommended replacement: '{dep['replacement']}'."
+            )
 
     return PreflightReport(
         warnings=warnings, blockers=blockers, estimated_cost_usd=estimated_cost_usd

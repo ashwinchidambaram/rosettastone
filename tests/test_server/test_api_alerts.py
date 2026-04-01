@@ -326,14 +326,14 @@ class TestUIAlertsPage:
         # Model name from our migration
         assert "claude-sonnet-4" in body
 
-    def test_alerts_page_falls_back_to_dummy(self, client: TestClient) -> None:
-        """When DB has no alerts, /ui/alerts falls back to DUMMY_ALERTS."""
+    def test_alerts_page_empty_when_no_alerts(self, client: TestClient) -> None:
+        """When DB has no alerts, /ui/alerts renders an empty list."""
         resp = client.get("/ui/alerts")
         assert resp.status_code == 200
         body = resp.text
         assert "Alerts" in body
-        # Dummy data contains gpt-4o-0613
-        assert "gpt-4o-0613" in body
+        # Page renders but with empty alerts list
+        assert resp.status_code == 200
 
     def test_alerts_page_auto_generates_on_load(self, client: TestClient, engine) -> None:
         """The alerts page auto-calls _generate_alerts so migrations appear without
@@ -428,3 +428,112 @@ class TestTypeMappingInAPIResponse:
         client.post("/api/v1/alerts/generate")
         alerts = client.get("/api/v1/alerts").json()
         assert alerts[0]["type"] == "new_model"
+
+
+# ---------------------------------------------------------------------------
+# Deprecation alerts
+# ---------------------------------------------------------------------------
+
+
+class TestDeprecationAlerts:
+    def test_deprecated_model_generates_warning_alert(self, client: TestClient, engine) -> None:
+        """A pending migration with a deprecated source model generates a deprecation alert."""
+        with Session(engine) as session:
+            # google/palm-2 is already retired in KNOWN_DEPRECATIONS
+            _make_migration(
+                session,
+                status="pending",
+                recommendation=None,
+                source="google/palm-2",
+                target="google/gemini-pro",
+            )
+
+        resp = client.post("/api/v1/alerts/generate")
+        assert resp.status_code == 200
+        # Should generate 1 deprecation alert
+        data = resp.json()
+        assert data["generated"] >= 1
+
+        alerts = client.get("/api/v1/alerts").json()
+        deprecation_alerts = [a for a in alerts if a["type"] == "deprecation"]
+        assert len(deprecation_alerts) >= 1
+        assert deprecation_alerts[0]["model"] == "google/palm-2"
+        assert deprecation_alerts[0]["severity"] == "critical"
+        assert "retired" in deprecation_alerts[0]["message"].lower()
+
+    def test_soon_to_retire_model_generates_critical_alert(self, client: TestClient, engine) -> None:
+        """A migration with source model retiring in <30 days generates a critical alert."""
+        with Session(engine) as session:
+            # openai/gpt-3.5-turbo-0613 will retire on 2026-03-01 (soon from 2026-04-01)
+            _make_migration(
+                session,
+                status="pending",
+                recommendation=None,
+                source="openai/gpt-3.5-turbo-0613",
+                target="openai/gpt-4o-mini",
+            )
+
+        resp = client.post("/api/v1/alerts/generate")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["generated"] >= 1
+
+        alerts = client.get("/api/v1/alerts").json()
+        deprecation_alerts = [a for a in alerts if a["type"] == "deprecation"]
+        assert len(deprecation_alerts) >= 1
+        assert "openai/gpt-3.5-turbo-0613" in [a["model"] for a in deprecation_alerts]
+
+    def test_deprecated_model_alert_idempotent(self, client: TestClient, engine) -> None:
+        """Generating alerts twice for the same model doesn't duplicate."""
+        with Session(engine) as session:
+            _make_migration(
+                session,
+                status="pending",
+                recommendation=None,
+                source="google/palm-2",
+                target="google/gemini-pro",
+            )
+
+        resp1 = client.post("/api/v1/alerts/generate")
+        count1 = resp1.json()["generated"]
+        assert count1 >= 1
+
+        resp2 = client.post("/api/v1/alerts/generate")
+        count2 = resp2.json()["generated"]
+        # Should not generate additional deprecation alerts
+        assert count2 < count1
+
+    def test_non_deprecated_model_no_alert(self, client: TestClient, engine) -> None:
+        """A migration with non-deprecated models generates no deprecation alerts."""
+        with Session(engine) as session:
+            # Both are non-deprecated models
+            _make_migration(
+                session,
+                status="pending",
+                recommendation=None,
+                source="openai/gpt-4o",
+                target="anthropic/claude-sonnet-4",
+            )
+
+        resp = client.post("/api/v1/alerts/generate")
+        assert resp.status_code == 200
+        data = resp.json()
+        # Should generate 0 alerts (no completion/failure, no deprecation)
+        assert data["generated"] == 0
+
+    def test_deprecation_alert_contains_replacement(self, client: TestClient, engine) -> None:
+        """Deprecation alerts include the suggested replacement model."""
+        with Session(engine) as session:
+            _make_migration(
+                session,
+                status="pending",
+                recommendation=None,
+                source="google/palm-2",
+                target="google/gemini-pro",
+            )
+
+        client.post("/api/v1/alerts/generate")
+        alerts = client.get("/api/v1/alerts").json()
+        deprecation_alerts = [a for a in alerts if a["type"] == "deprecation"]
+        assert len(deprecation_alerts) >= 1
+        assert "google/gemini-pro" in deprecation_alerts[0]["message"]

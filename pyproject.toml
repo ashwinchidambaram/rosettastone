@@ -25,6 +25,10 @@ redis = [
     "redis[hiredis]>=5.0",
     "redisvl>=0.3",
 ]
+rq = [
+    "rq>=1.16",
+    "redis>=5.0",
+]
 braintrust = [
     "braintrust",
 ]

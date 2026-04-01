@@ -21,6 +21,8 @@ router = APIRouter()
 
 def _generate_alerts(session: Session) -> int:
     """Scan for alert-worthy events and create Alert records. Returns count of new alerts."""
+    from rosettastone.core.deprecations import check_model_deprecation
+
     count = 0
 
     # Migration completion / failure alerts
@@ -87,6 +89,63 @@ def _generate_alerts(session: Session) -> int:
 
         session.add(alert)
         count += 1
+
+    # Deprecation alerts for active migrations
+    active_migrations = session.exec(
+        select(MigrationRecord).where(
+            MigrationRecord.status.in_(["pending", "running"])  # type: ignore[attr-defined]
+        )
+    ).all()
+
+    for migration in active_migrations:
+        for model_id in [migration.source_model, migration.target_model]:
+            if not model_id:
+                continue
+
+            dep = check_model_deprecation(model_id)
+            if not dep:
+                continue
+
+            # Idempotency: skip if an alert for this model already exists
+            existing = session.exec(
+                select(Alert).where(
+                    Alert.alert_type == "deprecation",
+                    Alert.model_id == model_id,
+                )
+            ).first()
+
+            if existing:
+                continue
+
+            if dep["already_retired"]:
+                message = (
+                    f"This model was retired on {dep['retirement_date']}. "
+                    f"Recommended replacement: {dep['replacement']}"
+                )
+            else:
+                message = (
+                    f"This model will be retired in {dep['days_until_retirement']} days "
+                    f"(on {dep['retirement_date']}). "
+                    f"Recommended replacement: {dep['replacement']}"
+                )
+
+            alert = Alert(
+                alert_type="deprecation",
+                model_id=model_id,
+                title=f"Model deprecation: {model_id}",
+                message=message,
+                action=f"Migrate to {dep['replacement']}",
+                severity=dep["severity"],
+                metadata_json=json.dumps(
+                    {
+                        "days_left": dep["days_until_retirement"],
+                        "deprecation_date": dep["retirement_date"],
+                        "replacement": dep["replacement"],
+                    }
+                ),
+            )
+            session.add(alert)
+            count += 1
 
     if count:
         session.commit()
