@@ -6,6 +6,7 @@ import os
 from collections.abc import Generator
 from pathlib import Path
 
+from sqlalchemy import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
 _DEFAULT_DB_DIR = Path.home() / ".rosettastone"
@@ -21,12 +22,12 @@ def _get_db_path() -> str:
     return str(_DEFAULT_DB_DIR / "migrations.db")
 
 
-def _is_postgres(engine) -> bool:
+def _is_postgres(engine: Engine) -> bool:
     """Return True if the engine is connected to PostgreSQL."""
     return engine.dialect.name == "postgresql"
 
 
-def get_engine():
+def get_engine() -> Engine:
     """Get or create the database engine.
 
     Uses PostgreSQL if DATABASE_URL is set and starts with 'postgresql://'.
@@ -62,7 +63,7 @@ def init_db() -> None:
     _migrate_add_columns(engine)
 
 
-def _migrate_add_columns(engine) -> None:
+def _migrate_add_columns(engine: Engine) -> None:
     """Add any new columns to existing tables (idempotent)."""
     new_columns = [
         ("migrations", "source_latency_p50", "REAL"),
