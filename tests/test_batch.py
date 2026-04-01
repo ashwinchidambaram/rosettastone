@@ -397,3 +397,78 @@ def test_format_batch_summary_empty() -> None:
 def test_batch_manifest_version() -> None:
     manifest = BatchManifest(migrations=[BatchEntry(**_minimal_entry_dict())])
     assert manifest.version == 1
+
+
+# ---------------------------------------------------------------------------
+# run_batch — output_dir path containment validation
+# ---------------------------------------------------------------------------
+
+
+def test_output_dir_outside_base_uses_default(tmp_path: Path) -> None:
+    """output_dir pointing outside output_base is rejected; default path is used instead."""
+    outside_dir = "/etc/cron.d"
+    entry = BatchEntry(**_minimal_entry_dict(output_dir=outside_dir))
+    manifest = BatchManifest(migrations=[entry])
+    mock_result = _make_migration_result()
+
+    captured_configs: list = []
+
+    def capture_config(**kwargs):
+        captured_configs.append(kwargs)
+        return MagicMock()
+
+    with (
+        patch("rosettastone.config.MigrationConfig", side_effect=capture_config),
+        patch("rosettastone.core.migrator.Migrator") as mock_migrator,
+        patch("rosettastone.batch.logger") as mock_logger,
+    ):
+        mock_migrator.return_value.run.return_value = mock_result
+        results = run_batch(manifest, tmp_path)
+
+    assert len(results) == 1
+    assert results[0].status == "complete"
+
+    # The config must NOT use the outside path
+    used_output_dir = captured_configs[0]["output_dir"]
+    assert not used_output_dir.startswith("/etc"), (
+        f"output_dir '{used_output_dir}' should not be outside output_base"
+    )
+
+    # The default sanitized path inside tmp_path must have been used instead.
+    # Hyphens are preserved in sanitized names (only non-alphanumeric, non-hyphen,
+    # non-underscore characters are replaced with underscores).
+    expected_default = str(tmp_path / "my-migration")
+    assert used_output_dir == expected_default
+
+    # A warning must have been logged
+    mock_logger.warning.assert_called_once()
+    warning_call_args = mock_logger.warning.call_args[0]
+    assert "outside output_base" in warning_call_args[0]
+
+
+def test_output_dir_within_base_is_accepted(tmp_path: Path) -> None:
+    """output_dir that is inside output_base is used as-is."""
+    inside_dir = str(tmp_path / "subdir" / "my-migration")
+    entry = BatchEntry(**_minimal_entry_dict(output_dir=inside_dir))
+    manifest = BatchManifest(migrations=[entry])
+    mock_result = _make_migration_result()
+
+    captured_configs: list = []
+
+    def capture_config(**kwargs):
+        captured_configs.append(kwargs)
+        return MagicMock()
+
+    with (
+        patch("rosettastone.config.MigrationConfig", side_effect=capture_config),
+        patch("rosettastone.core.migrator.Migrator") as mock_migrator,
+    ):
+        mock_migrator.return_value.run.return_value = mock_result
+        results = run_batch(manifest, tmp_path)
+
+    assert len(results) == 1
+    assert results[0].status == "complete"
+
+    used_output_dir = captured_configs[0]["output_dir"]
+    # The resolved inside_dir should be used directly
+    assert used_output_dir == str(Path(inside_dir).resolve())

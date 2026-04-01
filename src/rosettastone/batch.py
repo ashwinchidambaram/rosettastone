@@ -80,7 +80,21 @@ def run_batch(manifest: BatchManifest, output_base: Path) -> list[BatchResult]:
         # Sanitize the name for use as a directory component
         sanitized_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in entry.name)
         if entry.output_dir:
-            output_dir = str(entry.output_dir)
+            # Resolve and validate path containment
+            resolved = Path(entry.output_dir).resolve()
+            output_base_resolved = output_base.resolve()
+            try:
+                resolved.relative_to(output_base_resolved)
+                output_dir = str(resolved)
+            except ValueError:
+                # Path is outside output_base — reject it
+                logger.warning(
+                    "Batch entry '%s': output_dir '%s' is outside output_base '%s', using default",
+                    entry.name,
+                    entry.output_dir,
+                    output_base,
+                )
+                output_dir = str(output_base / sanitized_name)
         else:
             output_dir = str(output_base / sanitized_name)
 

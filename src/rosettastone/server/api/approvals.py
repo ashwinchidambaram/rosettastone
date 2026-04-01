@@ -252,18 +252,9 @@ def submit_rejection(
     if workflow.status != "pending":
         raise HTTPException(status_code=400, detail="Workflow is not pending")
 
-    user_id = request.state.user.get("user_id") if request.state.user else None
-
-    rejection = Approval(
-        workflow_id=workflow.id,
-        user_id=user_id,
-        decision="reject",
-        comment=body.comment,
-    )
-    session.add(rejection)
-    session.flush()
-
-    # Reset logic: delete all Approval rows for this workflow and reset status
+    # Reset logic: delete all existing Approval rows for this workflow and reset status.
+    # The rejection is recorded in the audit log (below) rather than as an Approval row
+    # to avoid a unique-constraint conflict when the rejector previously approved.
     existing_approvals = list(
         session.exec(select(Approval).where(Approval.workflow_id == workflow.id)).all()
     )

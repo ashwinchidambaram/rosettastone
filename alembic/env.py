@@ -11,8 +11,10 @@ from rosettastone.server.database import get_engine
 config = context.config
 
 # Set up Python logging from the ini file, if present.
+# disable_existing_loggers=False preserves pytest's caplog handlers and avoids
+# silencing application loggers that tests rely on for caplog assertions.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Use SQLModel's shared metadata so alembic can detect all table definitions.
 target_metadata = SQLModel.metadata

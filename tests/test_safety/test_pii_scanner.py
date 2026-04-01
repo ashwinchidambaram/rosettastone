@@ -93,6 +93,20 @@ class TestScanTextPhoneDetection:
             f"Expected MEDIUM severity for phone, got {phone_findings[0][1]}"
         )
 
+    def test_phone_no_false_positive_version_string(self):
+        """Version strings like '1.234.5678' should NOT be detected as phone numbers.
+
+        The leading \\b anchor prevents matching digit sequences that are embedded
+        within longer numeric tokens (e.g. version or build strings).
+        """
+        for version_string in ("1.234.5678", "v1.2.3456", "release-1.234.5678"):
+            findings = scan_text(version_string)
+            phone_findings = [pii_type for pii_type, _ in findings if pii_type == "us_phone"]
+            assert len(phone_findings) == 0, (
+                f"Expected no phone match for version string '{version_string}', "
+                f"got {phone_findings}"
+            )
+
 
 class TestScanTextSSNDetection:
     """Tests for US Social Security Number pattern detection in scan_text."""
@@ -160,6 +174,25 @@ class TestScanTextCreditCardDetection:
         assert len(cc_findings) > 0, "Expected credit card finding"
         assert cc_findings[0][1] == "HIGH", (
             f"Expected HIGH severity for credit card, got {cc_findings[0][1]}"
+        )
+
+    def test_credit_card_false_positive_documented(self):
+        """A plain 16-digit order ID IS detected — documenting known false-positive behavior.
+
+        The credit card regex matches any structurally valid 16-digit sequence.
+        No Luhn checksum is performed, so arbitrary numeric IDs (order IDs, transaction
+        references, etc.) will trigger this pattern. Matches are candidate detections
+        that require manual review before acting on them.
+        """
+        # This 16-digit string is an order ID, not a real credit card, but the
+        # regex cannot distinguish them without Luhn validation.
+        order_id_text = "Order ID: 1234567890123456"
+        findings = scan_text(order_id_text)
+        cc_findings = [pii_type for pii_type, _ in findings if pii_type == "credit_card"]
+        # Assert it IS detected — confirming the known false-positive behavior
+        assert len(cc_findings) > 0, (
+            "Expected credit_card match for 16-digit order ID (known false positive — "
+            "no Luhn check is performed)"
         )
 
 

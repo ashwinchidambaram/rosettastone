@@ -208,6 +208,47 @@ def test_workflow_not_found_404(client, migration_id):
     assert resp.status_code == 404
 
 
+def test_duplicate_approval_rejected(client, migration_id):
+    """Submitting a second approval from the same user for the same workflow returns 409."""
+    c, _ = client
+    _create_workflow(c, migration_id, required=2)
+    resp1 = _approve(c, migration_id, comment="First attempt")
+    assert resp1.status_code == 200
+
+    resp2 = _approve(c, migration_id, comment="Duplicate attempt")
+    assert resp2.status_code == 409
+
+
+def test_different_users_can_both_approve(monkeypatch):
+    """Two different users can each submit an approval for the same workflow."""
+    monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
+    monkeypatch.setenv("ROSETTASTONE_JWT_SECRET", _JWT_SECRET)
+    monkeypatch.delenv("ROSETTASTONE_API_KEY", raising=False)
+
+    app, engine = _make_app_and_engine()
+    migration_id = _insert_migration(engine)
+
+    token_user1 = _make_token(user_id=1, role="admin")
+    token_user2 = _make_token(user_id=2, role="admin")
+
+    with TestClient(app, headers={"Authorization": f"Bearer {token_user1}"}) as client1:
+        # Create the workflow requiring 2 approvals
+        resp = _create_workflow(client1, migration_id, required=2)
+        assert resp.status_code == 201
+
+        # User 1 approves
+        resp1 = _approve(client1, migration_id, comment="User 1 LGTM")
+        assert resp1.status_code == 200
+        assert resp1.json()["current_approvals"] == 1
+
+    with TestClient(app, headers={"Authorization": f"Bearer {token_user2}"}) as client2:
+        # User 2 also approves — should succeed and satisfy the threshold
+        resp2 = _approve(client2, migration_id, comment="User 2 LGTM")
+        assert resp2.status_code == 200
+        assert resp2.json()["current_approvals"] == 2
+        assert resp2.json()["status"] == "approved"
+
+
 def test_create_workflow_without_multi_user_404(monkeypatch):
     """Creating a workflow returns 404 when ROSETTASTONE_MULTI_USER is not set."""
     monkeypatch.delenv("ROSETTASTONE_MULTI_USER", raising=False)

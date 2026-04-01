@@ -17,6 +17,7 @@ on:
     paths:
       - '**/*.jsonl'
       - 'prompts/**'
+      - 'uv.lock'
   workflow_dispatch:
     inputs:
       source_model:

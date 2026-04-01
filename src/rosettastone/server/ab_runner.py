@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from rosettastone.decision.ab_stats import ABSignificanceResult
 
 from sqlmodel import Session, select
 
@@ -22,6 +26,21 @@ from rosettastone.server.models import (
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 50  # Commit results every N rows for partial failure resilience
+
+
+def _determine_winner(sig: ABSignificanceResult, wins_a: int, wins_b: int) -> str:
+    """Determine A/B test winner using mean_diff from significance result.
+
+    Uses mean_diff as the single source of truth. Returns 'inconclusive' when
+    not statistically significant or scores are identical.
+    """
+    if not sig.significant:
+        return "inconclusive"
+    if sig.mean_diff > 0:
+        return "a"
+    if sig.mean_diff < 0:
+        return "b"
+    return "inconclusive"
 
 
 def run_ab_test_background(
@@ -97,7 +116,8 @@ def _run_simulation(
     results: list[ABTestResult] = []
     for tc in test_cases:
         tc_id = tc.id
-        assigned = "a" if hash(tc_id) % 100 < int(traffic_split * 100) else "b"
+        bucket = int(hashlib.md5(str(tc_id).encode()).hexdigest(), 16) % 100
+        assigned = "a" if bucket < int(traffic_split * 100) else "b"
 
         score = tc.composite_score
 
@@ -154,7 +174,8 @@ def _run_live(
             continue
 
         tc_id = tc.id
-        assigned = "a" if hash(tc_id) % 100 < int(traffic_split * 100) else "b"
+        bucket = int(hashlib.md5(str(tc_id).encode()).hexdigest(), 16) % 100
+        assigned = "a" if bucket < int(traffic_split * 100) else "b"
 
         try:
             score_a = _evaluate_with_prompt(tc.prompt_text, prompt_a)
@@ -228,12 +249,11 @@ def _conclude_test(ab_test_id: int, engine: Any) -> None:
             for r in results
         ]
 
+        wins_a = sum(1 for r in result_dicts if r["winner"] == "a")
+        wins_b = sum(1 for r in result_dicts if r["winner"] == "b")
         sig = compute_ab_significance(result_dicts)
 
-        if sig.significant:
-            ab_test.winner = "a" if sig.mean_diff > 0 else "b"
-        else:
-            ab_test.winner = "inconclusive"
+        ab_test.winner = _determine_winner(sig, wins_a, wins_b)
 
         ab_test.status = "concluded"
         ab_test.end_time = datetime.now(UTC)

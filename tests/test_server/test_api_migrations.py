@@ -143,11 +143,14 @@ class TestGetMigration:
 
 
 class TestCreateMigration:
-    def test_create_migration(self, client):
+    def test_create_migration(self, client, tmp_path, monkeypatch):
+        data_file = tmp_path / "data.jsonl"
+        data_file.touch()
+        monkeypatch.setenv("HOME", str(tmp_path))
         payload = {
             "source_model": "openai/gpt-4o",
             "target_model": "anthropic/claude-sonnet-4",
-            "data_path": "/tmp/data.jsonl",
+            "data_path": str(tmp_path / ".rosettastone" / "data.jsonl"),
         }
         response = client.post("/api/v1/migrations", json=payload)
         assert response.status_code == 201
@@ -157,12 +160,13 @@ class TestCreateMigration:
         assert data["status"] == "pending"
         assert data["id"] is not None
 
-    def test_create_migration_with_cluster_prompts_and_objectives(self, client, engine):
+    def test_create_migration_with_cluster_prompts_and_objectives(self, client, tmp_path, monkeypatch, engine):
         """Test that cluster_prompts and improvement_objectives are captured in config."""
+        monkeypatch.setenv("HOME", str(tmp_path))
         payload = {
             "source_model": "openai/gpt-4o",
             "target_model": "anthropic/claude-sonnet-4",
-            "data_path": "/tmp/data.jsonl",
+            "data_path": str(tmp_path / ".rosettastone" / "data.jsonl"),
             "cluster_prompts": True,
             "improvement_objectives": [
                 {"name": "latency", "weight": 0.5},

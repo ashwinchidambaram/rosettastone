@@ -142,11 +142,15 @@ def update_user(
 
     current = getattr(request.state, "user", None)
     is_admin = False
+    current_id = None
+    current_role = "viewer"
     if current is not None:
         if isinstance(current, dict):
             current_role = current.get("role", "viewer")
+            current_id = current.get("user_id")
         else:
             current_role = getattr(current, "role", "viewer")
+            current_id = getattr(current, "id", None)
         is_admin = current_role == "admin"
 
     if is_admin:
@@ -159,6 +163,9 @@ def update_user(
         if body.password is not None:
             user.hashed_password = hash_password(body.password)
     else:
+        # In the non-admin update path, verify caller is updating their own profile
+        if current_role != "admin" and current_id != user_id:
+            raise HTTPException(status_code=403, detail="You can only update your own profile")
         if body.email is not None:
             user.email = body.email
         if body.password is not None:

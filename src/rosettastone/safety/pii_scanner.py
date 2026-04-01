@@ -25,7 +25,7 @@ _PII_PATTERNS = {
         "MEDIUM",
     ),
     "us_phone": (
-        r"(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}\b",
+        r"\b(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}\b",
         "MEDIUM",
     ),
     "ssn": (
@@ -33,6 +33,9 @@ _PII_PATTERNS = {
         "HIGH",
     ),
     "credit_card": (
+        # NOTE: Matches structural 16-digit patterns only. No Luhn checksum validation.
+        # False positive rate is high on technical data (order IDs, version strings, etc.).
+        # Matches should be treated as candidate detections requiring manual review.
         r"\b(?:\d{4}[-\s]?){3}\d{4}\b",
         "HIGH",
     ),

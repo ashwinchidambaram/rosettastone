@@ -91,10 +91,9 @@ class CompositeEvaluator:
                 new_response = response.choices[0].message.content or ""
             except Exception as e:
                 logger.warning(
-                    "Pair %d: litellm.completion failed (%s: %s), skipping",
+                    "Pair %d: litellm.completion failed (%s), skipping",
                     i,
-                    type(e).__name__,
-                    e,
+                    type(e).__name__,  # log only the exception type, not the message
                 )
                 continue
 

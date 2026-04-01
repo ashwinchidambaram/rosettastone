@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -11,7 +12,16 @@ if TYPE_CHECKING:
     from rosettastone.config import MigrationConfig
     from rosettastone.core.types import MigrationResult
 
+logger = logging.getLogger(__name__)
+
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+
+def _config_get(config: Any, key: str, default: Any = None) -> Any:
+    """Get a value from config whether it's a dict or a Pydantic model."""
+    if isinstance(config, dict):
+        return config.get(key, default)
+    return getattr(config, key, default)
 
 
 def _stats_to_dict(stats: Any) -> dict[str, Any]:
@@ -134,8 +144,8 @@ def generate_executive_narrative(
         import litellm
 
         prompt_text = EXECUTIVE_PROMPT.format(
-            source_model=result.config.get("source_model", "unknown"),
-            target_model=result.config.get("target_model", "unknown"),
+            source_model=_config_get(result.config, "source_model", "unknown"),
+            target_model=_config_get(result.config, "target_model", "unknown"),
             recommendation=getattr(result, "recommendation", "N/A") or "N/A",
             confidence_score=result.confidence_score,
             baseline_score=result.baseline_score,
@@ -160,6 +170,9 @@ def generate_executive_narrative(
         return response.choices[0].message.content or _template_fallback(result, per_type, safety)
 
     except Exception:
+        logger.warning(
+            "Executive narrative LLM call failed, using template fallback", exc_info=True
+        )
         return _template_fallback(result, per_type, safety)
 
 
@@ -179,8 +192,8 @@ def _template_fallback(
     converted = {k: _stats_to_dict(v) for k, v in per_type.items()}
 
     return template.render(
-        source_model=result.config.get("source_model", "unknown"),
-        target_model=result.config.get("target_model", "unknown"),
+        source_model=_config_get(result.config, "source_model", "unknown"),
+        target_model=_config_get(result.config, "target_model", "unknown"),
         recommendation=getattr(result, "recommendation", "N/A"),
         recommendation_reasoning=getattr(result, "recommendation_reasoning", ""),
         confidence_score=result.confidence_score,
@@ -199,8 +212,8 @@ def _template_fallback(
 def _basic_summary(result: MigrationResult, per_type: dict[str, Any]) -> str:
     """Minimal plain-text summary when no template is available."""
     rec = getattr(result, "recommendation", "N/A") or "N/A"
-    source = result.config.get("source_model", "unknown")
-    target = result.config.get("target_model", "unknown")
+    source = _config_get(result.config, "source_model", "unknown")
+    target = _config_get(result.config, "target_model", "unknown")
     wins = sum(1 for r in result.validation_results if r.is_win)
     total = len(result.validation_results)
 

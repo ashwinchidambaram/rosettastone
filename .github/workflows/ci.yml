@@ -30,4 +30,24 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
       - run: uv sync --dev --all-extras
-      - run: uv run pytest tests/ -v
+      - run: uv run pytest tests/ -v --ignore=tests/test_e2e
+
+  e2e:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --dev --all-extras
+      - name: Install Playwright browsers
+        run: uv run playwright install --with-deps chromium
+      - name: Run Playwright UI tests
+        run: uv run pytest tests/test_e2e/test_playwright_ui.py -v --tb=short
+
+  docker:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Docker smoke test
+        run: bash scripts/docker-smoke-test.sh

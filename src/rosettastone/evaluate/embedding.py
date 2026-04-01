@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
+import functools
 from typing import Any
 
 from rosettastone.evaluate.base import Evaluator
+
+
+@functools.lru_cache(maxsize=4)
+def _get_sentence_transformer(model_name: str) -> Any:
+    """Load and cache a SentenceTransformer model. Cached per model name."""
+    from sentence_transformers import SentenceTransformer
+
+    return SentenceTransformer(model_name)
 
 
 def compute_embedding_sim(expected: str, actual: str) -> float:
@@ -12,9 +21,7 @@ def compute_embedding_sim(expected: str, actual: str) -> float:
 
     Raises ImportError if sentence-transformers is not installed.
     """
-    from sentence_transformers import SentenceTransformer
-
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    model = _get_sentence_transformer("all-MiniLM-L6-v2")
     embeddings = model.encode([expected, actual])
     # Cosine similarity
     import numpy as np

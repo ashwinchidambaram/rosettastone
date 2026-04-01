@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse
 from sqlmodel import Session, func, select
 
 from rosettastone.decision.ab_stats import compute_ab_significance
+from rosettastone.server.ab_runner import _determine_winner
 from rosettastone.server.api.audit import log_audit
 from rosettastone.server.database import get_session
 from rosettastone.server.models import (
@@ -372,13 +373,10 @@ def conclude_ab_test(
 
     winner: str
     if result_dicts:
+        wins_a = sum(1 for r in result_dicts if r["winner"] == "a")
+        wins_b = sum(1 for r in result_dicts if r["winner"] == "b")
         sig = compute_ab_significance(result_dicts)
-        if sig.significant:
-            wins_a = sum(1 for r in result_dicts if r["winner"] == "a")
-            wins_b = sum(1 for r in result_dicts if r["winner"] == "b")
-            winner = "a" if wins_a >= wins_b else "b"
-        else:
-            winner = "inconclusive"
+        winner = _determine_winner(sig, wins_a, wins_b)
     else:
         winner = "inconclusive"
 

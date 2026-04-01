@@ -1,4 +1,8 @@
-"""HTML report generator — self-contained interactive report with Chart.js."""
+"""HTML report generator — self-contained interactive report with Chart.js.
+
+Chart.js is bundled from the local static asset at build time so the generated
+HTML file works fully offline without any CDN dependency.
+"""
 
 from __future__ import annotations
 
@@ -6,11 +10,18 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from jinja2 import Environment, FileSystemLoader
+from markupsafe import Markup
 
 if TYPE_CHECKING:
     from rosettastone.core.types import MigrationResult
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+# Local Chart.js bundle — served from the static directory bundled with the package.
+# Falls back to an empty string (charts will not render) if the file is missing.
+_CHARTJS_PATH = (
+    Path(__file__).parents[2] / "rosettastone" / "server" / "static" / "js" / "chart.min.js"
+)
 
 
 def _stats_to_dict(stats: Any) -> dict[str, Any]:
@@ -28,8 +39,8 @@ def generate_html_report(result: MigrationResult, output_dir: Path) -> Path:
     """Generate a self-contained HTML migration report.
 
     Renders the report.html.jinja template with Chart.js for interactive
-    score distribution charts. The output is a standalone HTML file that
-    can be opened in any browser without a web server.
+    score distribution charts. Chart.js is inlined from the local static
+    bundle so the output file works offline without any network access.
 
     Args:
         result: The migration result to report on.
@@ -43,6 +54,10 @@ def generate_html_report(result: MigrationResult, output_dir: Path) -> Path:
 
     raw_per_type = getattr(result, "per_type_scores", {}) or {}
     per_type_scores = {k: _stats_to_dict(v) for k, v in raw_per_type.items()}
+
+    chart_js_source = (
+        Markup(_CHARTJS_PATH.read_text(encoding="utf-8")) if _CHARTJS_PATH.is_file() else Markup("")
+    )
 
     html_content = template.render(
         config=result.config,
@@ -61,7 +76,7 @@ def generate_html_report(result: MigrationResult, output_dir: Path) -> Path:
         recommendation_reasoning=getattr(result, "recommendation_reasoning", None),
         per_type_scores=per_type_scores,
         safety_warnings=getattr(result, "safety_warnings", []),
-        embed_mode=True,
+        chart_js_source=chart_js_source,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

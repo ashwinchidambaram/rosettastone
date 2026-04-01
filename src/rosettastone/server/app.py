@@ -52,7 +52,7 @@ def _recover_orphaned_migrations() -> None:
     """Mark any 'running' migrations as 'failed' on startup (server restarted mid-run)."""
     from sqlmodel import Session, select
 
-    from rosettastone.server.models import MigrationRecord
+    from rosettastone.server.models import MigrationRecord, PipelineRecord
 
     engine = get_engine()
     with Session(engine) as session:
@@ -65,6 +65,22 @@ def _recover_orphaned_migrations() -> None:
         if orphaned:
             session.commit()
             logger.info("Recovered %d orphaned migration(s)", len(orphaned))
+
+        # Also recover orphaned PipelineRecord rows stuck in "running"
+        stale_pipelines = session.exec(
+            select(PipelineRecord).where(PipelineRecord.status == "running")
+        ).all()
+
+        for pipeline in stale_pipelines:
+            pipeline.status = "failed"
+            session.add(pipeline)
+
+        if stale_pipelines:
+            logger.warning(
+                "Recovered %d orphaned pipeline(s) stuck in 'running' state",
+                len(stale_pipelines),
+            )
+            session.commit()
 
 
 _JWT_SECRET_ENV = "ROSETTASTONE_JWT_SECRET"
@@ -123,7 +139,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
 
-    executor.shutdown(wait=False)
+    # Graceful shutdown: wait up to 30s for in-progress tasks to complete
+    executor.shutdown(wait=True, cancel_futures=False)
 
 
 def create_app() -> FastAPI:

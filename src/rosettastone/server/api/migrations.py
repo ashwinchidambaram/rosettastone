@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile
@@ -754,6 +756,18 @@ async def create_migration(
 
     if not source_model or not target_model:
         raise HTTPException(status_code=422, detail="source_model and target_model are required")
+
+    # Validate data_path is within a safe directory (prevent path traversal)
+    if data_path:
+        safe_base = Path(os.path.expanduser("~/.rosettastone"))
+        try:
+            resolved = Path(str(data_path)).resolve()
+            resolved.relative_to(safe_base)  # raises ValueError if not under safe_base
+        except ValueError:
+            raise HTTPException(
+                status_code=422,
+                detail=f"data_path must be within the rosettastone data directory ({safe_base})",
+            )
 
     config = {
         "source_model": source_model,

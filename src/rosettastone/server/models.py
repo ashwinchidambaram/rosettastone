@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Optional
 
 try:
+    from sqlalchemy import UniqueConstraint
     from sqlmodel import Field, Relationship, SQLModel
 except ImportError:
     raise ImportError("Web dependencies required. Install with: uv pip install 'rosettastone[web]'")
@@ -257,6 +258,7 @@ class ApprovalWorkflow(SQLModel, table=True):
 
 class Approval(SQLModel, table=True):
     __tablename__ = "approvals"
+    __table_args__ = (UniqueConstraint("workflow_id", "user_id", name="uq_approval_workflow_user"),)
 
     id: int | None = Field(default=None, primary_key=True)
     workflow_id: int = Field(foreign_key="approval_workflows.id", index=True)

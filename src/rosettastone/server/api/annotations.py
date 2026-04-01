@@ -86,6 +86,7 @@ def list_annotations(
         select(Annotation)
         .where(Annotation.migration_id == migration_id)
         .order_by(Annotation.created_at.desc())  # type: ignore[attr-defined]
+        .limit(500)
     )
     records = list(session.exec(stmt).all())
     return [_annotation_to_summary(r) for r in records]
@@ -185,6 +186,7 @@ def get_annotation_queue(
             select(Annotation)
             .where(Annotation.annotator_id == user_id)
             .order_by(Annotation.created_at.desc())  # type: ignore[attr-defined]
+            .limit(100)
         )
 
     records = list(session.exec(stmt).all())

@@ -202,6 +202,7 @@ def rollback_version(
     snapshot = json.loads(version.snapshot_json)
 
     # Restore MigrationRecord fields from snapshot (NOT test cases)
+    migration.status = snapshot.get("status", migration.status)
     migration.optimized_prompt = snapshot.get("optimized_prompt")
     migration.confidence_score = snapshot.get("confidence_score")
     migration.baseline_score = snapshot.get("baseline_score")

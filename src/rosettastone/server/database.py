@@ -89,6 +89,11 @@ def _migrate_add_columns(engine: Engine) -> None:
                 conn.exec_driver_sql(
                     f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {col_type}"
                 )
+            # Create unique index on approvals(workflow_id, user_id) if not exists
+            conn.exec_driver_sql(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_approval_workflow_user "
+                "ON approvals (workflow_id, user_id)"
+            )
         else:
             # SQLite does not support IF NOT EXISTS for columns; use try/except
             for table, column, col_type in new_columns:
@@ -96,6 +101,14 @@ def _migrate_add_columns(engine: Engine) -> None:
                     conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
                 except Exception:
                     pass  # Column already exists
+            # Create unique index on approvals(workflow_id, user_id) if not exists
+            try:
+                conn.exec_driver_sql(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_approval_workflow_user "
+                    "ON approvals (workflow_id, user_id)"
+                )
+            except Exception:
+                pass  # Index already exists or table doesn't exist yet
         conn.commit()
 
 

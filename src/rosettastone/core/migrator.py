@@ -33,6 +33,24 @@ class Migrator:
             run_preflight,
             run_prompt_audit,
         )
+        from rosettastone.core.types import MigrationResult
+
+        # Respect dry_run regardless of skip_preflight
+        if self.config.dry_run and self.config.skip_preflight:
+            return MigrationResult(
+                config=self.config.model_dump(),
+                optimized_prompt="",
+                baseline_results=[],
+                validation_results=[],
+                confidence_score=0.0,
+                baseline_score=0.0,
+                improvement=0.0,
+                cost_usd=0.0,
+                duration_seconds=0.0,
+                warnings=[],
+                recommendation="NO_GO",
+                recommendation_reasoning="Dry run — no migration performed.",
+            )
 
         start = time.time()
         ctx = PipelineContext()

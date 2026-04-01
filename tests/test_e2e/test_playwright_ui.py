@@ -6,6 +6,7 @@ and error handling as specified in PLAYWRIGHT_TEST_PLAN.md.
 
 from __future__ import annotations
 
+import pathlib
 import re
 import signal
 import subprocess
@@ -14,6 +15,11 @@ import urllib.request
 
 import pytest
 from playwright.sync_api import Page, expect, sync_playwright
+
+# Resolve the project root dynamically so the fixture works on any machine / CI.
+# This file lives at tests/test_e2e/test_playwright_ui.py, so .parent.parent.parent
+# walks up: test_playwright_ui.py → test_e2e/ → tests/ → project root.
+PROJECT_ROOT = pathlib.Path(__file__).parent.parent.parent
 
 BASE_URL = "http://localhost:8765"
 
@@ -61,7 +67,7 @@ def server():
             "--timeout-keep-alive",
             "0",
         ],
-        cwd="/Users/ashwinchidambaram/dev/projects/rosettastone",
+        cwd=str(PROJECT_ROOT),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )

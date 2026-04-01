@@ -321,6 +321,47 @@ class TestCSRF:
 
 
 # ---------------------------------------------------------------------------
+# Unit tests for _csrf_enabled()
+# ---------------------------------------------------------------------------
+
+
+class TestCsrfEnabled:
+    """Unit tests for the _csrf_enabled() helper in csrf.py."""
+
+    def test_csrf_enabled_with_multi_user_flag(self, monkeypatch):
+        """ROSETTASTONE_MULTI_USER=true enables CSRF even without an API key."""
+        from rosettastone.server.csrf import _csrf_enabled
+
+        monkeypatch.delenv("ROSETTASTONE_API_KEY", raising=False)
+        monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
+        assert _csrf_enabled() is True
+
+    def test_csrf_disabled_without_either_flag(self, monkeypatch):
+        """Neither flag set — CSRF must be disabled."""
+        from rosettastone.server.csrf import _csrf_enabled
+
+        monkeypatch.delenv("ROSETTASTONE_API_KEY", raising=False)
+        monkeypatch.delenv("ROSETTASTONE_MULTI_USER", raising=False)
+        assert _csrf_enabled() is False
+
+    def test_csrf_enabled_with_api_key_only(self, monkeypatch):
+        """Backward compat: API key alone still enables CSRF."""
+        from rosettastone.server.csrf import _csrf_enabled
+
+        monkeypatch.setenv("ROSETTASTONE_API_KEY", _TEST_KEY)
+        monkeypatch.delenv("ROSETTASTONE_MULTI_USER", raising=False)
+        assert _csrf_enabled() is True
+
+    def test_csrf_enabled_with_both_flags(self, monkeypatch):
+        """Both flags set — CSRF must be enabled."""
+        from rosettastone.server.csrf import _csrf_enabled
+
+        monkeypatch.setenv("ROSETTASTONE_API_KEY", _TEST_KEY)
+        monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
+        assert _csrf_enabled() is True
+
+
+# ---------------------------------------------------------------------------
 # Unit tests for auth helper functions
 # ---------------------------------------------------------------------------
 
