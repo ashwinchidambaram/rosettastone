@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from rosettastone.core.types import MigrationResult
 
@@ -30,7 +31,7 @@ def format_ci_json(result: MigrationResult) -> str:
     cost_usd, duration_seconds, warnings, safety_warnings, per_type_scores.
     Floats rounded to 4 decimal places.
     """
-    data: dict = {
+    data: dict[str, Any] = {
         "recommendation": result.recommendation,
         "confidence_score": round(result.confidence_score, 4),
         "baseline_score": round(result.baseline_score, 4),

@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
+from typing import cast
 
 from rosettastone.testing.synth_data import GeneratedPair
 
@@ -47,9 +48,9 @@ class RedisPopulator:
         pat = pattern or f"{self.key_prefix}:*"
         keys = self.client.keys(pat)
         if keys:
-            deleted = self.client.delete(*keys)
+            deleted = self.client.delete(*list(keys))  # type: ignore[arg-type]
             logger.info("Cleaned up %d Redis keys matching %s", deleted, pat)
-            return deleted
+            return cast(int, deleted)
         return 0
 
     def _make_key(self, messages: list[dict[str, str]]) -> str:

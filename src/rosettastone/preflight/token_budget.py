@@ -32,6 +32,8 @@ def check_token_budget(config: MigrationConfig) -> tuple[list[str], list[str]]:
     try:
         from rosettastone.ingest.jsonl import JSONLAdapter
 
+        if not config.data_path:
+            return warnings, blockers
         adapter = JSONLAdapter(config.data_path)
         pairs = adapter.load()
 

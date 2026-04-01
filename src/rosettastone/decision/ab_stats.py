@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -140,7 +141,7 @@ def bootstrap_ci(
 
 
 def compute_ab_significance(
-    results: list[dict],
+    results: list[dict[str, Any]],
 ) -> ABSignificanceResult:
     """Compute full significance analysis from A/B test result rows.
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import litellm
 
@@ -130,7 +130,7 @@ class CompositeEvaluator:
 
     def _get_threshold(self, output_type: OutputType) -> float:
         thresholds = getattr(self.config, "win_thresholds", DEFAULT_WIN_THRESHOLDS)
-        return thresholds.get(output_type.value, DEFAULT_WIN_THRESHOLDS.get(output_type.value, 0.8))
+        return cast(float, thresholds.get(output_type.value, DEFAULT_WIN_THRESHOLDS.get(output_type.value, 0.8)))
 
     def _score(
         self,

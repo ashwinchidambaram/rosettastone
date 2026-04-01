@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
@@ -59,7 +61,7 @@ class MigrationDisplay:
     def show_summary_table(
         self,
         results: list[EvalResult],
-        per_type_scores: dict,
+        per_type_scores: dict[str, Any],
     ) -> None:
         """Render a per-output-type breakdown table.
 
@@ -181,7 +183,7 @@ class MigrationDisplay:
     # Safety warnings
     # ------------------------------------------------------------------
 
-    def show_safety_warnings(self, warnings: list) -> None:
+    def show_safety_warnings(self, warnings: list[Any]) -> None:
         """Render a panel listing safety warnings with severity-based styling.
 
         Each warning may be a plain string or an object/dict with ``severity``

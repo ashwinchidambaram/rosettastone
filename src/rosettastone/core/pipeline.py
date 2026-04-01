@@ -168,6 +168,9 @@ def load_and_split_data(
 
 
 def optimize_prompt(train: list[PromptPair], val: list[PromptPair], config: MigrationConfig) -> str:
+    from rosettastone.optimize.base import Optimizer
+
+    optimizer: Optimizer
     if config.mipro_auto is not None:
         from rosettastone.optimize.mipro import MIPROv2Optimizer
 
