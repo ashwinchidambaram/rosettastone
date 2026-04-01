@@ -58,9 +58,9 @@ async def teams_page(
 ) -> HTMLResponse:
     """Render the teams UI page."""
     multi_user = _multi_user_enabled()
-    teams = list(session.exec(select(Team).order_by(Team.id)).all()) if multi_user else []
+    teams = list(session.exec(select(Team).order_by(Team.id)).all()) if multi_user else []  # type: ignore[arg-type]
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "teams.html",
         {"active_nav": "teams", "teams": teams, "multi_user": multi_user},
@@ -90,7 +90,7 @@ def create_team(
     """Create a new team. Admin only. Returns 409 if name already exists."""
     _require_multi_user()
 
-    existing = session.exec(select(Team).where(Team.name == body.name)).first()  # type: ignore[arg-type]
+    existing = session.exec(select(Team).where(Team.name == body.name)).first()
     if existing:
         raise HTTPException(status_code=409, detail=f"Team '{body.name}' already exists")
 
@@ -134,7 +134,7 @@ def delete_team(
         raise HTTPException(status_code=404, detail=f"Team {team_id} not found")
 
     memberships = list(
-        session.exec(select(TeamMembership).where(TeamMembership.team_id == team_id)).all()  # type: ignore[arg-type]
+        session.exec(select(TeamMembership).where(TeamMembership.team_id == team_id)).all()
     )
     for membership in memberships:
         session.delete(membership)
@@ -168,7 +168,7 @@ def add_team_member(
         raise HTTPException(status_code=404, detail=f"User {body.user_id} not found")
 
     existing = session.exec(
-        select(TeamMembership).where(  # type: ignore[arg-type]
+        select(TeamMembership).where(
             TeamMembership.team_id == team_id,
             TeamMembership.user_id == body.user_id,
         )
@@ -205,7 +205,7 @@ def remove_team_member(
         raise HTTPException(status_code=404, detail=f"Team {team_id} not found")
 
     membership = session.exec(
-        select(TeamMembership).where(  # type: ignore[arg-type]
+        select(TeamMembership).where(
             TeamMembership.team_id == team_id,
             TeamMembership.user_id == user_id,
         )
@@ -235,6 +235,6 @@ def list_team_members(
         raise HTTPException(status_code=404, detail=f"Team {team_id} not found")
 
     memberships = list(
-        session.exec(select(TeamMembership).where(TeamMembership.team_id == team_id)).all()  # type: ignore[arg-type]
+        session.exec(select(TeamMembership).where(TeamMembership.team_id == team_id)).all()
     )
     return [_membership_to_summary(m) for m in memberships]

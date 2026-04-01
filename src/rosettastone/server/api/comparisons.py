@@ -250,7 +250,7 @@ async def diff_fragment(
     else:
         diff = DUMMY_DIFF  # fallback
 
-    return request.app.state.templates.TemplateResponse(
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "fragments/diff_slideout.html",
         {"diff": diff},

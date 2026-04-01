@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
@@ -27,7 +28,7 @@ def log_audit(
     resource_id: int | None,
     action: str,
     user_id: int | None = None,
-    details: dict | None = None,
+    details: dict[str, Any] | None = None,
 ) -> None:
     """Record an audit log entry. Call within an existing session transaction."""
     entry = AuditLog(
@@ -66,9 +67,9 @@ def list_audit_log(
     if user_id is not None:
         conditions.append(AuditLog.user_id == user_id)
     if start_date is not None:
-        conditions.append(AuditLog.created_at >= start_date)  # type: ignore[operator]
+        conditions.append(AuditLog.created_at >= start_date)
     if end_date is not None:
-        conditions.append(AuditLog.created_at <= end_date)  # type: ignore[operator]
+        conditions.append(AuditLog.created_at <= end_date)
 
     count_stmt = select(func.count()).select_from(AuditLog)
     if conditions:
@@ -79,7 +80,7 @@ def list_audit_log(
     stmt = (
         select(AuditLog)
         .where(*conditions)
-        .order_by(AuditLog.created_at.desc())  # type: ignore[union-attr]
+        .order_by(AuditLog.created_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(per_page)
     )
@@ -120,13 +121,13 @@ async def audit_log_page(
     if action:
         conditions.append(AuditLog.action == action)
 
-    stmt = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(200)  # type: ignore[union-attr]
+    stmt = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(200)  # type: ignore[attr-defined]
     if conditions:
         stmt = stmt.where(*conditions)
     entries = list(session.exec(stmt).all())
 
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "audit_log.html",
         {"active_nav": "audit", "entries": entries},

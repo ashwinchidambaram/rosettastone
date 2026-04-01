@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
@@ -16,7 +18,7 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-def _generate_opportunities(model_costs: dict[str, float], session: Session) -> list[dict]:
+def _generate_opportunities(model_costs: dict[str, float], session: Session) -> list[dict[str, Any]]:
     """Generate cost optimization suggestions based on migration data."""
     opportunities = []
 
@@ -64,7 +66,7 @@ def _generate_opportunities(model_costs: dict[str, float], session: Session) -> 
     return opportunities[:3]  # Cap at 3
 
 
-def _compute_costs(session: Session) -> dict | None:
+def _compute_costs(session: Session) -> dict[str, Any] | None:
     """Compute cost aggregation from MigrationRecord rows.
 
     Returns None when no migration data exists (signals caller to use dummy data).
@@ -83,8 +85,8 @@ def _compute_costs(session: Session) -> dict | None:
     model_costs: dict[str, float] = {}
     total = 0.0
     for row in records:
-        target = row.target_model
-        cost = row.cost_usd or 0.0
+        target = row.target_model  # type: ignore[attr-defined]
+        cost = row.cost_usd or 0.0  # type: ignore[attr-defined]
         short_name = target.split("/")[-1] if "/" in target else target
         model_costs[short_name] = model_costs.get(short_name, 0.0) + cost
         total += cost
@@ -122,7 +124,7 @@ def _compute_costs(session: Session) -> dict | None:
 
 
 @router.get("/api/v1/costs")
-async def get_costs(session: Session = Depends(get_session)) -> dict:
+async def get_costs(session: Session = Depends(get_session)) -> dict[str, Any]:
     """Return aggregated cost data across all migrations."""
     costs = _compute_costs(session)
     if costs is None:
@@ -137,9 +139,9 @@ async def get_costs(session: Session = Depends(get_session)) -> dict:
 
 
 @router.get("/api/v1/costs/by-model")
-async def get_costs_by_model(session: Session = Depends(get_session)) -> list[dict]:
+async def get_costs_by_model(session: Session = Depends(get_session)) -> list[dict[str, Any]]:
     """Return cost breakdown by target model."""
     costs = _compute_costs(session)
     if costs is None:
         return []
-    return costs["by_model"]
+    return costs["by_model"]  # type: ignore[no-any-return]

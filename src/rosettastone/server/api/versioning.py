@@ -34,7 +34,7 @@ def create_version(migration_id: int, session: Session) -> MigrationVersion:
 
     # Get next version number
     max_ver_stmt = select(func.max(MigrationVersion.version_number)).where(
-        MigrationVersion.migration_id == migration_id  # type: ignore[arg-type]
+        MigrationVersion.migration_id == migration_id
     )
     max_ver = session.exec(max_ver_stmt).one()
     next_ver = (max_ver or 0) + 1
@@ -85,11 +85,11 @@ async def migration_versions_fragment(
     stmt = (
         select(MigrationVersion)
         .where(MigrationVersion.migration_id == migration_id)
-        .order_by(MigrationVersion.version_number.desc())  # type: ignore[union-attr]
+        .order_by(MigrationVersion.version_number.desc())  # type: ignore[attr-defined]
     )
     versions = list(session.exec(stmt).all())
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "fragments/version_timeline.html",
         {"versions": versions, "migration_id": migration_id},
@@ -115,7 +115,7 @@ def list_versions(
         select(func.count())
         .select_from(MigrationVersion)
         .where(
-            MigrationVersion.migration_id == migration_id  # type: ignore[arg-type]
+            MigrationVersion.migration_id == migration_id
         )
     )
     total = session.exec(count_stmt).one()
@@ -123,8 +123,8 @@ def list_versions(
     offset = (page - 1) * per_page
     stmt = (
         select(MigrationVersion)
-        .where(MigrationVersion.migration_id == migration_id)  # type: ignore[arg-type]
-        .order_by(MigrationVersion.version_number.desc())  # type: ignore[union-attr]
+        .where(MigrationVersion.migration_id == migration_id)
+        .order_by(MigrationVersion.version_number.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(per_page)
     )

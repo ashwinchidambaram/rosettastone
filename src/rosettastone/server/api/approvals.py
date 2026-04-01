@@ -36,7 +36,7 @@ def _count_approvals(workflow_id: int, session: Session) -> int:
     stmt = (
         select(func.count())
         .select_from(Approval)
-        .where(Approval.workflow_id == workflow_id)  # type: ignore[arg-type]
+        .where(Approval.workflow_id == workflow_id)
         .where(Approval.decision == "approve")
     )
     return session.exec(stmt).one()
@@ -84,7 +84,7 @@ def create_approval_workflow(
         raise HTTPException(status_code=404, detail=f"Migration {migration_id} not found")
 
     existing = session.exec(
-        select(ApprovalWorkflow).where(ApprovalWorkflow.migration_id == migration_id)  # type: ignore[arg-type]
+        select(ApprovalWorkflow).where(ApprovalWorkflow.migration_id == migration_id)
     ).first()
     if existing:
         raise HTTPException(
@@ -131,7 +131,7 @@ def get_approval_status(
     _multi_user_gate()
 
     workflow = session.exec(
-        select(ApprovalWorkflow).where(ApprovalWorkflow.migration_id == migration_id)  # type: ignore[arg-type]
+        select(ApprovalWorkflow).where(ApprovalWorkflow.migration_id == migration_id)
     ).first()
     if not workflow:
         raise HTTPException(
@@ -165,7 +165,7 @@ def submit_approval(
     _multi_user_gate()
 
     workflow = session.exec(
-        select(ApprovalWorkflow).where(ApprovalWorkflow.migration_id == migration_id)  # type: ignore[arg-type]
+        select(ApprovalWorkflow).where(ApprovalWorkflow.migration_id == migration_id)
     ).first()
     if not workflow:
         raise HTTPException(
@@ -181,7 +181,7 @@ def submit_approval(
     # Prevent duplicate approve votes from the same user
     existing_approval = session.exec(
         select(Approval).where(
-            Approval.workflow_id == workflow.id,  # type: ignore[arg-type]
+            Approval.workflow_id == workflow.id,
             Approval.user_id == current_user_id,
             Approval.decision == "approve",
         )
@@ -241,7 +241,7 @@ def submit_rejection(
     _multi_user_gate()
 
     workflow = session.exec(
-        select(ApprovalWorkflow).where(ApprovalWorkflow.migration_id == migration_id)  # type: ignore[arg-type]
+        select(ApprovalWorkflow).where(ApprovalWorkflow.migration_id == migration_id)
     ).first()
     if not workflow:
         raise HTTPException(
@@ -266,7 +266,7 @@ def submit_rejection(
     # Reset logic: delete all Approval rows for this workflow and reset status
     existing_approvals = list(
         session.exec(
-            select(Approval).where(Approval.workflow_id == workflow.id)  # type: ignore[arg-type]
+            select(Approval).where(Approval.workflow_id == workflow.id)
         ).all()
     )
     for a in existing_approvals:

@@ -6,6 +6,7 @@ import json
 import logging
 import os
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlmodel import Session, select
 
@@ -13,7 +14,7 @@ from rosettastone.server.models import Alert, RegisteredModel
 
 logger = logging.getLogger(__name__)
 
-KNOWN_DEPRECATIONS: dict[str, dict] = {
+KNOWN_DEPRECATIONS: dict[str, dict[str, Any]] = {
     "openai/gpt-4o-0613": {
         "date": "2026-04-15",
         "replacement": "openai/gpt-4o",
@@ -29,7 +30,7 @@ KNOWN_DEPRECATIONS: dict[str, dict] = {
 }
 
 
-def _load_custom_deprecations() -> dict[str, dict]:
+def _load_custom_deprecations() -> dict[str, dict[str, Any]]:
     """Return KNOWN_DEPRECATIONS merged with any overrides from ROSETTASTONE_DEPRECATIONS_JSON."""
     merged = dict(KNOWN_DEPRECATIONS)
 
@@ -37,7 +38,7 @@ def _load_custom_deprecations() -> dict[str, dict]:
     if custom_path:
         try:
             with open(custom_path) as fh:
-                overrides: dict[str, dict] = json.load(fh)
+                overrides: dict[str, dict[str, Any]] = json.load(fh)
             merged.update(overrides)
             logger.debug(
                 "Loaded %d custom deprecation entries from %s",

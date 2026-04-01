@@ -54,7 +54,7 @@ def list_users(
 ) -> list[UserMe]:
     """List all users. Admin only. Requires ROSETTASTONE_MULTI_USER."""
     _multi_user_gate()
-    users = list(session.exec(select(User).order_by(User.id)).all())
+    users = list(session.exec(select(User).order_by(User.id)).all())  # type: ignore[arg-type]
     return [_user_to_me(u) for u in users]
 
 
@@ -178,9 +178,9 @@ async def users_page(
 ) -> HTMLResponse:
     """Render the user management UI page."""
     multi_user = os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
-    users = list(session.exec(select(User).order_by(User.id)).all()) if multi_user else []
+    users = list(session.exec(select(User).order_by(User.id)).all()) if multi_user else []  # type: ignore[arg-type]
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "users.html",
         {"active_nav": "users", "users": users, "multi_user": multi_user},

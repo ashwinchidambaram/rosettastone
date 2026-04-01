@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
@@ -22,7 +23,7 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-def _reconstruct_migration_result(record: MigrationRecord, session: Session):
+def _reconstruct_migration_result(record: MigrationRecord, session: Session) -> Any:
     """Reconstruct a MigrationResult from DB record, querying TestCaseRecord rows.
 
     Returns a validated MigrationResult object. Missing fields (prompt/response
