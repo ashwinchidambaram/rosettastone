@@ -49,6 +49,13 @@ class MigrationConfig(BaseModel):
 
     # GEPA configuration
     gepa_auto: Literal["light", "medium", "heavy"] = "light"
+    gepa_max_metric_calls: int | None = Field(
+        default=None,
+        description=(
+            "Override GEPA budget via max_metric_calls instead of auto. "
+            "When set, gepa_auto is ignored. Use small values (e.g. 20) for fast E2E tests."
+        ),
+    )
     reflection_model: str = "openai/gpt-4o"
     num_threads: int = 4
 
@@ -113,4 +120,12 @@ class MigrationConfig(BaseModel):
     max_cost_usd: float | None = Field(
         default=None,
         description="Max migration cost in USD; aborts if preflight estimate exceeds this",
+    )
+
+    # Extra kwargs forwarded to dspy.LM() for target, reflection, and judge models.
+    # Useful for provider-specific options, e.g. {"extra_body": {"think": False}} for Ollama
+    # qwen3 models to disable extended reasoning and reduce latency.
+    lm_extra_kwargs: dict[str, object] = Field(
+        default_factory=dict,
+        description="Extra keyword arguments forwarded to dspy.LM() constructor calls",
     )

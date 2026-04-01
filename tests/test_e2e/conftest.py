@@ -8,6 +8,12 @@ from collections.abc import Generator
 import pytest
 
 
+def pytest_configure(config):  # type: ignore[no-untyped-def]
+    config.addinivalue_line("markers", "e2e: end-to-end tests requiring external services")
+    config.addinivalue_line("markers", "ollama: tests requiring local Ollama instance")
+    config.addinivalue_line("markers", "ray: tests requiring Ray cluster")
+
+
 @pytest.fixture(scope="session")
 def redis_url() -> str:
     """Redis URL for E2E tests. Uses DB 15 to isolate from dev data."""

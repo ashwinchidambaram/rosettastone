@@ -28,9 +28,14 @@ class GEPAOptimizer(Optimizer):
         config: MigrationConfig,
         on_iteration: Callable[[int, int, float], None] | None = None,
     ) -> str:
-        # Configure LMs
-        target_lm = dspy.LM(config.target_model)
-        reflection_lm = dspy.LM(config.reflection_model, temperature=1.0, max_tokens=16000)
+        # Configure LMs — merge any provider-specific extra kwargs from config
+        extra_kwargs: dict[str, object] = (
+            dict(config.lm_extra_kwargs) if config.lm_extra_kwargs else {}
+        )
+        target_lm = dspy.LM(config.target_model, **extra_kwargs)
+        reflection_lm = dspy.LM(
+            config.reflection_model, temperature=1.0, max_tokens=16000, **extra_kwargs
+        )
 
         # Build DSPy program
         program = MigrationProgram()
@@ -58,14 +63,26 @@ class GEPAOptimizer(Optimizer):
             )
             metric = tracker.wrap(metric)
 
-        # Run GEPA
+        # Run GEPA — use explicit max_metric_calls if provided, otherwise use auto preset
+        gepa_max_metric_calls = getattr(config, "gepa_max_metric_calls", None)
+        gepa_kwargs: dict[str, object]
+        if gepa_max_metric_calls is not None:
+            gepa_kwargs = {
+                "metric": metric,
+                "max_metric_calls": gepa_max_metric_calls,
+                "reflection_lm": reflection_lm,
+                "num_threads": config.num_threads,
+            }
+        else:
+            gepa_kwargs = {
+                "metric": metric,
+                "auto": config.gepa_auto,
+                "reflection_lm": reflection_lm,
+                "num_threads": config.num_threads,
+            }
+
         with dspy.context(lm=target_lm):
-            optimizer = dspy.GEPA(
-                metric=metric,
-                auto=config.gepa_auto,
-                reflection_lm=reflection_lm,
-                num_threads=config.num_threads,
-            )
+            optimizer = dspy.GEPA(**gepa_kwargs)
             compiled = optimizer.compile(program, trainset=trainset)
 
         from rosettastone.optimize.utils import extract_optimized_instructions

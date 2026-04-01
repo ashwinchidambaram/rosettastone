@@ -99,6 +99,8 @@ asyncio_default_fixture_loop_scope = "function"
 markers = [
     "playwright: marks tests as Playwright end-to-end UI tests (deselect with '-m not playwright')",
     "e2e: end-to-end tests requiring real APIs and Redis (deselect with '-m not e2e')",
+    "ollama: tests requiring a local Ollama instance (deselect with '-m not ollama')",
+    "ray: tests requiring a Ray cluster (deselect with '-m not ray')",
 ]
 
 [tool.mypy]

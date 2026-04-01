@@ -81,9 +81,13 @@ class CompositeEvaluator:
 
             # Generate response from target model
             try:
+                extra_kwargs: dict[str, object] = (
+                    dict(getattr(self.config, "lm_extra_kwargs", None) or {})
+                )
                 response = litellm.completion(
                     model=self.config.target_model,
                     messages=messages,
+                    **extra_kwargs,
                 )
                 if not response.choices:
                     logger.warning("Pair %d: empty choices in response, skipping", i)
