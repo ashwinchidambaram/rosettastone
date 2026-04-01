@@ -49,7 +49,7 @@ def _get_analyzer() -> Any:
     global _analyzer_instance  # noqa: PLW0603
     if _analyzer_instance is None:
         try:
-            from presidio_analyzer import AnalyzerEngine  # type: ignore[import]
+            from presidio_analyzer import AnalyzerEngine
         except ImportError as exc:
             raise ImportError(
                 "presidio_analyzer is required for Presidio-based PII scanning. "
@@ -70,14 +70,14 @@ def _get_anonymizer() -> Any:
     global _anonymizer_instance  # noqa: PLW0603
     if _anonymizer_instance is None:
         try:
-            from presidio_anonymizer import AnonymizerEngine  # type: ignore[import]
+            from presidio_anonymizer import AnonymizerEngine
         except ImportError as exc:
             raise ImportError(
                 "presidio_anonymizer is required for Presidio-based PII anonymization. "
                 "Install it with: pip install presidio-anonymizer"
             ) from exc
 
-        _anonymizer_instance = AnonymizerEngine()
+        _anonymizer_instance = AnonymizerEngine()  # type: ignore[no-untyped-call]
         logger.debug("AnonymizerEngine initialised (singleton)")
     return _anonymizer_instance
 
@@ -195,7 +195,7 @@ def anonymize_text(text: str) -> str:
 
     # Build per-entity Replace operators so the placeholder is the entity type
     try:
-        from presidio_anonymizer.entities import OperatorConfig  # type: ignore[import]
+        from presidio_anonymizer.entities import OperatorConfig
 
         operators: dict[str, Any] = {
             result.entity_type: OperatorConfig("replace", {"new_value": f"<{result.entity_type}>"})
@@ -211,7 +211,7 @@ def anonymize_text(text: str) -> str:
         operators=operators if operators else None,
     )
     logger.debug("anonymize_text: anonymized %d entity/entities", len(analyzer_results))
-    return anonymized.text
+    return str(anonymized.text)
 
 
 def anonymize_pairs(pairs: list[PromptPair]) -> list[PromptPair]:

@@ -93,7 +93,7 @@ class LangSmithAdapter(DataAdapter):
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _make_client(self):  # type: ignore[return]
+    def _make_client(self) -> Any:
         """Create and return a LangSmith client, raising clearly if langsmith is not installed."""
         try:
             import langsmith  # noqa: PLC0415  (lazy import — langsmith is optional)
@@ -105,7 +105,7 @@ class LangSmithAdapter(DataAdapter):
 
         return langsmith.Client(api_key=self._api_key)
 
-    def _parse_run(self, run) -> PromptPair | None:  # type: ignore[return]
+    def _parse_run(self, run: Any) -> PromptPair | None:
         """Parse a single LangSmith run into a PromptPair, or return None if unparseable.
 
         Extraction strategy:

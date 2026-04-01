@@ -30,7 +30,7 @@ def _build_signature(name: str, input_fields: list[str], output_fields: list[str
     for field in output_fields:
         fields[field] = dspy.OutputField(desc=f"Output: {field}")
 
-    return type(f"{name}Signature", (dspy.Signature,), fields)  # type: ignore[return-value]
+    return type(f"{name}Signature", (dspy.Signature,), fields)
 
 
 class PipelineProgram(dspy.Module):  # type: ignore[misc]
@@ -48,7 +48,7 @@ class PipelineProgram(dspy.Module):  # type: ignore[misc]
         self.module_configs = {m.name: m for m in config.modules}
 
         # Build a ChainOfThought predictor for each module
-        self.predictors: dict[str, dspy.ChainOfThought] = {}  # type: ignore[type-arg]
+        self.predictors: dict[str, dspy.ChainOfThought] = {}
         for module_cfg in config.modules:
             sig = _build_signature(
                 module_cfg.name, module_cfg.input_fields, module_cfg.output_fields

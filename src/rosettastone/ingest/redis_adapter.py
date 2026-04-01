@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rosettastone.core.types import PromptPair
 from rosettastone.ingest.base import DataAdapter
@@ -70,8 +70,8 @@ class RedisAdapter(DataAdapter):
             # Sample the first _SAMPLE_SIZE entries for format detection
             if sampled < _SAMPLE_SIZE:
                 for name, parser in _PARSERS:
-                    result = parser(key, value, self._source_model)  # type: ignore[operator]
-                    if result is not None:
+                    sample_result = parser(key, value, self._source_model)  # type: ignore[operator]
+                    if sample_result is not None:
                         scores[name] += 1
                 sampled += 1
 
@@ -91,11 +91,11 @@ class RedisAdapter(DataAdapter):
         pairs: list[PromptPair] = []
         skipped = 0
         for key, value in all_entries:
-            result: PromptPair | None = winning_parser(  # type: ignore[operator]
+            result2: PromptPair | None = winning_parser(  # type: ignore[operator]
                 key, value, self._source_model
             )
-            if result is not None:
-                pairs.append(result)
+            if result2 is not None:
+                pairs.append(result2)
             else:
                 skipped += 1
 
@@ -112,7 +112,7 @@ class RedisAdapter(DataAdapter):
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _make_client(self):  # type: ignore[return]
+    def _make_client(self) -> Any:
         """Create and return a Redis client, raising clearly if redis is not installed."""
         try:
             import redis  # noqa: PLC0415  (lazy import — redis is optional)
@@ -124,7 +124,7 @@ class RedisAdapter(DataAdapter):
 
         return redis.from_url(self._redis_url)
 
-    def _scan_keys(self, client) -> Iterator[bytes]:  # type: ignore[return]
+    def _scan_keys(self, client: Any) -> Iterator[bytes]:
         """Yield all keys via SCAN (non-blocking)."""
         cursor = 0
         while True:

@@ -85,7 +85,7 @@ class BraintrustAdapter(DataAdapter):
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _make_client(self):  # type: ignore[return]
+    def _make_client(self) -> Any:
         """Create and return a Braintrust client, raising clearly if braintrust is not installed."""
         try:
             import braintrust  # noqa: PLC0415  (lazy import — braintrust is optional)
@@ -99,7 +99,7 @@ class BraintrustAdapter(DataAdapter):
         if self._api_key:
             kwargs["api_key"] = self._api_key
 
-        return braintrust.Braintrust(**kwargs)
+        return braintrust.Braintrust(**kwargs)  # type: ignore[attr-defined]
 
     def _parse_log_entry(self, entry: dict[str, Any]) -> PromptPair | None:
         """Parse a single Braintrust log entry dict into a PromptPair.

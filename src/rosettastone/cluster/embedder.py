@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 
@@ -28,7 +28,7 @@ try:
 except ImportError:  # pragma: no cover
     KMeans = None  # type: ignore[assignment,misc]
     HDBSCAN = None  # type: ignore[assignment,misc]
-    silhouette_score = None  # type: ignore[assignment]
+    silhouette_score = None  # type: ignore[assignment,misc]
 
 try:
     from sklearn.feature_extraction.text import TfidfVectorizer
@@ -189,7 +189,7 @@ class PromptClusterer:
             if SentenceTransformer is None:
                 raise ImportError("sentence_transformers not installed")
             model = SentenceTransformer("all-MiniLM-L6-v2")
-            return model.encode(texts)
+            return cast(np.ndarray[Any, Any], model.encode(texts))
         except ImportError:
             logger.info("sentence_transformers unavailable, using TF-IDF")
             return self._tfidf_embed(texts)
@@ -200,7 +200,7 @@ class PromptClusterer:
             msg = "sklearn is required for TF-IDF fallback. Install with: pip install scikit-learn"
             raise ImportError(msg)
         vectorizer = TfidfVectorizer(max_features=512)
-        return vectorizer.fit_transform(texts).toarray()
+        return cast(np.ndarray[Any, Any], vectorizer.fit_transform(texts).toarray())
 
     def _extract_prompt_text(self, pair: PromptPair) -> str:
         """Extract plain text from prompt (handles str and list[dict])."""
@@ -224,7 +224,7 @@ class PromptClusterer:
                 msg = "sklearn is required for HDBSCAN clustering."
                 raise ImportError(msg)
             clusterer = HDBSCAN(min_cluster_size=self._min_cluster_size)
-            return clusterer.fit_predict(embeddings)
+            return cast(np.ndarray[Any, Any], clusterer.fit_predict(embeddings))
 
         if KMeans is None:
             msg = "sklearn is required for KMeans clustering."
@@ -232,7 +232,7 @@ class PromptClusterer:
         n = self._n_clusters or min(5, len(embeddings))
         # Cap n_clusters to number of samples
         n = min(n, len(embeddings))
-        return KMeans(n_clusters=n, n_init="auto").fit_predict(embeddings)
+        return cast(np.ndarray[Any, Any], KMeans(n_clusters=n, n_init="auto").fit_predict(embeddings))
 
     # ------------------------------------------------------------------
     # Result building

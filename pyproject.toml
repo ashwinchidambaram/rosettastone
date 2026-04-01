@@ -103,6 +103,10 @@ strict = true
 module = ["dspy", "dspy.*", "bert_score", "bert_score.*", "sentence_transformers", "sentence_transformers.*", "litellm", "litellm.*", "braintrust", "braintrust.*", "langsmith", "langsmith.*", "presidio_analyzer", "presidio_analyzer.*", "presidio_anonymizer", "presidio_anonymizer.*", "sklearn", "sklearn.*", "psycopg", "psycopg.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["rosettastone.cluster.embedder"]
+warn_unused_ignores = false
+
 [dependency-groups]
 dev = [
     "playwright>=1.58.0",
