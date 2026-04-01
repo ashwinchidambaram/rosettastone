@@ -8,10 +8,13 @@ import os
 import time
 from collections import defaultdict
 
+from typing import Any
+
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlmodel import func, select
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import Response
 
 router = APIRouter()
 
@@ -44,7 +47,7 @@ def _try_decode_jwt(token: str, secret: str, request: Request) -> object | None:
         from rosettastone.server.auth_utils import decode_jwt
 
         payload = decode_jwt(token, secret)
-        return {"user_id": int(payload["sub"]), "role": payload.get("role", "viewer")}
+        return {"user_id": int(str(payload["sub"])), "role": payload.get("role", "viewer")}
     except Exception:
         return None
 
@@ -66,7 +69,7 @@ def _record_failed_attempt(ip: str) -> None:
 class AuthMiddleware(BaseHTTPMiddleware):
     """Enforce API key auth for /api/ and /ui/ routes when ROSETTASTONE_API_KEY is set."""
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         api_key = get_api_key()
         multi_user = os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
 
@@ -130,17 +133,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
 
 @router.get("/ui/login")
-async def login_page(request: Request):
+async def login_page(request: Request) -> Response:
     """Render the login page, or redirect to /ui/ if auth is disabled."""
     if get_api_key() is None:
         return RedirectResponse(url="/ui/", status_code=302)
     templates = request.app.state.templates
     multi_user = os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
-    return templates.TemplateResponse(request, "login.html", {"multi_user": multi_user})
+    return templates.TemplateResponse(request, "login.html", {"multi_user": multi_user})  # type: ignore[no-any-return]
 
 
 @router.post("/ui/login")
-async def login_submit(request: Request, api_key: str = Form(...)):
+async def login_submit(request: Request, api_key: str = Form(...)) -> Response:
     """Verify the submitted API key and set the session cookie on success."""
     templates = request.app.state.templates
     expected = get_api_key()
@@ -149,7 +152,7 @@ async def login_submit(request: Request, api_key: str = Form(...)):
         return RedirectResponse(url="/ui/", status_code=302)
 
     if not _verify_key(api_key, expected):
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(  # type: ignore[no-any-return]
             request,
             "login.html",
             {"error": "Invalid API key. Please try again."},
@@ -169,7 +172,7 @@ async def login_submit(request: Request, api_key: str = Form(...)):
 
 
 @router.post("/ui/logout")
-async def logout(request: Request):
+async def logout(request: Request) -> Response:
     """Clear the session cookie and redirect to the login page."""
     response = RedirectResponse(url="/ui/login", status_code=302)
     response.delete_cookie(key="rosettastone_session")
@@ -202,7 +205,7 @@ def _extract_bearer(request: Request) -> str | None:
 
 
 @router.post("/api/v1/auth/login")
-async def auth_login(request: Request):
+async def auth_login(request: Request) -> Any:
     """Username/password login returning a JWT token. Requires ROSETTASTONE_MULTI_USER mode."""
     from rosettastone.server.auth_utils import create_jwt, verify_password
     from rosettastone.server.database import get_session
@@ -235,10 +238,10 @@ async def auth_login(request: Request):
             _record_failed_attempt(client_ip)
             return JSONResponse(status_code=401, content={"detail": "Account inactive"})
 
-        token = create_jwt(user.id, user.role, _get_jwt_secret())
+        token = create_jwt(user.id or 0, user.role, _get_jwt_secret())
         return TokenResponse(
             access_token=token,
-            user_id=user.id,
+            user_id=user.id or 0,
             role=user.role,
         )
     finally:
@@ -249,7 +252,7 @@ async def auth_login(request: Request):
 
 
 @router.post("/api/v1/auth/register", status_code=201)
-async def auth_register(request: Request):
+async def auth_register(request: Request) -> Any:
     """Register a new user. First user becomes admin. Requires ROSETTASTONE_MULTI_USER mode."""
     from rosettastone.server.auth_utils import hash_password
     from rosettastone.server.database import get_session
@@ -312,7 +315,7 @@ async def auth_register(request: Request):
 
 
 @router.post("/api/v1/auth/refresh")
-async def auth_refresh(request: Request):
+async def auth_refresh(request: Request) -> Any:
     """Accept a valid JWT and return a new JWT with fresh expiry. Requires multi-user mode."""
     from rosettastone.server.auth_utils import create_jwt, decode_jwt
     from rosettastone.server.database import get_session
@@ -335,15 +338,15 @@ async def auth_refresh(request: Request):
     db_gen = get_session()
     session = next(db_gen)
     try:
-        user_id = int(payload["sub"])
+        user_id = int(str(payload["sub"]))
         user = session.get(User, user_id)
         if user is None or not user.is_active:
             return JSONResponse(status_code=401, content={"detail": "User not found or inactive"})
 
-        new_token = create_jwt(user.id, user.role, secret)
+        new_token = create_jwt(user.id or 0, user.role, secret)
         return TokenResponse(
             access_token=new_token,
-            user_id=user.id,
+            user_id=user.id or 0,
             role=user.role,
         )
     finally:
@@ -354,7 +357,7 @@ async def auth_refresh(request: Request):
 
 
 @router.get("/api/v1/auth/me")
-async def auth_me(request: Request):
+async def auth_me(request: Request) -> Any:
     """Return current user info for a valid JWT. Requires ROSETTASTONE_MULTI_USER mode."""
     from rosettastone.server.auth_utils import decode_jwt
     from rosettastone.server.database import get_session
@@ -377,13 +380,13 @@ async def auth_me(request: Request):
     db_gen = get_session()
     session = next(db_gen)
     try:
-        user_id = int(payload["sub"])
+        user_id = int(str(payload["sub"]))
         user = session.get(User, user_id)
         if user is None or not user.is_active:
             return JSONResponse(status_code=401, content={"detail": "User not found or inactive"})
 
         return UserMe(
-            id=user.id,
+            id=user.id or 0,
             username=user.username,
             email=user.email,
             role=user.role,

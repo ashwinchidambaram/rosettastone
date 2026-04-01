@@ -86,7 +86,7 @@ def create_pipeline(
     target_model). Returns the created PipelineSummary with status 201.
     Returns 422 if the YAML is invalid or missing required fields.
     """
-    import yaml
+    import yaml  # type: ignore[import-untyped]
     from pydantic import ValidationError
 
     from rosettastone.optimize.pipeline_config import PipelineConfig
@@ -139,7 +139,7 @@ def list_pipelines(
     offset = (page - 1) * per_page
     stmt = (
         select(PipelineRecord)
-        .order_by(PipelineRecord.created_at.desc())  # type: ignore[union-attr]
+        .order_by(PipelineRecord.created_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(per_page)
     )
@@ -165,7 +165,7 @@ def get_pipeline_status(
     stages = list(
         session.exec(
             select(PipelineStageRecord).where(
-                PipelineStageRecord.pipeline_id == pipeline_id  # type: ignore[arg-type]
+                PipelineStageRecord.pipeline_id == pipeline_id
             )
         ).all()
     )
@@ -189,7 +189,7 @@ def get_pipeline_modules(
     stages = list(
         session.exec(
             select(PipelineStageRecord).where(
-                PipelineStageRecord.pipeline_id == pipeline_id  # type: ignore[arg-type]
+                PipelineStageRecord.pipeline_id == pipeline_id
             )
         ).all()
     )
@@ -206,16 +206,16 @@ def get_pipeline_modules(
 async def pipelines_page(
     request: Request,
     session: Session = Depends(get_session),
-):
+) -> HTMLResponse:
     """List all pipelines."""
     stmt = (
         select(PipelineRecord)
-        .order_by(PipelineRecord.created_at.desc())  # type: ignore[union-attr]
+        .order_by(PipelineRecord.created_at.desc())  # type: ignore[attr-defined]
         .limit(100)
     )
     pipelines = list(session.exec(stmt).all())
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "pipelines.html",
         {"active_nav": "pipelines", "pipelines": pipelines},
@@ -227,7 +227,7 @@ async def pipeline_detail_page(
     pipeline_id: int,
     request: Request,
     session: Session = Depends(get_session),
-):
+) -> HTMLResponse:
     """Pipeline detail page."""
     pipeline = session.get(PipelineRecord, pipeline_id)
     if not pipeline:
@@ -236,13 +236,13 @@ async def pipeline_detail_page(
     stages = list(
         session.exec(
             select(PipelineStageRecord).where(
-                PipelineStageRecord.pipeline_id == pipeline_id  # type: ignore[arg-type]
+                PipelineStageRecord.pipeline_id == pipeline_id
             )
         ).all()
     )
 
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "pipeline_detail.html",
         {"active_nav": "pipelines", "pipeline": pipeline, "stages": stages},
@@ -254,7 +254,7 @@ async def pipeline_stages_fragment(
     pipeline_id: int,
     request: Request,
     session: Session = Depends(get_session),
-):
+) -> HTMLResponse:
     """HTMX fragment: returns the pipeline stages table for polling updates."""
     pipeline = session.get(PipelineRecord, pipeline_id)
     if not pipeline:
@@ -263,13 +263,13 @@ async def pipeline_stages_fragment(
     stages = list(
         session.exec(
             select(PipelineStageRecord).where(
-                PipelineStageRecord.pipeline_id == pipeline_id  # type: ignore[arg-type]
+                PipelineStageRecord.pipeline_id == pipeline_id
             )
         ).all()
     )
 
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "fragments/pipeline_stages.html",
         {"stages": stages},

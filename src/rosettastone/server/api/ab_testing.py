@@ -84,7 +84,7 @@ def _build_metrics_from_results(results: list[ABTestResult]) -> ABTestMetrics:
 def _build_metrics(ab_test_id: int, session: Session) -> ABTestMetrics:
     """Fetch ABTestResult rows and compute aggregated metrics."""
     results = list(
-        session.exec(select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)).all()  # type: ignore[arg-type]
+        session.exec(select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)).all()
     )
     return _build_metrics_from_results(results)
 
@@ -200,7 +200,7 @@ def list_ab_tests(
     offset = (page - 1) * per_page
     stmt = (
         select(ABTest)
-        .order_by(ABTest.created_at.desc())  # type: ignore[union-attr]
+        .order_by(ABTest.created_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(per_page)
     )
@@ -301,7 +301,7 @@ def get_ab_test_metrics(
     # Cache miss — compute from DB (single query).
     results = list(
         session.exec(
-            select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)  # type: ignore[arg-type]
+            select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)
         ).all()
     )
     metrics = _build_metrics_from_results(results)
@@ -361,7 +361,7 @@ def conclude_ab_test(
 
     results = list(
         session.exec(
-            select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)  # type: ignore[arg-type]
+            select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)
         ).all()
     )
     result_dicts = [
@@ -422,12 +422,12 @@ def conclude_ab_test(
 async def ab_tests_page(
     request: Request,
     session: Session = Depends(get_session),
-):
+) -> HTMLResponse:
     """List all A/B tests."""
-    stmt = select(ABTest).order_by(ABTest.created_at.desc()).limit(100)  # type: ignore[arg-type]
+    stmt = select(ABTest).order_by(ABTest.created_at.desc()).limit(100)  # type: ignore[attr-defined]
     ab_tests = list(session.exec(stmt).all())
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "ab_tests.html",
         {"active_nav": "ab_tests", "ab_tests": ab_tests},
@@ -439,13 +439,13 @@ async def ab_test_detail_page(
     ab_test_id: int,
     request: Request,
     session: Session = Depends(get_session),
-):
+) -> HTMLResponse:
     """A/B test detail page."""
     ab_test = session.get(ABTest, ab_test_id)
     if not ab_test:
         raise HTTPException(status_code=404, detail="A/B test not found")
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "ab_test_detail.html",
         {"active_nav": "ab_tests", "ab_test": ab_test},
@@ -457,11 +457,11 @@ async def ab_test_metrics_fragment(
     ab_test_id: int,
     request: Request,
     session: Session = Depends(get_session),
-):
+) -> HTMLResponse:
     """HTMX fragment: live A/B test metrics."""
     metrics = _build_metrics(ab_test_id, session)
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "fragments/ab_metrics.html",
         {"metrics": metrics},
