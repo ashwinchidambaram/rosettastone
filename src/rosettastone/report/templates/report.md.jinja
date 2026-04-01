@@ -96,11 +96,10 @@ No issues found.
 
 ## Cost Summary
 
-{% set costs = config.get('costs', {}) %}
-{% if costs %}
+{% if cost_breakdown %}
 | Phase | Cost (USD) |
 |-------|-----------|
-{% for phase, cost in costs.items() -%}
+{% for phase, cost in cost_breakdown.items() -%}
 | {{ phase }} | ${{ "%.4f" | format(cost) }} |
 {% endfor %}
 | **Total** | **${{ "%.4f" | format(cost_usd) }}** |

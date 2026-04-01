@@ -52,6 +52,7 @@ def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
         recommendation_reasoning=getattr(result, "recommendation_reasoning", None),
         per_type_scores=per_type_scores,
         safety_warnings=getattr(result, "safety_warnings", []),
+        cost_breakdown=getattr(result, "cost_breakdown", {}),
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

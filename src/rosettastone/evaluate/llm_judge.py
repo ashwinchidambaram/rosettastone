@@ -10,6 +10,7 @@ from rosettastone.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from rosettastone.config import MigrationConfig
+    from rosettastone.core.context import PipelineContext
 
 logger = get_logger("evaluate.llm_judge")
 
@@ -80,8 +81,13 @@ class LLMJudgeEvaluator(Evaluator):
     than penalising with 0.
     """
 
-    def __init__(self, config: MigrationConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: MigrationConfig | None = None,
+        ctx: PipelineContext | None = None,
+    ) -> None:
         super().__init__(config)
+        self._ctx = ctx
 
     @property
     def _judge_model(self) -> str:
@@ -109,6 +115,9 @@ class LLMJudgeEvaluator(Evaluator):
                     temperature=0,
                     max_tokens=16,
                 )
+                cost = getattr(response, "_hidden_params", {}).get("response_cost", 0.0) or 0.0
+                if self._ctx is not None:
+                    self._ctx.add_cost("evaluation", cost)
                 content = response.choices[0].message.content or ""
             except Exception as exc:
                 logger.warning(

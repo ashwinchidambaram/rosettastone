@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -47,3 +48,9 @@ class PipelineContext:
     per_type_stats: dict[OutputType, TypeStats] = field(default_factory=dict)
     recommendation: tuple[str, str, dict[str, object]] | None = None
     cluster_summary: dict[str, object] | None = None
+    _cost_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def add_cost(self, phase: str, cost: float) -> None:
+        """Thread-safely accumulate cost for a pipeline phase."""
+        with self._cost_lock:
+            self.costs[phase] = self.costs.get(phase, 0.0) + cost

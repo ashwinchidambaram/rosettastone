@@ -77,6 +77,7 @@ def generate_html_report(result: MigrationResult, output_dir: Path) -> Path:
         per_type_scores=per_type_scores,
         safety_warnings=getattr(result, "safety_warnings", []),
         chart_js_source=chart_js_source,
+        cost_breakdown=getattr(result, "cost_breakdown", {}),
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

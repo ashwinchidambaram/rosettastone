@@ -556,10 +556,23 @@
         <h2>Cost Summary</h2>
         <div class="card">
             <table>
+                {% if cost_breakdown %}
+                {% for phase, cost in cost_breakdown.items() %}
+                <tr>
+                    <td><strong>{{ phase | capitalize }} Cost</strong></td>
+                    <td>${{ "%.4f" | format(cost) }}</td>
+                </tr>
+                {% endfor %}
                 <tr>
                     <td><strong>Total API Cost</strong></td>
                     <td>${{ "%.4f" | format(cost_usd) }}</td>
                 </tr>
+                {% else %}
+                <tr>
+                    <td><strong>Total API Cost</strong></td>
+                    <td>${{ "%.4f" | format(cost_usd) }}</td>
+                </tr>
+                {% endif %}
                 <tr>
                     <td><strong>Duration</strong></td>
                     <td>{{ "%.1f" | format(duration_seconds) }}s</td>

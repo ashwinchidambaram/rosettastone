@@ -219,17 +219,36 @@ class Migrator:
             # We don't try to reconstruct full EvalResult objects; re-run is acceptable
             # but we skip re-checkpointing since we're just passing through
             t0 = time.time()
-            baseline = evaluate_baseline(test, self.config)
+            baseline = evaluate_baseline(test, self.config, ctx=ctx)
             ctx.timing["baseline_eval"] = time.time() - t0
         else:
             t0 = time.time()
-            baseline = evaluate_baseline(test, self.config)
+            baseline = evaluate_baseline(test, self.config, ctx=ctx)
             ctx.timing["baseline_eval"] = time.time() - t0
             baseline_score = sum(1 for r in baseline if r.is_win) / max(len(baseline), 1)
             self._checkpoint("baseline_eval", {"baseline_score": baseline_score})
         self._emit("baseline_eval", 1.0, 0.50)
 
+        import litellm as _litellm
+
         from rosettastone.optimize.gepa import GEPATimeoutWithResult
+
+        def _make_gepa_cost_callback(
+            gepa_cost_accumulator: list[float],
+        ) -> Callable[[dict, object, object, object], None]:
+            def _gepa_cost_callback(
+                kwargs: dict,
+                completion_response: object,
+                start_time: object,
+                end_time: object,
+            ) -> None:
+                cost = (
+                    getattr(completion_response, "_hidden_params", {}).get("response_cost", 0.0)
+                    or 0.0
+                )
+                gepa_cost_accumulator[0] += cost
+
+            return _gepa_cost_callback
 
         # Step 3: Optimize — restore optimized prompt from checkpoint if available
         if _already_done("optimize"):
@@ -241,6 +260,9 @@ class Migrator:
                 optimized_prompt = ""
             # Fall back to re-running optimize if checkpoint didn't preserve the prompt
             if not optimized_prompt:
+                _gepa_cost: list[float] = [0.0]
+                _gepa_cb = _make_gepa_cost_callback(_gepa_cost)
+                _litellm.success_callback.append(_gepa_cb)
                 t0 = time.time()
                 try:
                     optimized_prompt = optimize_prompt(
@@ -256,10 +278,18 @@ class Migrator:
                         f"Migration failed."
                     )
                     raise
+                finally:
+                    _litellm.success_callback = [
+                        cb for cb in _litellm.success_callback if cb is not _gepa_cb
+                    ]
+                    ctx.add_cost("optimization", _gepa_cost[0])
                 ctx.timing["optimize"] = time.time() - t0
             else:
                 ctx.timing["optimize"] = 0.0
         else:
+            _gepa_cost2: list[float] = [0.0]
+            _gepa_cb2 = _make_gepa_cost_callback(_gepa_cost2)
+            _litellm.success_callback.append(_gepa_cb2)
             t0 = time.time()
             try:
                 optimized_prompt = optimize_prompt(
@@ -275,6 +305,11 @@ class Migrator:
                     f"Migration failed."
                 )
                 raise
+            finally:
+                _litellm.success_callback = [
+                    cb for cb in _litellm.success_callback if cb is not _gepa_cb2
+                ]
+                ctx.add_cost("optimization", _gepa_cost2[0])
             ctx.timing["optimize"] = time.time() - t0
             self._checkpoint("optimize", {"optimized_prompt": optimized_prompt})
         self._emit("optimize", 1.0, 0.75)
@@ -290,13 +325,13 @@ class Migrator:
         # Step 4: Validate
         if not _already_done("validation_eval"):
             t0 = time.time()
-            validation = evaluate_optimized(test, optimized_prompt, self.config)
+            validation = evaluate_optimized(test, optimized_prompt, self.config, ctx=ctx)
             ctx.timing["validation_eval"] = time.time() - t0
             val_score = sum(1 for r in validation if r.is_win) / max(len(validation), 1)
             self._checkpoint("validation_eval", {"validation_score": val_score})
         else:
             t0 = time.time()
-            validation = evaluate_optimized(test, optimized_prompt, self.config)
+            validation = evaluate_optimized(test, optimized_prompt, self.config, ctx=ctx)
             ctx.timing["validation_eval"] = time.time() - t0
         self._emit("validation_eval", 1.0, 0.95)
 

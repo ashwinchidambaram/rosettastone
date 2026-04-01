@@ -46,3 +46,7 @@ class MigrationResult(BaseModel):
     recommendation: str | None = None
     recommendation_reasoning: str | None = None
     per_type_scores: dict[str, Any] = {}
+
+    # Cost tracking
+    cost_breakdown: dict[str, float] = {}
+    estimated_cost_usd: float = 0.0

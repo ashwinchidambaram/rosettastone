@@ -18,7 +18,10 @@ import logging
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from rosettastone.core.context import PipelineContext
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +116,7 @@ def _score_objective(
     actual_response: str,
     model: str,
     expected_response: str | None = None,
+    ctx: PipelineContext | None = None,
 ) -> ImprovementScore:
     """Score a single objective via LLM-as-judge.
 
@@ -144,6 +148,9 @@ def _score_objective(
 
     try:
         response = _call_litellm_completion(model=model, messages=messages)
+        cost = getattr(response, "_hidden_params", {}).get("response_cost", 0.0) or 0.0
+        if ctx is not None:
+            ctx.add_cost("optimization", cost)
         text = response.choices[0].message.content or ""
     except Exception:
         logger.debug(
@@ -176,6 +183,7 @@ def _score_objective(
 def build_improvement_scorer(
     objectives: list[str],
     judge_model: str = "openai/gpt-4o",
+    ctx: PipelineContext | None = None,
 ) -> Callable[[str, str, str], list[ImprovementScore]]:
     """Build a scorer function that evaluates responses against improvement objectives.
 
@@ -190,6 +198,7 @@ def build_improvement_scorer(
     Args:
         objectives: List of objective description strings.
         judge_model: LiteLLM model identifier for the judge.
+        ctx: Optional PipelineContext for accumulating API costs.
 
     Returns:
         A callable (prompt, expected_response, actual_response) -> list[ImprovementScore].
@@ -211,6 +220,7 @@ def build_improvement_scorer(
                 actual_response=actual_response,
                 model=judge_model,
                 expected_response=expected_response or None,
+                ctx=ctx,
             )
             results.append(result)
         return results

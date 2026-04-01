@@ -15,6 +15,7 @@ from rosettastone.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from rosettastone.config import MigrationConfig
+    from rosettastone.core.context import PipelineContext
 
 logger = get_logger("evaluate.composite")
 
@@ -58,9 +59,11 @@ class CompositeEvaluator:
         self,
         config: MigrationConfig,
         on_progress: Callable[[int, int], None] | None = None,
+        ctx: PipelineContext | None = None,
     ) -> None:
         self.config = config
         self.on_progress = on_progress
+        self._ctx = ctx
 
     def evaluate(
         self,
@@ -90,6 +93,9 @@ class CompositeEvaluator:
                     messages=messages,
                     **extra_kwargs,
                 )
+                cost = getattr(response, "_hidden_params", {}).get("response_cost", 0.0) or 0.0
+                if self._ctx is not None:
+                    self._ctx.add_cost("evaluation", cost)
                 if not response.choices:
                     logger.warning("Pair %d: empty choices in response, skipping", i)
                     skipped_count += 1

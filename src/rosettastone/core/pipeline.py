@@ -192,19 +192,26 @@ def optimize_prompt(
         return optimizer.optimize(train, val, config, on_iteration=on_iteration)
 
 
-def evaluate_baseline(test: list[PromptPair], config: MigrationConfig) -> list[EvalResult]:
+def evaluate_baseline(
+    test: list[PromptPair],
+    config: MigrationConfig,
+    ctx: PipelineContext | None = None,
+) -> list[EvalResult]:
     from rosettastone.evaluate.composite import CompositeEvaluator
 
-    evaluator = CompositeEvaluator(config)
+    evaluator = CompositeEvaluator(config, ctx=ctx)
     return evaluator.evaluate(test)
 
 
 def evaluate_optimized(
-    test: list[PromptPair], optimized_prompt: str, config: MigrationConfig
+    test: list[PromptPair],
+    optimized_prompt: str,
+    config: MigrationConfig,
+    ctx: PipelineContext | None = None,
 ) -> list[EvalResult]:
     from rosettastone.evaluate.composite import CompositeEvaluator
 
-    evaluator = CompositeEvaluator(config)
+    evaluator = CompositeEvaluator(config, ctx=ctx)
     return evaluator.evaluate(test, optimized_prompt=optimized_prompt)
 
 
@@ -363,6 +370,7 @@ def build_result(
         recommendation, recommendation_reasoning, per_type_scores = ctx.recommendation
 
     total_cost = sum(ctx.costs.values()) if ctx else 0.0
+    cost_breakdown = dict(ctx.costs) if ctx else {}
 
     # Build config dict and add cluster_summary if available
     config_dict = config.model_dump(mode="json")
@@ -384,6 +392,7 @@ def build_result(
         recommendation=recommendation,
         recommendation_reasoning=recommendation_reasoning,
         per_type_scores=per_type_scores,
+        cost_breakdown=cost_breakdown,
     )
 
 
