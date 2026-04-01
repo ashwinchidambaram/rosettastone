@@ -28,6 +28,11 @@ class EvalResult(BaseModel):
     is_win: bool
     details: dict[str, Any] = {}
 
+    # T4: Multi-run variance tracking
+    run_scores: list[float] = []
+    score_std: float = 0.0
+    is_non_deterministic: bool = False
+
 
 class PromptRegression(BaseModel):
     prompt_index: int
@@ -67,3 +72,7 @@ class MigrationResult(BaseModel):
     prompt_regressions: list[PromptRegression] = []
     regression_count: int = 0
     at_risk_count: int = 0
+
+    # T4: Multi-run metadata
+    non_deterministic_count: int = 0
+    eval_runs: int = 1

@@ -78,6 +78,14 @@ def generate_html_report(result: MigrationResult, output_dir: Path) -> Path:
         safety_warnings=getattr(result, "safety_warnings", []),
         chart_js_source=chart_js_source,
         cost_breakdown=getattr(result, "cost_breakdown", {}),
+        # T3: regression fields
+        prompt_regressions=getattr(result, "prompt_regressions", []),
+        regression_count=getattr(result, "regression_count", 0),
+        at_risk_count=getattr(result, "at_risk_count", 0),
+        # T4: multi-run fields
+        eval_runs=getattr(result, "eval_runs", 1),
+        non_deterministic_count=getattr(result, "non_deterministic_count", 0),
+        variance_flag_threshold=result.config.get("variance_flag_threshold", 0.1),
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

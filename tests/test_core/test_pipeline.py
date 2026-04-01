@@ -352,7 +352,7 @@ class TestEvaluateBaseline:
         ) as mock_evaluate:
             evaluate_baseline(test_pairs, config)
 
-        mock_evaluate.assert_called_once_with(test_pairs)
+        mock_evaluate.assert_called_once_with(test_pairs, optimized_prompt=None)
 
     def test_evaluate_baseline_empty_input_returns_empty(self):
         """An empty test set should return an empty list."""

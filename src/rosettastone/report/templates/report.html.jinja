@@ -324,6 +324,7 @@
             <li><a href="#per-case-results">Per-Case Results</a></li>
             {% if validation_results %}<li><a href="#worst-regressions">Worst Regressions</a></li>{% endif %}
             {% if prompt_regressions %}<li><a href="#regression-analysis">Regression Analysis</a></li>{% endif %}
+            {% if eval_runs is defined and eval_runs > 1 and non_deterministic_count > 0 %}<li><a href="#non-deterministic">Non-Deterministic Prompts</a></li>{% endif %}
             {% if safety_warnings %}<li><a href="#safety-findings">Safety Findings</a></li>{% endif %}
             {% if warnings %}<li><a href="#warnings">Warnings</a></li>{% endif %}
             <li><a href="#cost-summary">Cost Summary</a></li>
@@ -567,6 +568,28 @@
             {% if not at_risk_list and not regressed_list %}
             <p>No regressions detected &mdash; all prompts improved or remained stable.</p>
             {% endif %}
+        </details>
+    </section>
+    {% endif %}
+
+    {% if eval_runs is defined and eval_runs > 1 and non_deterministic_count > 0 %}
+    <section id="non-deterministic">
+        <details>
+            <summary>Non-Deterministic Prompts <span style="color: var(--color-yellow);">({{ non_deterministic_count }} flagged)</span></summary>
+            <p style="margin-bottom: 12px;">Ran <strong>{{ eval_runs }}</strong> evaluation pass(es). Prompts with score std dev &gt; {{ variance_flag_threshold | default(0.1) }} are flagged.</p>
+            <table>
+                <tr><th>#</th><th>Type</th><th>Agg Score</th><th>Std Dev</th><th>Run Scores</th></tr>
+                {% set nd_list = validation_results | selectattr('is_non_deterministic', 'eq', true) | list %}
+                {% for r in nd_list %}
+                <tr>
+                    <td>{{ loop.index0 }}</td>
+                    <td>{{ r.details.get('output_type', 'unknown') }}</td>
+                    <td>{{ "%.3f" | format(r.composite_score) }}</td>
+                    <td style="color: var(--color-yellow);">{{ "%.3f" | format(r.score_std) }}</td>
+                    <td style="font-size: 0.85em;">{% for s in r.run_scores %}{{ "%.3f" | format(s) }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+                </tr>
+                {% endfor %}
+            </table>
         </details>
     </section>
     {% endif %}

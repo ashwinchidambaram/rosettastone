@@ -188,6 +188,70 @@ class CompositeEvaluator:
 
         return results
 
+    def evaluate_multi_run(
+        self,
+        test_set: list[PromptPair],
+        optimized_prompt: str | None = None,
+    ) -> list[EvalResult]:
+        """Run evaluate() N times and aggregate results by index position.
+
+        Preserves 3-phase BERTScore batching by calling the full evaluate() per run.
+        """
+        n_runs = getattr(self.config, "eval_runs", 1)
+        if n_runs <= 1:
+            return self.evaluate(test_set, optimized_prompt=optimized_prompt)
+
+        run_results: list[list[EvalResult]] = []
+        for _ in range(n_runs):
+            run_results.append(self.evaluate(test_set, optimized_prompt=optimized_prompt))
+
+        # Aggregate by position — zip run_results together
+        aggregated: list[EvalResult] = []
+        # Find min length across all runs (some may skip pairs)
+        min_len = min(len(r) for r in run_results)
+        for i in range(min_len):
+            run_evals = [run[i] for run in run_results]
+            aggregated.append(self._aggregate_runs(run_evals))
+        return aggregated
+
+    def _aggregate_runs(self, run_evals: list[EvalResult]) -> EvalResult:
+        """Aggregate multiple EvalResults for the same prompt into one."""
+        import statistics
+
+        strategy = getattr(self.config, "eval_aggregation", "median")
+        threshold = getattr(self.config, "variance_flag_threshold", 0.1)
+
+        scores_list = [r.composite_score for r in run_evals]
+
+        if strategy == "mean":
+            agg_score = statistics.mean(scores_list)
+        elif strategy == "p25":
+            sorted_scores = sorted(scores_list)
+            idx = max(0, len(sorted_scores) // 4 - 1)
+            agg_score = sorted_scores[idx]
+        else:  # "median" (default)
+            agg_score = statistics.median(scores_list)
+
+        score_std = statistics.stdev(scores_list) if len(scores_list) > 1 else 0.0
+        is_non_det = score_std > threshold
+
+        # Use the first run's result as the base (preserves prompt_pair, scores breakdown, etc.)
+        base = run_evals[0]
+
+        return EvalResult(
+            prompt_pair=base.prompt_pair,
+            new_response=base.new_response,
+            scores=base.scores,
+            composite_score=agg_score,
+            is_win=agg_score >= self._get_threshold(
+                base.prompt_pair.output_type or detect_output_type(base.prompt_pair.response)
+            ),
+            details=base.details,
+            run_scores=scores_list,
+            score_std=score_std,
+            is_non_deterministic=is_non_det,
+        )
+
     def _get_threshold(self, output_type: OutputType) -> float:
         thresholds = getattr(self.config, "win_thresholds", DEFAULT_WIN_THRESHOLDS)
         return cast(

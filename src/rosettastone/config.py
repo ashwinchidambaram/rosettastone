@@ -128,6 +128,17 @@ class MigrationConfig(BaseModel):
         default=2.0, gt=0.0, description="Score divisor applied to known-issue pairs in GEPA metric"
     )
 
+    # T4: Multi-run evaluation
+    eval_runs: int = Field(
+        default=1, ge=1, description="Number of evaluation runs; aggregated for variance tracking."
+    )
+    eval_aggregation: Literal["median", "mean", "p25"] = Field(
+        default="median", description="Aggregation strategy across runs."
+    )
+    variance_flag_threshold: float = Field(
+        default=0.1, ge=0.0, description="Score std dev threshold for non-deterministic flagging."
+    )
+
     # Cost guardrail
     max_cost_usd: float | None = Field(
         default=None,

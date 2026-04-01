@@ -200,7 +200,7 @@ def evaluate_baseline(
     from rosettastone.evaluate.composite import CompositeEvaluator
 
     evaluator = CompositeEvaluator(config, ctx=ctx)
-    return evaluator.evaluate(test)
+    return evaluator.evaluate_multi_run(test)
 
 
 def evaluate_optimized(
@@ -212,7 +212,7 @@ def evaluate_optimized(
     from rosettastone.evaluate.composite import CompositeEvaluator
 
     evaluator = CompositeEvaluator(config, ctx=ctx)
-    return evaluator.evaluate(test, optimized_prompt=optimized_prompt)
+    return evaluator.evaluate_multi_run(test, optimized_prompt=optimized_prompt)
 
 
 def run_pii_scan(pairs: list[PromptPair], ctx: PipelineContext, config: MigrationConfig) -> None:
@@ -434,6 +434,12 @@ def build_result(
     regression_count = sum(1 for r in prompt_regressions if r.status == "regressed")
     at_risk_count = sum(1 for r in prompt_regressions if r.status == "at_risk")
 
+    # T4: Multi-run metadata
+    non_deterministic_count = sum(
+        1 for r in validation if getattr(r, "is_non_deterministic", False)
+    )
+    eval_runs_value = getattr(config, "eval_runs", 1)
+
     return MigrationResult(
         config=config_dict,
         optimized_prompt=optimized_prompt,
@@ -453,6 +459,8 @@ def build_result(
         prompt_regressions=prompt_regressions,
         regression_count=regression_count,
         at_risk_count=at_risk_count,
+        non_deterministic_count=non_deterministic_count,
+        eval_runs=eval_runs_value,
     )
 
 

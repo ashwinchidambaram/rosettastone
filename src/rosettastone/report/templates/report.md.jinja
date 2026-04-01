@@ -115,6 +115,21 @@ _No regression analysis available (requires both baseline and validation results
 
 ---
 
+{% if eval_runs is defined and eval_runs > 1 and non_deterministic_count > 0 %}
+## Non-Deterministic Prompts
+
+Evaluation ran {{ eval_runs }} time(s). {{ non_deterministic_count }} prompt(s) had high score variance (std dev > {{ variance_flag_threshold | default(0.1) }}).
+
+{% set nd_list = validation_results | selectattr('is_non_deterministic', 'eq', true) | list %}
+| # | Output Type | Agg Score | Std Dev | Run Scores |
+|---|-------------|-----------|---------|------------|
+{% for r in nd_list -%}
+| {{ loop.index0 }} | {{ r.details.get('output_type', 'unknown') }} | {{ "%.3f" | format(r.composite_score) }} | {{ "%.3f" | format(r.score_std) }} | {% for s in r.run_scores %}{{ "%.3f" | format(s) }}{% if not loop.last %}, {% endif %}{% endfor %} |
+{% endfor %}
+{% endif %}
+
+---
+
 ## Safety Findings
 
 {% if safety_warnings %}
