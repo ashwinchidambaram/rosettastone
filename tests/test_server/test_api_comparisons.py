@@ -11,7 +11,73 @@ sqlmodel = pytest.importorskip("sqlmodel")
 
 from sqlmodel import Session  # noqa: E402
 
+from rosettastone.server.api.comparisons import _word_diff_html  # noqa: E402
 from rosettastone.server.models import TestCaseRecord  # noqa: E402
+
+# ---------------------------------------------------------------------------
+# Unit tests for _word_diff_html
+# ---------------------------------------------------------------------------
+
+
+class TestWordDiffHtml:
+    def test_identical_inputs_produce_no_spans(self):
+        """When expected == actual, output contains no diff spans."""
+        text = "hello world foo"
+        exp_html, act_html = _word_diff_html(text, text)
+        assert "<span" not in exp_html
+        assert "<span" not in act_html
+
+    def test_identical_multiline_produces_no_spans(self):
+        """Multi-line identical input produces no diff spans."""
+        text = '{\n  "key": "value",\n  "num": 42\n}'
+        exp_html, act_html = _word_diff_html(text, text)
+        assert "<span" not in exp_html
+        assert "<span" not in act_html
+
+    def test_multiline_input_preserves_newlines(self):
+        """Newlines in the input must survive into the output HTML."""
+        expected = '{\n  "priority": "urgent"\n}'
+        actual = '{\n  "priority": "high"\n}'
+        exp_html, act_html = _word_diff_html(expected, actual)
+        assert "\n" in exp_html, "newline lost from expected HTML"
+        assert "\n" in act_html, "newline lost from actual HTML"
+
+    def test_changed_word_wrapped_in_span(self):
+        """A replaced word on expected side gets diff-del span; actual gets diff-add."""
+        expected = "hello world"
+        actual = "hello earth"
+        exp_html, act_html = _word_diff_html(expected, actual)
+        assert 'class="diff-del"' in exp_html
+        assert "world" in exp_html
+        assert 'class="diff-add"' in act_html
+        assert "earth" in act_html
+
+    def test_html_special_chars_are_escaped(self):
+        """Angle brackets and ampersands must be HTML-escaped in the output."""
+        expected = "<b>foo</b> & bar"
+        actual = "<b>foo</b> & baz"
+        exp_html, act_html = _word_diff_html(expected, actual)
+        assert "<b>" not in exp_html  # raw tag must not appear unescaped
+        assert "&lt;b&gt;" in exp_html
+        assert "&amp;" in exp_html
+
+    def test_deleted_word_only_in_expected(self):
+        """A word deleted from actual appears with diff-del only on expected side."""
+        expected = "one two three"
+        actual = "one three"
+        exp_html, act_html = _word_diff_html(expected, actual)
+        assert 'class="diff-del"' in exp_html
+        assert "two" in exp_html
+        assert 'class="diff-add"' not in act_html
+
+    def test_inserted_word_only_in_actual(self):
+        """A word inserted in actual appears with diff-add only on actual side."""
+        expected = "one three"
+        actual = "one two three"
+        exp_html, act_html = _word_diff_html(expected, actual)
+        assert 'class="diff-add"' in act_html
+        assert "two" in act_html
+        assert 'class="diff-del"' not in exp_html
 
 
 class TestDistributions:
@@ -140,7 +206,9 @@ class TestUIFragments:
         # Dummy data has these values; template always renders outer structure
         assert "BERTScore" in body
 
-    def test_diff_fragment_with_real_data(self, client, engine, sample_migration, sample_test_cases):
+    def test_diff_fragment_with_real_data(
+        self, client, engine, sample_migration, sample_test_cases
+    ):
         """When real TC exists, the fragment renders with DB data."""
         tc = sample_test_cases[0]
         response = client.get(f"/ui/fragments/diff/{sample_migration.id}/{tc.id}")

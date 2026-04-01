@@ -12,6 +12,7 @@ from sqlmodel import Session, func, select
 from rosettastone.server.api.utils import _get_migration_or_404
 from rosettastone.server.database import get_session
 from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningRecord
+from rosettastone.server.rbac import require_role
 from rosettastone.server.schemas import (
     MigrationDetail,
     MigrationSummary,
@@ -132,6 +133,9 @@ DUMMY_MIGRATIONS = [
                 "got": "def foo() ->None:",
             },
         ],
+        "wins": 146,
+        "losses": 10,
+        "score_histogram": [0, 0, 1, 2, 3, 4, 12, 30, 64, 40],
     },
     {
         "id": 2,
@@ -151,6 +155,9 @@ DUMMY_MIGRATIONS = [
         ),
         "per_type": [],
         "regressions": [],
+        "wins": 34,
+        "losses": 9,
+        "score_histogram": [0, 1, 2, 3, 4, 5, 8, 10, 7, 4],
     },
     {
         "id": 3,
@@ -221,6 +228,9 @@ DUMMY_MIGRATIONS = [
                 "got": "general_inquiry",
             },
         ],
+        "wins": 60,
+        "losses": 29,
+        "score_histogram": [2, 5, 8, 10, 4, 6, 12, 18, 14, 10],
     },
 ]
 
@@ -271,6 +281,50 @@ DUMMY_COSTS = {
             "confidence": "No quality impact",
         },
     ],
+}
+
+DUMMY_TEST_CASES: dict[int, dict] = {
+    42: {
+        "tc_id": 42,
+        "is_win": False,
+        "composite_score": 0.31,
+        "output_type": "Classification",
+        "phase": "validation",
+        "scores": {"bertscore": 0.54, "embedding": 0.48, "composite": 0.31},
+        "prompt": "Content not stored (run with --store-prompt-content)",
+        "source_response": '{"priority": "urgent", "category": "billing", "confidence": 0.94}',
+        "target_response": (
+            '{"priority": "high_priority", "category": "billing", "confidence": 0.91}'
+        ),
+        "evaluators_used": "bertscore,embedding_similarity",
+        "fallback_triggered": False,
+    },
+    87: {
+        "tc_id": 87,
+        "is_win": False,
+        "composite_score": 0.45,
+        "output_type": "JSON",
+        "phase": "validation",
+        "scores": {"bertscore": 0.61, "embedding": 0.55, "composite": 0.45},
+        "prompt": "Content not stored (run with --store-prompt-content)",
+        "source_response": '{"status": "complete", "result": {"items": [1, 2, 3], "total": 3}}',
+        "target_response": '{"status": "done"}',
+        "evaluators_used": "bertscore,json_validator",
+        "fallback_triggered": False,
+    },
+    103: {
+        "tc_id": 103,
+        "is_win": False,
+        "composite_score": 0.52,
+        "output_type": "Code",
+        "phase": "validation",
+        "scores": {"bertscore": 0.68, "embedding": 0.71, "composite": 0.52},
+        "prompt": "Content not stored (run with --store-prompt-content)",
+        "source_response": "def foo():\n    return 42",
+        "target_response": "def foo() ->None:\n    return 42",
+        "evaluators_used": "bertscore,embedding_similarity",
+        "fallback_triggered": False,
+    },
 }
 
 
@@ -347,8 +401,10 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
     result["projected_target_cost_per_call"] = record.projected_target_cost_per_call
 
     # Test case count
-    count_stmt = select(func.count()).select_from(TestCaseRecord).where(
-        TestCaseRecord.migration_id == record.id
+    count_stmt = (
+        select(func.count())
+        .select_from(TestCaseRecord)
+        .where(TestCaseRecord.migration_id == record.id)
     )
     result["test_cases"] = session.exec(count_stmt).one()
 
@@ -414,6 +470,19 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
         regressions.append(reg)
     result["regressions"] = regressions
 
+    # Chart data: win/loss counts and score histogram (10 bins)
+    all_tc_stmt = select(TestCaseRecord).where(TestCaseRecord.migration_id == record.id)
+    all_tcs = list(session.exec(all_tc_stmt).all())
+    chart_wins = sum(1 for tc in all_tcs if tc.is_win)
+    chart_losses = len(all_tcs) - chart_wins
+    score_histogram = [0] * 10
+    for tc in all_tcs:
+        bin_idx = min(int(tc.composite_score * 10), 9)
+        score_histogram[bin_idx] += 1
+    result["wins"] = chart_wins
+    result["losses"] = chart_losses
+    result["score_histogram"] = score_histogram
+
     return result
 
 
@@ -427,10 +496,15 @@ def _test_case_to_diff_dict(tc: TestCaseRecord, migration: MigrationRecord) -> d
         "output_type": tc.output_type.replace("_", " ").title(),
         "scores": {
             "bertscore": round(
-                scores.get("bertscore", scores.get("bert_score", 0)), 2
+                scores.get("bertscore_f1", scores.get("bertscore", scores.get("bert_score", 0))),
+                2,
             ),
             "embedding": round(
-                scores.get("embedding_similarity", scores.get("embedding", 0)), 2
+                scores.get(
+                    "embedding_sim",
+                    scores.get("embedding_similarity", scores.get("embedding", 0)),
+                ),
+                2,
             ),
             "composite": round(tc.composite_score, 2),
         },
@@ -444,12 +518,8 @@ def _test_case_to_diff_dict(tc: TestCaseRecord, migration: MigrationRecord) -> d
             if "/" in migration.target_model
             else migration.target_model
         ),
-        "expected": (
-            tc.response_text or "Content not stored (run with --store-prompt-content)"
-        ),
-        "actual": (
-            tc.new_response_text or "Content not stored (run with --store-prompt-content)"
-        ),
+        "expected": (tc.response_text or "Content not stored (run with --store-prompt-content)"),
+        "actual": (tc.new_response_text or "Content not stored (run with --store-prompt-content)"),
     }
 
 
@@ -580,6 +650,18 @@ def _migration_to_detail(record: MigrationRecord, session: Session) -> Migration
     test_cases = list(session.exec(tc_stmt).all())
     test_case_summaries = [_test_case_to_summary(tc) for tc in test_cases]
 
+    # Extract cluster summary if clustering was enabled
+    cluster_summary = None
+    if config.get("cluster_prompts"):
+        cluster_info = config.get("cluster_summary")
+        if cluster_info:
+            cluster_summary = {
+                "n_clusters": cluster_info.get("n_clusters"),
+                "silhouette_score": cluster_info.get("silhouette_score"),
+                "original_pairs": cluster_info.get("original_pairs"),
+                "representative_pairs": cluster_info.get("representative_pairs"),
+            }
+
     return MigrationDetail(
         id=record.id,  # type: ignore[arg-type]
         source_model=record.source_model,
@@ -604,6 +686,7 @@ def _migration_to_detail(record: MigrationRecord, session: Session) -> Migration
         per_type_scores=per_type_scores,
         warnings=warnings,
         safety_warnings=safety_warnings,
+        cluster_summary=cluster_summary,
         test_cases=test_case_summaries,
     )
 
@@ -650,7 +733,12 @@ async def get_migration(
     return _migration_to_detail(record, session)
 
 
-@router.post("/api/v1/migrations", response_model=MigrationSummary, status_code=201)
+@router.post(
+    "/api/v1/migrations",
+    response_model=MigrationSummary,
+    status_code=201,
+    dependencies=[Depends(require_role("editor", "admin"))],
+)
 async def create_migration(
     request: Request,
     session: Session = Depends(get_session),
@@ -660,6 +748,8 @@ async def create_migration(
     source_model = body.get("source_model")
     target_model = body.get("target_model")
     data_path = body.get("data_path")
+    cluster_prompts = body.get("cluster_prompts", False)
+    improvement_objectives = body.get("improvement_objectives")
 
     if not source_model or not target_model:
         raise HTTPException(status_code=422, detail="source_model and target_model are required")
@@ -670,6 +760,10 @@ async def create_migration(
     }
     if data_path:
         config["data_path"] = data_path
+    if cluster_prompts:
+        config["cluster_prompts"] = cluster_prompts
+    if improvement_objectives is not None:
+        config["improvement_objectives"] = improvement_objectives
 
     record = MigrationRecord(
         source_model=source_model,
@@ -761,12 +855,15 @@ async def dashboard(
     if not records and empty != "false":
         # No models registered — show empty state
         return request.app.state.templates.TemplateResponse(
-            request, "models_empty.html", {"active_nav": "models"},
+            request,
+            "models_empty.html",
+            {"active_nav": "models"},
         )
 
     models = [_model_to_template_dict(r) for r in records] if records else DUMMY_MODELS
     return request.app.state.templates.TemplateResponse(
-        request, "models.html",
+        request,
+        "models.html",
         {"models": models, "alerts": DUMMY_ALERTS, "active_nav": "models"},
     )
 
@@ -786,7 +883,8 @@ async def migrations_page(
         migrations = DUMMY_MIGRATIONS  # fallback when DB is empty
 
     return request.app.state.templates.TemplateResponse(
-        request, "migrations.html",
+        request,
+        "migrations.html",
         {"migrations": migrations, "active_nav": "migrations"},
     )
 
@@ -801,7 +899,8 @@ async def new_migration_form(
 ) -> HTMLResponse:
     """Render the new migration form."""
     return request.app.state.templates.TemplateResponse(
-        request, "migration_new.html",
+        request,
+        "migration_new.html",
         {"active_nav": "migrations", "source_model": source or "", "error": None},
     )
 
@@ -825,7 +924,8 @@ async def create_migration_from_form(
     # Validate file upload
     if data_file is None or data_file.filename == "":
         return templates.TemplateResponse(
-            request, "migration_new.html",
+            request,
+            "migration_new.html",
             {
                 "active_nav": "migrations",
                 "source_model": source_model,
@@ -839,7 +939,8 @@ async def create_migration_from_form(
     content = await data_file.read()
     if len(content) > MAX_UPLOAD_SIZE:
         return templates.TemplateResponse(
-            request, "migration_new.html",
+            request,
+            "migration_new.html",
             {
                 "active_nav": "migrations",
                 "source_model": source_model,
@@ -854,7 +955,8 @@ async def create_migration_from_form(
         text_content = content.decode("utf-8")
     except UnicodeDecodeError:
         return templates.TemplateResponse(
-            request, "migration_new.html",
+            request,
+            "migration_new.html",
             {
                 "active_nav": "migrations",
                 "source_model": source_model,
@@ -874,7 +976,8 @@ async def create_migration_from_form(
 
     if not first_line:
         return templates.TemplateResponse(
-            request, "migration_new.html",
+            request,
+            "migration_new.html",
             {
                 "active_nav": "migrations",
                 "source_model": source_model,
@@ -888,7 +991,8 @@ async def create_migration_from_form(
         first_obj = json.loads(first_line)
     except json.JSONDecodeError as e:
         return templates.TemplateResponse(
-            request, "migration_new.html",
+            request,
+            "migration_new.html",
             {
                 "active_nav": "migrations",
                 "source_model": source_model,
@@ -901,7 +1005,8 @@ async def create_migration_from_form(
     # Schema validation — must have prompt and response keys
     if not isinstance(first_obj, dict) or "prompt" not in first_obj or "response" not in first_obj:
         return templates.TemplateResponse(
-            request, "migration_new.html",
+            request,
+            "migration_new.html",
             {
                 "active_nav": "migrations",
                 "source_model": source_model,
@@ -917,10 +1022,12 @@ async def create_migration_from_form(
         target_model=target_model,
         status="pending",
         created_at=datetime.now(UTC),
-        config_json=json.dumps({
-            "source_model": source_model,
-            "target_model": target_model,
-        }),
+        config_json=json.dumps(
+            {
+                "source_model": source_model,
+                "target_model": target_model,
+            }
+        ),
     )
     session.add(record)
     session.commit()
@@ -979,7 +1086,8 @@ async def migration_detail_page(
             raise HTTPException(status_code=404, detail="Migration not found")
 
     return request.app.state.templates.TemplateResponse(
-        request, "migration_detail.html",
+        request,
+        "migration_detail.html",
         {"migration": migration, "active_nav": "migrations"},
     )
 
@@ -1002,7 +1110,8 @@ async def executive_report_page(
 
     report_date = datetime.now(UTC).strftime("%B %-d, %Y")
     return request.app.state.templates.TemplateResponse(
-        request, "executive_report.html",
+        request,
+        "executive_report.html",
         {"migration": migration, "report_date": report_date, "active_nav": "migrations"},
     )
 
@@ -1017,7 +1126,9 @@ async def costs_page(request: Request, session: Session = Depends(get_session)) 
         costs = DUMMY_COSTS  # fallback when no data
 
     return request.app.state.templates.TemplateResponse(
-        request, "costs.html", {"costs": costs, "active_nav": "costs"},
+        request,
+        "costs.html",
+        {"costs": costs, "active_nav": "costs"},
     )
 
 
@@ -1040,7 +1151,9 @@ async def alerts_page(request: Request, session: Session = Depends(get_session))
         alerts = DUMMY_ALERTS  # fallback when DB is empty
 
     return request.app.state.templates.TemplateResponse(
-        request, "alerts.html", {"alerts": alerts, "active_nav": "alerts"},
+        request,
+        "alerts.html",
+        {"alerts": alerts, "active_nav": "alerts"},
     )
 
 
@@ -1057,6 +1170,151 @@ async def eval_grid_fragment(migration_id: int, request: Request) -> HTMLRespons
 
 
 @router.get("/ui/fragments/test-case/{migration_id}/{tc_id}", response_class=HTMLResponse)
-async def test_case_fragment(migration_id: int, tc_id: int, request: Request) -> HTMLResponse:
+async def test_case_fragment(
+    migration_id: int,
+    tc_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
     """HTMX partial for test case detail."""
-    return HTMLResponse("<div>Template pending integration</div>")
+    migration = session.get(MigrationRecord, migration_id)
+    db_tc = session.get(TestCaseRecord, tc_id) if migration else None
+
+    if db_tc and db_tc.migration_id == migration_id:
+        scores = json.loads(db_tc.scores_json)
+        tc = {
+            "tc_id": db_tc.id,
+            "is_win": db_tc.is_win,
+            "composite_score": round(db_tc.composite_score, 2),
+            "output_type": db_tc.output_type.replace("_", " ").title(),
+            "phase": db_tc.phase,
+            "scores": {
+                "bertscore": round(
+                    scores.get(
+                        "bertscore_f1", scores.get("bertscore", scores.get("bert_score", 0))
+                    ),
+                    2,
+                ),
+                "embedding": round(
+                    scores.get(
+                        "embedding_sim",
+                        scores.get("embedding_similarity", scores.get("embedding", 0)),
+                    ),
+                    2,
+                ),
+                "composite": round(db_tc.composite_score, 2),
+            },
+            "prompt": db_tc.prompt_text,
+            "source_response": db_tc.response_text,
+            "target_response": db_tc.new_response_text,
+            "evaluators_used": db_tc.evaluators_used,
+            "fallback_triggered": db_tc.fallback_triggered,
+        }
+    else:
+        tc = DUMMY_TEST_CASES.get(
+            tc_id,
+            DUMMY_TEST_CASES[42],  # default fallback
+        )
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "fragments/test_case_detail.html",
+        {"tc": tc},
+    )
+
+
+@router.get("/ui/migrations/{migration_id}/test-cases-table", response_class=HTMLResponse)
+async def test_cases_table_fragment(
+    migration_id: int,
+    request: Request,
+    outcome: str = Query("all"),  # "win" | "loss" | "all"
+    search: str = Query(""),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """HTMX partial for filterable test case grid."""
+    _get_migration_or_404(migration_id, session)
+
+    conditions = [TestCaseRecord.migration_id == migration_id]
+    if outcome == "win":
+        conditions.append(TestCaseRecord.is_win == True)  # noqa: E712
+    elif outcome == "loss":
+        conditions.append(TestCaseRecord.is_win == False)  # noqa: E712
+    if search:
+        conditions.append(TestCaseRecord.prompt_text.contains(search))  # type: ignore[union-attr]
+
+    count_stmt = select(func.count()).select_from(TestCaseRecord).where(*conditions)
+    total = session.exec(count_stmt).one()
+
+    offset = (page - 1) * page_size
+    stmt = (
+        select(TestCaseRecord)
+        .where(*conditions)
+        .order_by(TestCaseRecord.composite_score.asc())  # type: ignore[union-attr]
+        .offset(offset)
+        .limit(page_size)
+    )
+    test_cases = list(session.exec(stmt).all())
+    total_pages = max(1, (total + page_size - 1) // page_size)
+
+    tc_list = []
+    for tc in test_cases:
+        tc_list.append(
+            {
+                "id": tc.id,
+                "prompt_preview": (tc.prompt_text or "")[:80]
+                + ("…" if tc.prompt_text and len(tc.prompt_text) > 80 else ""),
+                "output_type": tc.output_type.replace("_", " ").title(),
+                "composite_score": round(tc.composite_score, 2),
+                "is_win": tc.is_win,
+            }
+        )
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "fragments/test_cases_table.html",
+        {
+            "migration_id": migration_id,
+            "test_cases": tc_list,
+            "outcome": outcome,
+            "search": search,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": total_pages,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# P2.2: Inline executive summary fragment
+# ---------------------------------------------------------------------------
+
+
+@router.get("/ui/migrations/{migration_id}/executive-summary", response_class=HTMLResponse)
+async def executive_summary_fragment(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """HTMX fragment: compact executive summary card."""
+    record = session.get(MigrationRecord, migration_id)
+    if record:
+        migration = _migration_to_template_dict(record, session)
+    else:
+        migration = next((m for m in DUMMY_MIGRATIONS if m["id"] == migration_id), None)
+        if migration is None:
+            raise HTTPException(status_code=404, detail="Migration not found")
+
+    # Truncate reasoning to first paragraph, max 500 chars
+    reasoning = migration.get("reasoning", "") or ""
+    narrative = reasoning.split("\n\n")[0]  # first paragraph
+    if len(narrative) > 500:
+        narrative = narrative[:497] + "\u2026"
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "fragments/executive_summary.html",
+        {"migration": migration, "narrative": narrative},
+    )

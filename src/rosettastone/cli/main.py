@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -9,7 +10,9 @@ console = Console()
 
 @app.command()
 def migrate(
-    data: Path = typer.Option(..., "--data", "-d", help="Path to JSONL file"),
+    data: Path | None = typer.Option(  # noqa: UP007
+        None, "--data", "-d", help="Path to data file (JSONL/CSV/OTel)"
+    ),
     source: str = typer.Option(..., "--from", help="Source model (e.g. openai/gpt-4o)"),
     target: str = typer.Option(..., "--to", help="Target model (e.g. anthropic/claude-sonnet-4)"),
     output: Path = typer.Option("./migration_output", "--output", "-o"),
@@ -31,10 +34,81 @@ def migrate(
     mipro_auto: str | None = typer.Option(  # noqa: UP007
         None, "--mipro-auto", help="MIPROv2 auto preset: light/medium/heavy"
     ),
+    # Phase 4 flags
+    adapter: str = typer.Option(
+        "jsonl", "--adapter", help="Data adapter: jsonl, redis, csv, braintrust, langsmith, otel"
+    ),
+    pii_engine: str = typer.Option("regex", "--pii-engine", help="PII scanner: regex or presidio"),
+    cluster_prompts: bool = typer.Option(
+        False, "--cluster-prompts", help="Cluster prompts before optimization"
+    ),
+    known_issue_weight: float = typer.Option(
+        2.0, "--known-issue-weight", help="Score divisor for known-issue pairs in GEPA metric"
+    ),
+    # Adapter-specific options
+    csv_delimiter: str | None = typer.Option(  # noqa: UP007
+        None, "--csv-delimiter", help="CSV delimiter"
+    ),
+    csv_prompt_col: str | None = typer.Option(  # noqa: UP007
+        None, "--csv-prompt-col", help="CSV prompt column name"
+    ),
+    csv_response_col: str | None = typer.Option(  # noqa: UP007
+        None, "--csv-response-col", help="CSV response column name"
+    ),
+    braintrust_project: str | None = typer.Option(  # noqa: UP007
+        None, "--braintrust-project", help="Braintrust project name"
+    ),
+    langsmith_project: str | None = typer.Option(  # noqa: UP007
+        None, "--langsmith-project", help="LangSmith project name"
+    ),
+    langsmith_start: str | None = typer.Option(  # noqa: UP007
+        None, "--langsmith-start", help="LangSmith start date (ISO-8601)"
+    ),
+    langsmith_end: str | None = typer.Option(  # noqa: UP007
+        None, "--langsmith-end", help="LangSmith end date (ISO-8601)"
+    ),
+    otel_path: Path | None = typer.Option(  # noqa: UP007
+        None, "--otel-path", help="Path to OTel JSON export"
+    ),
+    improvement_objectives: str | None = typer.Option(  # noqa: UP007
+        None,
+        "--improvement-objectives",
+        help='JSON array of objectives, e.g. \'[{"description": "be more concise"}]\'',
+    ),
+    pipeline: Annotated[
+        Path | None,
+        typer.Option(
+            "--pipeline",
+            help="Path to pipeline YAML config for multi-step migration.",
+        ),
+    ] = None,
 ) -> None:
     """Run a full migration: preflight -> optimize -> evaluate -> report."""
+    import json as json_mod
+
     from rosettastone.config import MigrationConfig
     from rosettastone.core.migrator import Migrator
+
+    # Handle pipeline mode
+    if pipeline:
+        from rosettastone.optimize.pipeline_config import load_pipeline_config
+
+        pipeline_config = load_pipeline_config(pipeline)
+        num_modules = len(pipeline_config.modules)
+        typer.echo(f"Pipeline mode: {pipeline_config.name} ({num_modules} modules)")
+        typer.echo(
+            "Pipeline optimization is handled server-side via POST /api/v1/pipelines/migrate"
+        )
+        return
+
+    # Parse improvement objectives from JSON string
+    parsed_objectives = None
+    if improvement_objectives:
+        try:
+            parsed_objectives = json_mod.loads(improvement_objectives)
+        except json_mod.JSONDecodeError:
+            console.print("[red]Error: --improvement-objectives must be valid JSON[/red]")
+            raise typer.Exit(code=1)
 
     config = MigrationConfig(
         source_model=source,
@@ -49,6 +123,20 @@ def migrate(
         pii_scan=not no_pii_scan,
         prompt_audit=not no_prompt_audit,
         mipro_auto=mipro_auto if optimizer == "mipro" else None,  # type: ignore[arg-type]
+        # Phase 4
+        adapter=adapter,  # type: ignore[arg-type]
+        pii_engine=pii_engine,  # type: ignore[arg-type]
+        cluster_prompts=cluster_prompts,
+        csv_delimiter=csv_delimiter,
+        csv_prompt_column=csv_prompt_col,
+        csv_response_column=csv_response_col,
+        braintrust_project=braintrust_project,
+        langsmith_project=langsmith_project,
+        langsmith_start_date=langsmith_start,
+        langsmith_end_date=langsmith_end,
+        otel_path=otel_path,
+        improvement_objectives=parsed_objectives,
+        known_issue_weight=known_issue_weight,
     )
     migrator = Migrator(config)
     result = migrator.run()
@@ -144,6 +232,97 @@ def batch(
 
     summary = format_batch_summary(results)
     console.print(summary)
+
+
+@app.command(name="ci-report")
+def ci_report(
+    result_path: Path = typer.Option(
+        ..., "--result", "-r", help="Path to migration result JSON file"
+    ),
+    output_format: str = typer.Option(
+        "json", "--format", "-f", help="Output format: json, pr-comment, or quality-diff"
+    ),
+    source: str | None = typer.Option(  # noqa: UP007
+        None, "--from", help="Source model (required for pr-comment format)"
+    ),
+    target: str | None = typer.Option(  # noqa: UP007
+        None, "--to", help="Target model (required for pr-comment format)"
+    ),
+    output: Path | None = typer.Option(  # noqa: UP007
+        None, "--output", "-o", help="Write output to file (default: stdout)"
+    ),
+) -> None:
+    """Generate CI/CD-friendly output from a migration result."""
+    import json
+
+    from rosettastone.core.types import MigrationResult
+
+    # Load result from JSON file
+    try:
+        raw = json.loads(result_path.read_text())
+        result = MigrationResult(**raw)
+    except FileNotFoundError:
+        console.print(f"[red]Error: Result file not found: {result_path}[/red]")
+        raise typer.Exit(code=1)
+    except json.JSONDecodeError:
+        console.print(f"[red]Error: Invalid JSON in {result_path}[/red]")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"[red]Error loading result: {e}[/red]")
+        raise typer.Exit(code=1)
+
+    from rosettastone.cli.ci_output import (
+        format_ci_json,
+        format_pr_comment,
+        format_quality_diff,
+    )
+
+    try:
+        if output_format == "json":
+            formatted = format_ci_json(result)
+        elif output_format == "pr-comment":
+            if not source or not target:
+                console.print("[red]Error: pr-comment format requires --from and --to flags[/red]")
+                raise typer.Exit(code=1)
+            formatted = format_pr_comment(result, source, target)
+        elif output_format == "quality-diff":
+            formatted = format_quality_diff(result)
+        else:
+            console.print(
+                f"[red]Unknown format: {output_format}. "
+                f"Use: json, pr-comment, or quality-diff[/red]"
+            )
+            raise typer.Exit(code=1)
+
+        if output:
+            output.write_text(formatted)
+            console.print(f"[green]Written to {output}[/green]")
+        else:
+            console.print(formatted, highlight=False)
+    except Exception as e:
+        console.print(f"[red]Error formatting output: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("0.0.0.0", "--host", help="Server host"),
+    port: int = typer.Option(8000, "--port", help="Server port"),
+    reload: bool = typer.Option(False, "--reload", help="Enable hot-reload (development)"),
+) -> None:
+    """Start the RosettaStone FastAPI server."""
+    import uvicorn
+
+    url = f"http://{host}:{port}"
+    console.print(f"[bold green]Starting RosettaStone server at {url}[/bold green]")
+
+    uvicorn.run(
+        "rosettastone.server.app:create_app",
+        host=host,
+        port=port,
+        reload=reload,
+        factory=True,
+    )
 
 
 if __name__ == "__main__":

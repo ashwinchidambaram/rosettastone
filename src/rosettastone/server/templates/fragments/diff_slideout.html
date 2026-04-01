@@ -11,8 +11,8 @@
             <span class="px-1.5 py-0.5 rounded {% if diff.is_win %}bg-[#8B9D83] text-white{% else %}bg-[#D85650] text-white{% endif %} text-[10px] font-black mb-1">{% if diff.is_win %}WIN{% else %}LOSS{% endif %}</span>
         </div>
     </div>
-    <button data-action="close-slideout" class="p-2 hover:bg-white/5 rounded-full transition-colors">
-        <span class="material-symbols-outlined text-[#BDBDBD] text-3xl">close</span>
+    <button data-action="close-slideout" class="p-2 hover:bg-white/5 rounded-full transition-colors" aria-label="Close diff panel">
+        <span class="material-symbols-outlined text-[#BDBDBD] text-3xl" aria-hidden="true">close</span>
     </button>
 </div>
 
@@ -57,8 +57,8 @@
 <div class="flex-1 overflow-y-auto custom-scrollbar">
     {% if diff.expected and diff.expected != 'Content not stored (run with --store-prompt-content)' %}
     <!-- PII Warning Banner -->
-    <div class="m-6 p-4 bg-[#D4A574]/10 border-l-4 border-[#D4A574] flex items-center gap-3">
-        <span class="material-symbols-outlined text-[#D4A574] text-sm" style="font-variation-settings: 'FILL' 1;">warning</span>
+    <div class="m-6 p-4 bg-[#D4A574]/10 border-l-4 border-[#D4A574] flex items-center gap-3" role="alert">
+        <span class="material-symbols-outlined text-[#D4A574] text-sm" style="font-variation-settings: 'FILL' 1;" aria-hidden="true">warning</span>
         <p class="text-[14px] text-[#D4A574] font-medium">Content may contain sensitive data from production prompts</p>
     </div>
 
@@ -72,17 +72,21 @@
                 <span class="text-[12px] font-mono text-[#9E9E9E] uppercase tracking-tighter">Actual ({{ diff.target_model|default('') }})</span>
             </div>
         </div>
+        <style>
+            .diff-del { background-color: rgba(216,86,80,0.20); color: #D85650; border-radius: 2px; padding: 0 2px; }
+            .diff-add { background-color: rgba(139,157,131,0.20); color: #8B9D83; border-radius: 2px; padding: 0 2px; }
+        </style>
         <div class="grid grid-cols-2 font-mono text-[14px] leading-relaxed">
             <!-- Left Column (Expected) -->
-            <div class="p-5 border-r border-white/5 text-[#E8DCC4] whitespace-pre-wrap">{{ diff.expected }}</div>
+            <div class="p-5 border-r border-white/5 text-[#E8DCC4] whitespace-pre-wrap">{% if diff.expected_html %}{{ diff.expected_html | safe }}{% else %}{{ diff.expected }}{% endif %}</div>
             <!-- Right Column (Actual) -->
-            <div class="p-5 text-[#E8DCC4] whitespace-pre-wrap">{{ diff.actual|default('') }}</div>
+            <div class="p-5 text-[#E8DCC4] whitespace-pre-wrap">{% if diff.actual_html %}{{ diff.actual_html | safe }}{% else %}{{ diff.actual|default('') }}{% endif %}</div>
         </div>
     </div>
     {% else %}
     <!-- Content not available info message -->
     <div class="m-6 p-6 bg-surface-container-low border border-outline-variant/20 rounded-xl flex flex-col items-center gap-3 text-center">
-        <span class="material-symbols-outlined text-3xl text-on-surface-variant/40">visibility_off</span>
+        <span class="material-symbols-outlined text-3xl text-on-surface-variant/40" aria-hidden="true">visibility_off</span>
         <p class="text-[14px] text-on-surface-variant font-medium">Content not stored</p>
         <p class="text-[12px] text-on-surface-variant/60 max-w-xs">Run the migration with <code class="font-mono bg-surface-container-high px-1 rounded">--store-prompt-content</code> to enable diff view.</p>
     </div>

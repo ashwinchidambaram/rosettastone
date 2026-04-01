@@ -48,7 +48,7 @@ class Migrator:
 
         # Step 1: Ingest
         t0 = time.time()
-        train, val, test = load_and_split_data(self.config)
+        train, val, test = load_and_split_data(self.config, ctx)
         ctx.timing["ingest"] = time.time() - t0
 
         # Step 1.5: PII scan on ingested data
@@ -68,7 +68,7 @@ class Migrator:
 
         # Step 3.5: Safety checks on optimized prompt
         t0 = time.time()
-        run_pii_scan_text(optimized_prompt, ctx)
+        run_pii_scan_text(optimized_prompt, ctx, self.config)
         run_prompt_audit(optimized_prompt, train, ctx, self.config)
         ctx.timing["prompt_safety"] = time.time() - t0
 

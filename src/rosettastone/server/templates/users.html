@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}RosettaStone | User Management{% endblock %}
+
+{% block content %}
+<div class="pb-24 px-8 max-w-[1440px] mx-auto min-h-screen pt-8">
+
+<!-- Header -->
+<div class="mb-10 flex flex-wrap items-center justify-between gap-6">
+  <div>
+    <h1 class="text-[28px] font-semibold text-[#E8DCC4] font-headline tracking-tight">User Management</h1>
+    <p class="text-sm text-on-surface-variant mt-1">Manage accounts, roles, and access for your organization.</p>
+  </div>
+  {% if multi_user %}
+  <button id="create-user-toggle"
+          data-action="toggle-collapse"
+          data-target="create-user-form"
+          aria-expanded="false"
+          class="flex items-center gap-2 px-4 py-2 bg-[#D4745E] hover:brightness-110 text-white text-sm font-bold rounded-lg transition-all active:scale-95 shadow-md shadow-[#D4745E]/20">
+    <span class="material-symbols-outlined text-[18px]">person_add</span>
+    Create User
+  </button>
+  {% endif %}
+</div>
+
+{% if not multi_user %}
+<!-- Single-user mode notice -->
+<div class="bg-surface-container-low border border-outline-variant/20 rounded-xl p-8 flex items-start gap-4">
+  <span class="material-symbols-outlined text-on-surface-variant text-3xl mt-0.5" aria-hidden="true">manage_accounts</span>
+  <div>
+    <h2 class="text-base font-semibold text-on-surface mb-1">Multi-user mode is not enabled</h2>
+    <p class="text-sm text-on-surface-variant leading-relaxed">
+      Set <code class="font-mono bg-surface-container-highest px-1.5 py-0.5 rounded text-[#D4A574]">ROSETTASTONE_MULTI_USER=true</code> in your environment to enable user management, roles, and team collaboration features.
+    </p>
+  </div>
+</div>
+
+{% else %}
+<!-- Create User inline form (collapsed by default) -->
+<div id="create-user-form" class="collapsible-content mb-8">
+  <div class="bg-surface-container-low border border-outline-variant/20 rounded-xl p-6">
+    <h2 class="text-sm font-bold text-on-surface/80 uppercase tracking-wider mb-5">New User</h2>
+    <form method="POST" action="/api/v1/users" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {% if request.state.csrf_token %}
+      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+      {% endif %}
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-medium text-on-surface-variant" for="new-username">Username</label>
+        <input id="new-username" name="username" type="text" required
+               class="bg-surface-container-high border border-outline-variant/30 rounded-lg px-3 py-2 text-sm text-on-surface placeholder-on-surface-variant/40 focus:outline-none focus:border-[#D4745E]/60 transition-colors"
+               placeholder="e.g. jane.smith" autocomplete="username">
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-medium text-on-surface-variant" for="new-email">Email</label>
+        <input id="new-email" name="email" type="email"
+               class="bg-surface-container-high border border-outline-variant/30 rounded-lg px-3 py-2 text-sm text-on-surface placeholder-on-surface-variant/40 focus:outline-none focus:border-[#D4745E]/60 transition-colors"
+               placeholder="jane@example.com" autocomplete="email">
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-medium text-on-surface-variant" for="new-password">Password</label>
+        <input id="new-password" name="password" type="password" required
+               class="bg-surface-container-high border border-outline-variant/30 rounded-lg px-3 py-2 text-sm text-on-surface placeholder-on-surface-variant/40 focus:outline-none focus:border-[#D4745E]/60 transition-colors"
+               placeholder="Minimum 8 characters" autocomplete="new-password">
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-medium text-on-surface-variant" for="new-role">Role</label>
+        <select id="new-role" name="role"
+                class="bg-surface-container-high border border-outline-variant/30 rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-[#D4745E]/60 transition-colors">
+          <option value="viewer">Viewer</option>
+          <option value="editor">Editor</option>
+          <option value="approver">Approver</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="sm:col-span-2 flex gap-3 pt-2">
+        <button type="submit"
+                class="px-5 py-2 bg-[#D4745E] hover:brightness-110 text-white text-sm font-bold rounded-lg transition-all active:scale-95">
+          Create User
+        </button>
+        <button type="button"
+                data-action="toggle-collapse"
+                data-target="create-user-form"
+                class="px-5 py-2 bg-surface-container-high hover:bg-surface-bright text-on-surface text-sm font-medium rounded-lg transition-all">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Users Table -->
+{% if users %}
+<div class="bg-surface-container-low rounded-xl overflow-hidden border border-outline-variant/10 shadow-xl shadow-black/20">
+  <div class="px-6 py-5 bg-surface-container-high border-b border-outline-variant/10 flex items-center justify-between">
+    <h2 class="font-bold text-sm uppercase tracking-wider text-on-surface/70">All Users</h2>
+    <span class="text-xs font-label text-on-surface-variant">{{ users|length }} total</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm" aria-label="User list">
+      <thead>
+        <tr class="border-b border-outline-variant/10">
+          <th class="px-6 py-3 text-left text-[10px] font-label uppercase tracking-widest text-on-surface-variant">Username</th>
+          <th class="px-6 py-3 text-left text-[10px] font-label uppercase tracking-widest text-on-surface-variant">Email</th>
+          <th class="px-6 py-3 text-left text-[10px] font-label uppercase tracking-widest text-on-surface-variant">Role</th>
+          <th class="px-6 py-3 text-left text-[10px] font-label uppercase tracking-widest text-on-surface-variant">Status</th>
+          <th class="px-6 py-3 text-left text-[10px] font-label uppercase tracking-widest text-on-surface-variant">Created</th>
+          <th class="px-6 py-3 text-right text-[10px] font-label uppercase tracking-widest text-on-surface-variant">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-outline-variant/10">
+        {% for user in users %}
+        <tr class="hover:bg-surface-container-high/50 transition-colors">
+          <td class="px-6 py-4 font-medium text-on-surface">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-full bg-surface-container-highest border border-outline-variant/20 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-on-surface-variant text-xs" aria-hidden="true">account_circle</span>
+              </div>
+              {{ user.username }}
+            </div>
+          </td>
+          <td class="px-6 py-4 text-on-surface-variant font-label text-xs">{{ user.email or '—' }}</td>
+          <td class="px-6 py-4">
+            {% if user.role == 'admin' %}
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#D4745E]/10 text-[#D4745E] border border-[#D4745E]/30">admin</span>
+            {% elif user.role == 'approver' %}
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/30">approver</span>
+            {% elif user.role == 'editor' %}
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#8B9D83]/10 text-[#8B9D83] border border-[#8B9D83]/30">editor</span>
+            {% else %}
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-container-highest text-on-surface-variant border border-outline-variant/30">viewer</span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4">
+            {% if user.is_active %}
+            <span class="flex items-center gap-1.5 text-xs text-[#8B9D83]">
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-[#8B9D83]"></span>
+              Active
+            </span>
+            {% else %}
+            <span class="flex items-center gap-1.5 text-xs text-on-surface-variant/50">
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-on-surface-variant/30"></span>
+              Inactive
+            </span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 text-xs text-on-surface-variant font-label">
+            {{ user.created_at.strftime('%Y-%m-%d') }}
+          </td>
+          <td class="px-6 py-4 text-right">
+            <div class="flex items-center justify-end gap-2">
+              {% if user.is_active %}
+              <button type="button"
+                      hx-put="/api/v1/users/{{ user.id }}"
+                      hx-vals='{"is_active": false}'
+                      hx-confirm="Deactivate user {{ user.username }}?"
+                      class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant border border-outline-variant/30 rounded hover:bg-surface-container-high transition-colors"
+                      aria-label="Deactivate {{ user.username }}">
+                Deactivate
+              </button>
+              {% endif %}
+              <button type="button"
+                      hx-delete="/api/v1/users/{{ user.id }}"
+                      hx-confirm="Permanently delete user {{ user.username }}? This cannot be undone."
+                      class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-error/70 border border-error/20 rounded hover:bg-error/5 transition-colors"
+                      aria-label="Delete {{ user.username }}">
+                Delete
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<!-- Empty state -->
+<div class="bg-surface-container-low rounded-xl p-12 text-center border border-outline-variant/10">
+  <span class="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-4 block" aria-hidden="true">group</span>
+  <p class="text-on-surface-variant text-sm">No users yet. Create the first user to get started.</p>
+</div>
+{% endif %}
+
+{% endif %}
+
+</div>
+{% endblock %}

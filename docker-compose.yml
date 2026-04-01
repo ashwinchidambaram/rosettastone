@@ -1,0 +1,58 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      ROSETTASTONE_API_KEY: "${ROSETTASTONE_API_KEY:-}"
+      DATABASE_URL: "${DATABASE_URL:-}"
+      REDIS_URL: "${REDIS_URL:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+    volumes:
+      - rosettastone-data:/home/rosettastone/.rosettastone
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+        required: false
+
+  postgres:
+    profiles:
+      - postgres
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: rosettastone
+      POSTGRES_USER: rosettastone
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-rosettastone}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "rosettastone"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    profiles:
+      - redis
+    image: redis:7-alpine
+    volumes:
+      - redisdata:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  rosettastone-data:
+  pgdata:
+  redisdata:

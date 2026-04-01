@@ -68,9 +68,7 @@ def _reconstruct_migration_result(record: MigrationRecord, session: Session):
         )
 
     baseline_results = [_build_eval_result(tc) for tc in test_cases if tc.phase == "baseline"]
-    validation_results = [
-        _build_eval_result(tc) for tc in test_cases if tc.phase == "validation"
-    ]
+    validation_results = [_build_eval_result(tc) for tc in test_cases if tc.phase == "validation"]
 
     result_dict = {
         "config": config,
@@ -224,9 +222,7 @@ async def get_pdf_report(
         content=content,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="migration_{migration_id}_report.pdf"'
-            )
+            "Content-Disposition": (f'attachment; filename="migration_{migration_id}_report.pdf"')
         },
     )
 
@@ -256,8 +252,6 @@ async def get_executive_report(
         content=narrative,
         media_type="text/markdown",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="migration_{migration_id}_executive.md"'
-            )
+            "Content-Disposition": (f'attachment; filename="migration_{migration_id}_executive.md"')
         },
     )

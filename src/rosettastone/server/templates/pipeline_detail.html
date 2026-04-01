@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}RosettaStone | {{ pipeline.name }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen pb-20 px-8 max-w-6xl mx-auto pt-16">
+
+<!-- Back link -->
+<a class="flex items-center gap-2 text-[#D4745E] font-medium mb-6 hover:opacity-80 transition-opacity w-fit" href="/ui/pipelines">
+    <span class="material-symbols-outlined text-sm" aria-hidden="true">arrow_back</span>
+    Pipeline Migrations
+</a>
+
+<!-- Page Header -->
+<header class="flex items-center gap-4 mb-10">
+    <span class="material-symbols-outlined text-3xl text-on-surface-variant" aria-hidden="true">account_tree</span>
+    <div>
+        <h1 class="font-headline font-semibold text-[28px] text-[#E8DCC4] tracking-tight">{{ pipeline.name }}</h1>
+        <p class="text-on-surface-variant text-sm mt-0.5 opacity-70">Pipeline ID #{{ pipeline.id }}</p>
+    </div>
+    <span class="ml-2 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider
+        {% if pipeline.status == 'complete' %}bg-[#8B9D83] text-[#131313]
+        {% elif pipeline.status == 'failed' %}bg-[#D85650] text-white
+        {% elif pipeline.status == 'running' %}bg-[#D4A373] text-[#131313]
+        {% else %}bg-[#55433e] text-[#dbc1bb]{% endif %}">
+        {{ pipeline.status }}
+    </span>
+</header>
+
+<!-- Info Grid -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+    <div class="p-4 bg-surface-container rounded-xl border border-outline-variant/10">
+        <div class="text-xs font-['JetBrains_Mono'] uppercase tracking-widest text-on-surface-variant/60 mb-2">Source Model</div>
+        <div class="font-mono text-sm text-on-surface break-all">{{ pipeline.source_model }}</div>
+    </div>
+    <div class="p-4 bg-surface-container rounded-xl border border-outline-variant/10">
+        <div class="text-xs font-['JetBrains_Mono'] uppercase tracking-widest text-on-surface-variant/60 mb-2">Target Model</div>
+        <div class="font-mono text-sm text-[#D4745E] break-all">{{ pipeline.target_model }}</div>
+    </div>
+    <div class="p-4 bg-surface-container rounded-xl border border-outline-variant/10">
+        <div class="text-xs font-['JetBrains_Mono'] uppercase tracking-widest text-on-surface-variant/60 mb-2">Status</div>
+        <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full
+                {% if pipeline.status == 'complete' %}bg-[#8B9D83]
+                {% elif pipeline.status == 'failed' %}bg-[#D85650]
+                {% elif pipeline.status == 'running' %}bg-[#D4A373] animate-pulse
+                {% else %}bg-[#55433e]{% endif %}"></span>
+            <span class="text-sm font-medium text-on-surface capitalize">{{ pipeline.status }}</span>
+        </div>
+    </div>
+    <div class="p-4 bg-surface-container rounded-xl border border-outline-variant/10">
+        <div class="text-xs font-['JetBrains_Mono'] uppercase tracking-widest text-on-surface-variant/60 mb-2">Created</div>
+        <div class="text-sm text-on-surface">{{ pipeline.created_at.strftime('%Y-%m-%d') }}</div>
+        <div class="text-xs text-on-surface-variant/60 mt-0.5">{{ pipeline.created_at.strftime('%H:%M UTC') }}</div>
+    </div>
+</div>
+
+<!-- Pipeline Modules Section -->
+<section>
+    <div class="flex items-center gap-3 mb-4">
+        <h2 class="font-headline font-semibold text-[18px] text-[#E8DCC4]">Pipeline Modules</h2>
+        {% if pipeline.status == 'running' %}
+        <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#D4A373]/10 text-[#D4A373] text-xs font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#D4A373] animate-pulse"></span>
+            Live
+        </span>
+        {% endif %}
+    </div>
+
+    <!-- HTMX polling target (only active when pipeline is running) -->
+    {% if pipeline.status == 'running' %}
+    <div id="pipeline-stages"
+         hx-get="/ui/pipelines/{{ pipeline.id }}/stages-fragment"
+         hx-trigger="every 5s"
+         hx-swap="innerHTML">
+        {% include "fragments/pipeline_stages.html" %}
+    </div>
+    {% else %}
+    <div id="pipeline-stages">
+        {% include "fragments/pipeline_stages.html" %}
+    </div>
+    {% endif %}
+</section>
+
+</div>
+{% endblock %}

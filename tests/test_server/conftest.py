@@ -77,6 +77,58 @@ def sample_migration(session: Session) -> MigrationRecord:
 
 
 @pytest.fixture
+def sample_migration_with_cluster(session: Session) -> MigrationRecord:
+    """Insert a sample migration record with cluster_summary in config."""
+    migration = MigrationRecord(
+        source_model="openai/gpt-4o",
+        target_model="anthropic/claude-sonnet-4",
+        status="complete",
+        confidence_score=0.92,
+        baseline_score=0.85,
+        improvement=0.07,
+        cost_usd=1.23,
+        duration_seconds=45.6,
+        recommendation="GO",
+        recommendation_reasoning="All types pass thresholds.",
+        config_json=json.dumps(
+            {
+                "source_model": "openai/gpt-4o",
+                "target_model": "anthropic/claude-sonnet-4",
+                "cluster_prompts": True,
+                "cluster_summary": {
+                    "n_clusters": 5,
+                    "silhouette_score": 0.72,
+                    "original_pairs": 100,
+                    "representative_pairs": 25,
+                },
+            }
+        ),
+        per_type_scores_json=json.dumps(
+            {
+                "json": {
+                    "win_rate": 0.95,
+                    "mean": 0.93,
+                    "median": 0.94,
+                    "p10": 0.88,
+                    "p50": 0.94,
+                    "p90": 0.98,
+                    "min_score": 0.85,
+                    "max_score": 1.0,
+                    "sample_count": 20,
+                    "confidence_interval": [0.88, 0.99],
+                },
+            }
+        ),
+        warnings_json=json.dumps(["Low sample count for classification"]),
+        safety_warnings_json=json.dumps([]),
+    )
+    session.add(migration)
+    session.commit()
+    session.refresh(migration)
+    return migration
+
+
+@pytest.fixture
 def sample_test_cases(session: Session, sample_migration: MigrationRecord) -> list[TestCaseRecord]:
     """Insert sample test case records."""
     cases = []

@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
 sqlmodel = pytest.importorskip("sqlmodel")
 
 from fastapi.testclient import TestClient  # noqa: E402
-from sqlmodel import Session  # noqa: E402
+from sqlmodel import Session, select  # noqa: E402
 
 from rosettastone.server.app import create_app  # noqa: E402
 from rosettastone.server.models import MigrationRecord  # noqa: E402
@@ -109,6 +111,31 @@ class TestGetMigration:
         data = response.json()
         assert len(data["test_cases"]) == 5
 
+    def test_get_detail_includes_cluster_summary(
+        self, client, engine, sample_migration_with_cluster
+    ):
+        """Test that cluster_summary is exposed in migration detail response."""
+        response = client.get(f"/api/v1/migrations/{sample_migration_with_cluster.id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert "cluster_summary" in data
+        cluster_summary = data["cluster_summary"]
+        assert cluster_summary is not None
+        assert cluster_summary["n_clusters"] == 5
+        assert cluster_summary["silhouette_score"] == 0.72
+        assert cluster_summary["original_pairs"] == 100
+        assert cluster_summary["representative_pairs"] == 25
+
+    def test_get_detail_cluster_summary_null_when_not_clustered(
+        self, client, engine, sample_migration
+    ):
+        """Test that cluster_summary is null when clustering was not enabled."""
+        response = client.get(f"/api/v1/migrations/{sample_migration.id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert "cluster_summary" in data
+        assert data["cluster_summary"] is None
+
     def test_404_for_missing(self, client):
         response = client.get("/api/v1/migrations/999")
         assert response.status_code == 404
@@ -129,6 +156,36 @@ class TestCreateMigration:
         assert data["target_model"] == "anthropic/claude-sonnet-4"
         assert data["status"] == "pending"
         assert data["id"] is not None
+
+    def test_create_migration_with_cluster_prompts_and_objectives(self, client, engine):
+        """Test that cluster_prompts and improvement_objectives are captured in config."""
+        payload = {
+            "source_model": "openai/gpt-4o",
+            "target_model": "anthropic/claude-sonnet-4",
+            "data_path": "/tmp/data.jsonl",
+            "cluster_prompts": True,
+            "improvement_objectives": [
+                {"name": "latency", "weight": 0.5},
+                {"name": "accuracy", "weight": 0.5},
+            ],
+        }
+        response = client.post("/api/v1/migrations", json=payload)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["id"] is not None
+
+        # Verify the record was created with the config fields
+        migration_id = data["id"]
+        with Session(engine) as session:
+            stmt = select(MigrationRecord).where(MigrationRecord.id == migration_id)
+            migration = session.exec(stmt).first()
+            assert migration is not None
+            config = json.loads(migration.config_json)
+            assert config["cluster_prompts"] is True
+            assert config["improvement_objectives"] == [
+                {"name": "latency", "weight": 0.5},
+                {"name": "accuracy", "weight": 0.5},
+            ]
 
     def test_create_missing_fields(self, client):
         payload = {"source_model": "openai/gpt-4o"}
@@ -289,6 +346,28 @@ class TestUIEndpoints:
         assert "0.72" in body
         assert "BERTScore" in body
 
+    def test_case_fragment_dummy_fallback(self, ui_client: TestClient) -> None:
+        """Returns 200 with dummy fallback when TC is not in the DB."""
+        resp = ui_client.get("/ui/fragments/test-case/1/9999")
+        assert resp.status_code == 200
+        body = resp.text
+        # Falls back to DUMMY_TEST_CASES[42] — composite score and output type present
+        assert "0.31" in body
+        assert "Classification" in body
+
+    def test_case_fragment_html_elements(self, ui_client: TestClient) -> None:
+        """Response contains expected score bars and metadata sections."""
+        resp = ui_client.get("/ui/fragments/test-case/1/42")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "BERTScore" in body
+        assert "Embedding similarity" in body
+        assert "Composite" in body
+        assert "Test Case Metadata" in body
+        # Dummy tc_id 42 has composite_score 0.31 and output_type Classification
+        assert "0.31" in body
+        assert "Classification" in body
+
     def test_nav_links_present(self, client: TestClient) -> None:
         # Nav links are in base.html, present on both empty state and models page.
         resp = client.get("/ui/")
@@ -331,7 +410,7 @@ class TestUIWithData:
     """UI endpoint tests verifying templates render with real DB data."""
 
     def test_migrations_list_shows_real_data(
-        self, client: TestClient, sample_migration: "MigrationRecord"
+        self, client: TestClient, sample_migration: MigrationRecord
     ) -> None:
         """When DB has migrations, the list page should show real data."""
         resp = client.get("/ui/migrations")
@@ -353,7 +432,7 @@ class TestUIWithData:
         assert "Migrations" in body
 
     def test_migration_detail_shows_real_data(
-        self, client: TestClient, sample_migration: "MigrationRecord"
+        self, client: TestClient, sample_migration: MigrationRecord
     ) -> None:
         """Migration detail page should render real data from DB."""
         resp = client.get(f"/ui/migrations/{sample_migration.id}")
@@ -365,7 +444,7 @@ class TestUIWithData:
         assert "92" in body
 
     def test_recommendation_label_mapping(
-        self, client: TestClient, sample_migration: "MigrationRecord"
+        self, client: TestClient, sample_migration: MigrationRecord
     ) -> None:
         """DB 'GO' recommendation maps to 'Safe to ship' in the template."""
         resp = client.get(f"/ui/migrations/{sample_migration.id}")
@@ -377,7 +456,7 @@ class TestUIWithData:
         assert "Recommendation: Safe to switch" in body or "Safe to ship" in body
 
     def test_executive_report_with_real_data(
-        self, client: TestClient, sample_migration: "MigrationRecord"
+        self, client: TestClient, sample_migration: MigrationRecord
     ) -> None:
         """Executive report page should render with real migration data."""
         resp = client.get(f"/ui/migrations/{sample_migration.id}/executive")
@@ -392,3 +471,273 @@ class TestUIWithData:
         """Should return 404 when migration is not in DB or dummy data."""
         resp = client.get("/ui/migrations/9999")
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# P2.1: Filterable test case grid (HTMX fragment endpoint)
+# ---------------------------------------------------------------------------
+
+
+class TestTestCasesTableFragment:
+    """Tests for GET /ui/migrations/{id}/test-cases-table HTMX fragment."""
+
+    def test_test_cases_table_loads(
+        self, client: TestClient, engine, sample_migration: MigrationRecord, sample_test_cases
+    ) -> None:
+        """Fragment endpoint returns 200 with table HTML containing test case rows."""
+        resp = client.get(f"/ui/migrations/{sample_migration.id}/test-cases-table")
+        assert resp.status_code == 200
+        body = resp.text
+        # Table structure present
+        assert "<table" in body
+        assert "<tbody" in body
+        # Filter form present
+        assert "tc-filter-form" in body
+        # At least one row for the 5 sample test cases
+        assert "WIN" in body
+
+    def test_test_cases_table_filter_win(
+        self, client: TestClient, engine, session, sample_migration: MigrationRecord
+    ) -> None:
+        """?outcome=win returns only WIN rows; no LOSS badges visible."""
+        import json as _json
+
+        from rosettastone.server.models import TestCaseRecord
+
+        # Insert mixed win/loss test cases
+        win_tc = TestCaseRecord(
+            migration_id=sample_migration.id,
+            phase="validation",
+            output_type="json",
+            composite_score=0.9,
+            is_win=True,
+            scores_json=_json.dumps({"bertscore": 0.9}),
+            details_json=_json.dumps({}),
+            prompt_text="win prompt",
+        )
+        loss_tc = TestCaseRecord(
+            migration_id=sample_migration.id,
+            phase="validation",
+            output_type="json",
+            composite_score=0.3,
+            is_win=False,
+            scores_json=_json.dumps({"bertscore": 0.3}),
+            details_json=_json.dumps({}),
+            prompt_text="loss prompt",
+        )
+        session.add(win_tc)
+        session.add(loss_tc)
+        session.commit()
+
+        resp = client.get(f"/ui/migrations/{sample_migration.id}/test-cases-table?outcome=win")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "WIN" in body
+        assert "LOSS" not in body
+
+    def test_test_cases_table_filter_loss(
+        self, client: TestClient, engine, session, sample_migration: MigrationRecord
+    ) -> None:
+        """?outcome=loss returns only LOSS rows; no WIN badges visible."""
+        import json as _json
+
+        from rosettastone.server.models import TestCaseRecord
+
+        # Clear any existing test cases for this migration and insert fresh ones
+        win_tc = TestCaseRecord(
+            migration_id=sample_migration.id,
+            phase="validation",
+            output_type="json",
+            composite_score=0.9,
+            is_win=True,
+            scores_json=_json.dumps({"bertscore": 0.9}),
+            details_json=_json.dumps({}),
+            prompt_text="win only",
+        )
+        loss_tc = TestCaseRecord(
+            migration_id=sample_migration.id,
+            phase="validation",
+            output_type="json",
+            composite_score=0.2,
+            is_win=False,
+            scores_json=_json.dumps({"bertscore": 0.2}),
+            details_json=_json.dumps({}),
+            prompt_text="loss only",
+        )
+        session.add(win_tc)
+        session.add(loss_tc)
+        session.commit()
+
+        resp = client.get(f"/ui/migrations/{sample_migration.id}/test-cases-table?outcome=loss")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "LOSS" in body
+        assert "WIN" not in body
+
+    def test_test_cases_table_pagination(
+        self, client: TestClient, engine, sample_migration: MigrationRecord, sample_test_cases
+    ) -> None:
+        """page_size=1 returns exactly 1 row; page=2 returns the next row."""
+        resp_p1 = client.get(
+            f"/ui/migrations/{sample_migration.id}/test-cases-table?page_size=1&page=1"
+        )
+        assert resp_p1.status_code == 200
+        body_p1 = resp_p1.text
+        # Only one data row — pagination controls present
+        assert "Next" in body_p1
+        # Page indicator
+        assert "Page 1 of" in body_p1
+
+        resp_p2 = client.get(
+            f"/ui/migrations/{sample_migration.id}/test-cases-table?page_size=1&page=2"
+        )
+        assert resp_p2.status_code == 200
+        body_p2 = resp_p2.text
+        assert "Page 2 of" in body_p2
+        assert "Prev" in body_p2
+
+    def test_test_cases_table_empty(
+        self, client: TestClient, engine, sample_migration: MigrationRecord
+    ) -> None:
+        """Migration with no test cases returns the empty-state message."""
+        # sample_migration has no test cases (sample_test_cases fixture not requested)
+        resp = client.get(f"/ui/migrations/{sample_migration.id}/test-cases-table")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "No test cases match your filters." in body
+
+
+# ---------------------------------------------------------------------------
+# P2.2: Inline persona toggle — executive summary fragment
+# ---------------------------------------------------------------------------
+
+
+class TestExecutiveSummaryFragment:
+    """Tests for GET /ui/migrations/{id}/executive-summary HTMX fragment."""
+
+    def test_executive_summary_fragment_returns_200(self, ui_client: TestClient) -> None:
+        """Fragment endpoint returns 200 for a known dummy migration."""
+        resp = ui_client.get("/ui/migrations/1/executive-summary")
+        assert resp.status_code == 200
+
+    def test_executive_summary_contains_confidence(self, ui_client: TestClient) -> None:
+        """Response body includes the confidence score for the migration."""
+        resp = ui_client.get("/ui/migrations/1/executive-summary")
+        assert resp.status_code == 200
+        body = resp.text
+        # Dummy migration 1 has confidence 92
+        assert "92" in body
+        assert "Confidence Score" in body
+
+    def test_executive_summary_narrative_truncated(
+        self, client: TestClient, engine, session
+    ) -> None:
+        """Reasoning longer than 500 chars is capped with an ellipsis."""
+        long_reasoning = "A" * 600
+        record = MigrationRecord(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+            confidence_score=0.88,
+            recommendation="GO",
+            recommendation_reasoning=long_reasoning,
+        )
+        session.add(record)
+        session.commit()
+        session.refresh(record)
+
+        resp = client.get(f"/ui/migrations/{record.id}/executive-summary")
+        assert resp.status_code == 200
+        body = resp.text
+        # The narrative should be truncated and end with ellipsis
+        assert "\u2026" in body
+        # The full 600-char string should not appear verbatim
+        assert "A" * 600 not in body
+
+
+# ---------------------------------------------------------------------------
+# P2.3: Score charts — win-rate donut and score histogram
+# ---------------------------------------------------------------------------
+
+
+class TestScoreCharts:
+    """Tests for chart data injected by _migration_to_template_dict (P2.3)."""
+
+    def test_migration_detail_has_wins_and_losses(
+        self,
+        client: TestClient,
+        engine,
+        session,
+        sample_migration: MigrationRecord,
+    ) -> None:
+        """Migration detail page includes chart canvas elements when per_type data exists."""
+        import json as _json
+
+        from rosettastone.server.models import TestCaseRecord
+
+        # Insert 3 wins and 2 losses
+        for i in range(3):
+            tc = TestCaseRecord(
+                migration_id=sample_migration.id,
+                phase="validation",
+                output_type="json",
+                composite_score=0.85 + i * 0.05,
+                is_win=True,
+                scores_json=_json.dumps({"bertscore": 0.9}),
+                details_json=_json.dumps({}),
+            )
+            session.add(tc)
+        for i in range(2):
+            tc = TestCaseRecord(
+                migration_id=sample_migration.id,
+                phase="validation",
+                output_type="json",
+                composite_score=0.30 + i * 0.05,
+                is_win=False,
+                scores_json=_json.dumps({"bertscore": 0.3}),
+                details_json=_json.dumps({}),
+            )
+            session.add(tc)
+        session.commit()
+
+        resp = client.get(f"/ui/migrations/{sample_migration.id}")
+        assert resp.status_code == 200
+        body = resp.text
+        # Chart canvas elements should be present (per_type is populated in sample_migration)
+        assert "winRateChart" in body
+        assert "scoreHistChart" in body
+
+    def test_score_histogram_always_10_bins(
+        self,
+        client: TestClient,
+        engine,
+        session,
+        sample_migration: MigrationRecord,
+    ) -> None:
+        """score_histogram in the rendered page has exactly 10 bins summing to total test cases."""
+        import json as _json
+
+        from rosettastone.server.api.migrations import _migration_to_template_dict
+        from rosettastone.server.models import TestCaseRecord
+
+        # Insert test cases with scores spread across bins
+        scores = [0.05, 0.15, 0.25, 0.55, 0.75, 0.95]
+        for score in scores:
+            tc = TestCaseRecord(
+                migration_id=sample_migration.id,
+                phase="validation",
+                output_type="json",
+                composite_score=score,
+                is_win=score >= 0.5,
+                scores_json=_json.dumps({"bertscore": score}),
+                details_json=_json.dumps({}),
+            )
+            session.add(tc)
+        session.commit()
+
+        result = _migration_to_template_dict(sample_migration, session)
+
+        histogram = result["score_histogram"]
+        assert isinstance(histogram, list)
+        assert len(histogram) == 10
+        assert sum(histogram) == len(scores)

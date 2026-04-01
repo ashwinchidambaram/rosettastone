@@ -43,21 +43,127 @@ def run_preflight(config: MigrationConfig) -> PreflightReport:
     return run_all_checks(config)
 
 
-def load_and_split_data(
-    config: MigrationConfig,
-) -> tuple[list[PromptPair], list[PromptPair], list[PromptPair]]:
-    if config.redis_url:
+def _build_adapter(config: MigrationConfig) -> Any:
+    """Build the appropriate data adapter based on config.adapter."""
+    from rosettastone.config import AdapterChoice
+
+    adapter_type = config.adapter
+
+    # Legacy compat: if redis_url is set and adapter is still default, use Redis
+    if config.redis_url and adapter_type == AdapterChoice.JSONL:
+        adapter_type = AdapterChoice.REDIS
+
+    if adapter_type == AdapterChoice.REDIS:
         from rosettastone.ingest.redis_adapter import RedisAdapter
 
-        adapter = RedisAdapter(config.redis_url, config.source_model)
-    else:
-        from rosettastone.ingest.jsonl import JSONLAdapter
+        if not config.redis_url:
+            raise ValueError("redis_url is required for the Redis adapter")
+        return RedisAdapter(config.redis_url, config.source_model)
 
-        adapter = JSONLAdapter(config.data_path)
+    if adapter_type == AdapterChoice.CSV:
+        from rosettastone.ingest.csv_adapter import CSVAdapter
+
+        if not config.data_path:
+            raise ValueError("data_path is required for the CSV adapter")
+        kwargs: dict[str, Any] = {}
+        if config.csv_delimiter:
+            kwargs["delimiter"] = config.csv_delimiter
+        if config.csv_prompt_column or config.csv_response_column:
+            from rosettastone.ingest.csv_adapter import CSVColumnMapping
+
+            kwargs["column_mapping"] = CSVColumnMapping(
+                prompt_col=config.csv_prompt_column or "prompt",
+                response_col=config.csv_response_column or "response",
+            )
+        return CSVAdapter(config.data_path, **kwargs)
+
+    if adapter_type == AdapterChoice.BRAINTRUST:
+        from rosettastone.ingest.braintrust_adapter import BraintrustAdapter
+
+        if not config.braintrust_project:
+            raise ValueError("braintrust_project is required for the Braintrust adapter")
+        return BraintrustAdapter(
+            project_name=config.braintrust_project,
+            source_model=config.source_model,
+        )
+
+    if adapter_type == AdapterChoice.LANGSMITH:
+        from rosettastone.ingest.langsmith_adapter import LangSmithAdapter
+
+        if not config.langsmith_project:
+            raise ValueError("langsmith_project is required for the LangSmith adapter")
+        kwargs_ls: dict[str, Any] = {"project_name": config.langsmith_project}
+        if config.langsmith_start_date:
+            kwargs_ls["start_date"] = config.langsmith_start_date
+        if config.langsmith_end_date:
+            kwargs_ls["end_date"] = config.langsmith_end_date
+        return LangSmithAdapter(**kwargs_ls)
+
+    if adapter_type == AdapterChoice.OTEL:
+        from rosettastone.ingest.otel_adapter import OTelAdapter
+
+        otel_path = config.otel_path or config.data_path
+        if not otel_path:
+            raise ValueError("otel_path or data_path is required for the OTel adapter")
+        return OTelAdapter(export_path=otel_path, source_model=config.source_model)
+
+    # Default: JSONL
+    from rosettastone.ingest.jsonl import JSONLAdapter
+
+    if not config.data_path:
+        raise ValueError("data_path is required for the JSONL adapter")
+    return JSONLAdapter(config.data_path)
+
+
+def load_and_split_data(
+    config: MigrationConfig,
+    ctx: PipelineContext | None = None,
+) -> tuple[list[PromptPair], list[PromptPair], list[PromptPair]]:
+    adapter = _build_adapter(config)
 
     from rosettastone.ingest.splitter import split_data
 
     pairs = adapter.load()
+    original_count = len(pairs)
+
+    # Optional: cluster prompts for analysis/dedup before splitting
+    if config.cluster_prompts and pairs:
+        try:
+            from rosettastone.cluster.embedder import PromptClusterer
+
+            clusterer = PromptClusterer()
+            cluster_result = clusterer.cluster(pairs)
+            # Use the largest cluster's pairs as a deduped representative set
+            if cluster_result.clusters:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.info(
+                    "Clustered %d pairs into %d groups (silhouette=%.2f)",
+                    len(pairs),
+                    len(cluster_result.clusters),
+                    cluster_result.silhouette_score or 0.0,
+                )
+                # Replace pairs with one representative per cluster + noise pairs
+                representative_pairs = [c.pairs[0] for c in cluster_result.clusters if c.pairs]
+                pairs = representative_pairs + cluster_result.noise_pairs
+
+                # Capture cluster summary in context
+                if ctx:
+                    ctx.cluster_summary = {
+                        "n_clusters": len(cluster_result.clusters),
+                        "silhouette_score": cluster_result.silhouette_score,
+                        "original_pairs": original_count,
+                        "representative_pairs": len(pairs),
+                    }
+        except ImportError:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Clustering requested but dependencies not installed. "
+                "Install with: uv pip install 'rosettastone[clustering]'"
+            )
+
     return split_data(pairs, config.train_split, config.val_split)
 
 
@@ -94,10 +200,17 @@ def run_pii_scan(pairs: list[PromptPair], ctx: PipelineContext, config: Migratio
     if not config.pii_scan:
         return
 
+    from rosettastone.config import PIIEngine
     from rosettastone.core.context import SafetySeverity, SafetyWarning
-    from rosettastone.safety.pii_scanner import scan_pairs
 
-    pii_warnings = scan_pairs(pairs)
+    if config.pii_engine == PIIEngine.PRESIDIO:
+        from rosettastone.safety.presidio_engine import scan_pairs_presidio
+
+        pii_warnings = scan_pairs_presidio(pairs)
+    else:
+        from rosettastone.safety.pii_scanner import scan_pairs
+
+        pii_warnings = scan_pairs(pairs)
     for pw in pii_warnings:
         ctx.safety_warnings.append(
             SafetyWarning(
@@ -137,12 +250,22 @@ def run_prompt_audit(
         )
 
 
-def run_pii_scan_text(text: str, ctx: PipelineContext) -> None:
+def run_pii_scan_text(
+    text: str, ctx: PipelineContext, config: MigrationConfig | None = None
+) -> None:
     """Scan optimized prompt text for HIGH-severity PII (blocker)."""
+    from rosettastone.config import PIIEngine
     from rosettastone.core.context import SafetySeverity, SafetyWarning
-    from rosettastone.safety.pii_scanner import scan_text
 
-    findings = scan_text(text)
+    use_presidio = config and config.pii_engine == PIIEngine.PRESIDIO
+    if use_presidio:
+        from rosettastone.safety.presidio_engine import scan_text_presidio
+
+        findings = scan_text_presidio(text)
+    else:
+        from rosettastone.safety.pii_scanner import scan_text
+
+        findings = scan_text(text)
     for pii_type, severity in findings:
         if severity == "HIGH":
             ctx.safety_warnings.append(
@@ -225,8 +348,13 @@ def build_result(
 
     total_cost = sum(ctx.costs.values()) if ctx else 0.0
 
+    # Build config dict and add cluster_summary if available
+    config_dict = config.model_dump(mode="json")
+    if ctx and ctx.cluster_summary:
+        config_dict["cluster_summary"] = ctx.cluster_summary
+
     return MigrationResult(
-        config=config.model_dump(mode="json"),
+        config=config_dict,
         optimized_prompt=optimized_prompt,
         baseline_results=baseline,
         validation_results=validation,

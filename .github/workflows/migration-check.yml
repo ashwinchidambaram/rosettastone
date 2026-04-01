@@ -1,0 +1,60 @@
+name: Migration Check
+
+# This workflow template auto-runs model migration checks on pull requests.
+# Customize the source_model, target_model, and data_path inputs to match your use case.
+# For manual runs, use the "Run workflow" button on the Actions tab and provide input values.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migration-check-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.jsonl'
+      - 'prompts/**'
+  workflow_dispatch:
+    inputs:
+      source_model:
+        description: 'Source model identifier'
+        required: true
+        default: 'openai/gpt-4o'
+      target_model:
+        description: 'Target model identifier'
+        required: true
+        default: 'anthropic/claude-sonnet-4'
+      data_path:
+        description: 'Path to JSONL data file'
+        required: true
+        default: 'examples/sample_data.jsonl'
+
+jobs:
+  migration-check:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - name: Check for API credentials
+        id: check-creds
+        run: |
+          if [ -z "$OPENAI_API_KEY" ] || [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::Skipping migration check — API keys not available"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check-creds.outputs.skip != 'true'
+
+      - name: Run migration check
+        if: steps.check-creds.outputs.skip != 'true'
+        uses: ./.github/actions/rosettastone-migrate
+        with:
+          source_model: ${{ inputs.source_model || 'openai/gpt-4o' }}
+          target_model: ${{ inputs.target_model || 'anthropic/claude-sonnet-4' }}
+          data_path: ${{ inputs.data_path || 'examples/sample_data.jsonl' }}
+          fail_on_nogo: 'true'

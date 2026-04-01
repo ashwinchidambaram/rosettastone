@@ -8,7 +8,12 @@ from typing import TYPE_CHECKING
 
 from rosettastone.core.types import PromptPair
 from rosettastone.ingest.base import DataAdapter
-from rosettastone.ingest.redis_formats import parse_litellm_entry
+from rosettastone.ingest.redis_formats import (
+    parse_gptcache_entry,
+    parse_langchain_entry,
+    parse_litellm_entry,
+    parse_redisvl_entry,
+)
 
 if TYPE_CHECKING:
     pass
@@ -22,6 +27,9 @@ _SAMPLE_SIZE = 100
 # Each parser has signature: (key: bytes, value: bytes, source_model: str) -> PromptPair | None
 _PARSERS: list[tuple[str, object]] = [
     ("litellm", parse_litellm_entry),
+    ("langchain", parse_langchain_entry),
+    ("redisvl", parse_redisvl_entry),
+    ("gptcache", parse_gptcache_entry),
 ]
 
 

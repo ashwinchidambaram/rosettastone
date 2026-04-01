@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}RosettaStone | A/B Test #{{ ab_test.id }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <a class="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-medium mb-4 hover:opacity-80" href="/ui/ab-tests">
+    <span class="material-symbols-outlined text-sm" aria-hidden="true">arrow_back</span>
+    A/B Tests
+  </a>
+
+  <div class="flex items-center gap-4 mb-8">
+    <h2 class="text-2xl font-bold">{{ ab_test.name or 'A/B Test' }} #{{ ab_test.id }}</h2>
+    <span class="px-2 py-0.5 rounded text-xs font-medium
+      {% if ab_test.status == 'concluded' %}bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400
+      {% elif ab_test.status == 'running' %}bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400
+      {% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300{% endif %}">
+      {{ ab_test.status }}
+    </span>
+  </div>
+
+  <!-- Config -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+      <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Migration</div>
+      <div class="font-medium">#{{ ab_test.migration_id }}</div>
+    </div>
+    <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+      <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Traffic Split</div>
+      <div class="font-medium">{{ '%.0f' | format(ab_test.traffic_split * 100) }}% / {{ '%.0f' | format((1 - ab_test.traffic_split) * 100) }}%</div>
+    </div>
+    <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+      <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Version A</div>
+      <div class="font-medium">#{{ ab_test.version_a_id }}</div>
+    </div>
+    <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+      <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Version B</div>
+      <div class="font-medium">#{{ ab_test.version_b_id }}</div>
+    </div>
+  </div>
+
+  <!-- Metrics (HTMX polled while running) -->
+  <div id="ab-metrics"
+       hx-get="/ui/ab-tests/{{ ab_test.id }}/metrics-fragment"
+       hx-trigger="load{% if ab_test.status == 'running' %}, every 5s{% endif %}"
+       hx-swap="innerHTML">
+    <p class="text-sm text-gray-500">Loading metrics...</p>
+  </div>
+
+  {% if ab_test.winner %}
+  <div class="mt-6 p-4 rounded-lg border-2
+    {% if ab_test.winner == 'inconclusive' %}border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-800
+    {% else %}border-green-300 bg-green-50 dark:border-green-600 dark:bg-green-900/20{% endif %}">
+    <div class="text-lg font-bold">
+      {% if ab_test.winner == 'inconclusive' %}
+        Result: Inconclusive
+      {% else %}
+        Winner: Version {{ ab_test.winner|upper }}
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

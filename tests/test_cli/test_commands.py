@@ -298,3 +298,57 @@ def test_from_alias_works():
         assert result.exit_code == 0, result.output
         config = mock_cls.call_args[0][0]
         assert config.source_model == "openai/gpt-4o"
+
+
+# ---------------------------------------------------------------------------
+# serve command
+# ---------------------------------------------------------------------------
+
+
+def test_serve_command_registered():
+    """serve command is registered on the Typer app."""
+    result = runner.invoke(app, ["serve", "--help"])
+    assert result.exit_code == 0
+    assert "Start the RosettaStone FastAPI server" in result.output
+
+
+def test_serve_default_options():
+    """serve uses default host 0.0.0.0 and port 8000."""
+    with patch("uvicorn.run") as mock_uvicorn:
+        result = runner.invoke(app, ["serve"])
+        assert result.exit_code == 0
+        assert "http://0.0.0.0:8000" in result.output
+        mock_uvicorn.assert_called_once()
+        call_kwargs = mock_uvicorn.call_args[1]
+        assert call_kwargs["host"] == "0.0.0.0"
+        assert call_kwargs["port"] == 8000
+        assert call_kwargs["reload"] is False
+        assert call_kwargs["factory"] is True
+
+
+def test_serve_custom_host_port():
+    """serve accepts --host and --port options."""
+    with patch("uvicorn.run") as mock_uvicorn:
+        result = runner.invoke(app, ["serve", "--host", "127.0.0.1", "--port", "9000"])
+        assert result.exit_code == 0
+        call_kwargs = mock_uvicorn.call_args[1]
+        assert call_kwargs["host"] == "127.0.0.1"
+        assert call_kwargs["port"] == 9000
+
+
+def test_serve_reload_flag():
+    """serve --reload sets reload=True."""
+    with patch("uvicorn.run") as mock_uvicorn:
+        result = runner.invoke(app, ["serve", "--reload"])
+        assert result.exit_code == 0
+        call_kwargs = mock_uvicorn.call_args[1]
+        assert call_kwargs["reload"] is True
+
+
+def test_serve_app_factory_reference():
+    """serve passes correct app factory reference to uvicorn."""
+    with patch("uvicorn.run") as mock_uvicorn:
+        result = runner.invoke(app, ["serve"])
+        assert result.exit_code == 0
+        # First positional arg is the app reference
+        assert mock_uvicorn.call_args[0][0] == "rosettastone.server.app:create_app"

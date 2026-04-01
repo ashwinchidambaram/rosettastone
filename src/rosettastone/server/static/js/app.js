@@ -132,6 +132,8 @@
         setTimeout(function () {
             drawer.classList.add("hidden");
             backdrop.classList.add("hidden");
+            // Return focus to hamburger menu button after drawer closes
+            if (btn) btn.focus();
         }, 300);
         document.body.style.overflow = "";
     }

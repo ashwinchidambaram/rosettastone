@@ -59,9 +59,7 @@ def _generate_alerts(session: Session) -> int:
                 alert_type="migration_failed",
                 model_id=migration.target_model,
                 migration_id=migration.id,
-                title=(
-                    f"Migration blocked: {migration.source_model} to {migration.target_model}"
-                ),
+                title=(f"Migration blocked: {migration.source_model} to {migration.target_model}"),
                 message=(
                     f"Migration failed or blocked — "
                     f"{migration.recommendation_reasoning or 'see details'}"
@@ -76,8 +74,7 @@ def _generate_alerts(session: Session) -> int:
                 model_id=migration.target_model,
                 migration_id=migration.id,
                 title=(
-                    f"Migration needs review: "
-                    f"{migration.source_model} to {migration.target_model}"
+                    f"Migration needs review: {migration.source_model} to {migration.target_model}"
                 ),
                 message=(
                     f"Completed with {round((migration.confidence_score or 0) * 100)}% confidence,"

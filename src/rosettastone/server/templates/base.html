@@ -5,7 +5,8 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>RosettaStone | {% block title %}Dashboard{% endblock %}</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<script src="/static/js/htmx.min.js"></script>
+<script src="/static/js/chart.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -100,21 +101,26 @@
                 <a class="{% if active_nav == 'alerts' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/alerts">Alerts</a>
                 <span class="absolute -top-1 -right-2 w-1.5 h-1.5 bg-[#D85650] rounded-full"></span>
             </div>
+            <a class="{% if active_nav == 'audit' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/audit-log">Audit Log</a>
+            <a class="{% if active_nav == 'ab_tests' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/ab-tests">A/B Tests</a>
+            <a class="{% if active_nav == 'pipelines' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/pipelines">Pipelines</a>
+            <a class="{% if active_nav == 'users' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/users">Users</a>
+            <a class="{% if active_nav == 'teams' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/teams">Teams</a>
         </div>
     </div>
     <div class="flex items-center gap-4">
         <!-- Hamburger button (mobile only) -->
         <button id="mobile-menu-btn" data-action="toggle-mobile-nav" class="md:hidden p-2 text-[#BDBDBD] hover:bg-stone-800/50 rounded-lg transition-all active:scale-95" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav-drawer">
-            <span class="material-symbols-outlined">menu</span>
+            <span class="material-symbols-outlined" aria-hidden="true">menu</span>
         </button>
         <button data-action="toggle-theme" class="p-2 text-[#BDBDBD] hover:bg-stone-800/50 rounded-lg transition-all active:scale-95" aria-label="Toggle dark/light theme">
-            <span class="material-symbols-outlined">dark_mode</span>
+            <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
         </button>
         <button class="p-2 text-[#BDBDBD] hover:bg-stone-800/50 rounded-lg transition-all active:scale-95" aria-label="Settings">
-            <span class="material-symbols-outlined">settings</span>
+            <span class="material-symbols-outlined" aria-hidden="true">settings</span>
         </button>
         <div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant/30 flex items-center justify-center">
-            <span class="material-symbols-outlined text-on-surface-variant text-sm">account_circle</span>
+            <span class="material-symbols-outlined text-on-surface-variant text-sm" aria-hidden="true">account_circle</span>
         </div>
     </div>
 </nav>
@@ -125,25 +131,47 @@
     <div class="flex items-center justify-between p-6 border-b border-outline-variant/10">
         <span class="text-lg font-bold text-on-surface">Navigation</span>
         <button data-action="close-mobile-nav" class="p-2 text-on-surface-variant hover:text-on-surface rounded-lg" aria-label="Close navigation menu">
-            <span class="material-symbols-outlined">close</span>
+            <span class="material-symbols-outlined" aria-hidden="true">close</span>
         </button>
     </div>
     <nav class="p-6 flex flex-col gap-4" aria-label="Mobile navigation">
         <a href="/ui/" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'models' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
-            <span class="material-symbols-outlined text-lg">hub</span>
+            <span class="material-symbols-outlined text-lg" aria-hidden="true">hub</span>
             Models
         </a>
         <a href="/ui/migrations" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'migrations' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
-            <span class="material-symbols-outlined text-lg">swap_horiz</span>
+            <span class="material-symbols-outlined text-lg" aria-hidden="true">swap_horiz</span>
             Migrations
         </a>
         <a href="/ui/costs" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'costs' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
-            <span class="material-symbols-outlined text-lg">payments</span>
+            <span class="material-symbols-outlined text-lg" aria-hidden="true">payments</span>
             Costs
         </a>
         <a href="/ui/alerts" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'alerts' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
-            <span class="material-symbols-outlined text-lg">notifications</span>
+            <span class="material-symbols-outlined text-lg" aria-hidden="true">notifications</span>
             Alerts
+        </a>
+        <a href="/ui/audit-log" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'audit' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
+            <span class="material-symbols-outlined text-lg" aria-hidden="true">history</span>
+            Audit Log
+        </a>
+        <a href="/ui/ab-tests" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'ab_tests' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
+            <span class="material-symbols-outlined text-lg" aria-hidden="true">science</span>
+            A/B Tests
+        </a>
+        <a href="/ui/pipelines" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'pipelines' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
+            <span class="material-symbols-outlined text-lg" aria-hidden="true">account_tree</span>
+            Pipelines
+        </a>
+        <!-- Admin / multi-user collaboration pages -->
+        <div class="h-px bg-outline-variant/10 my-2"></div>
+        <a href="/ui/users" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'users' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
+            <span class="material-symbols-outlined text-lg" aria-hidden="true">group</span>
+            Users
+        </a>
+        <a href="/ui/teams" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'teams' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
+            <span class="material-symbols-outlined text-lg" aria-hidden="true">people</span>
+            Teams
         </a>
     </nav>
 </div>

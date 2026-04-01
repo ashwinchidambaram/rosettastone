@@ -19,7 +19,7 @@
         <p class="text-on-surface-variant text-sm mt-2 opacity-70">Evaluate and deploy model schema updates across your infrastructure.</p>
     </div>
     <a href="/ui/migrations/new" class="bg-[#D4745E] text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-[#D4745E]/20">
-        <span class="material-symbols-outlined text-sm">add</span>
+        <span class="material-symbols-outlined text-sm" aria-hidden="true">add</span>
         + New migration
     </a>
 </header>
@@ -45,7 +45,7 @@
             <div class="flex items-center gap-4 text-[#BDBDBD] font-label text-[13px]">
                 <div class="flex items-center gap-1.5">
                     <span class="material-symbols-outlined text-[16px]
-                        {% if migration.recommendation == 'Safe to ship' %}text-[#8B9D83]{% elif migration.recommendation == 'Do not ship' %}text-[#D85650]{% else %}text-[#D4A574]{% endif %}">
+                        {% if migration.recommendation == 'Safe to ship' %}text-[#8B9D83]{% elif migration.recommendation == 'Do not ship' %}text-[#D85650]{% else %}text-[#D4A574]{% endif %}" aria-hidden="true">
                         {% if migration.recommendation == 'Safe to ship' %}verified{% elif migration.recommendation == 'Do not ship' %}cancel{% else %}warning{% endif %}
                     </span>
                     {{ migration.confidence|default(0) }}% confidence
@@ -54,12 +54,12 @@
                 <span>{{ migration.test_cases|default(0) }} test cases</span>
                 <span class="text-white/10">&bull;</span>
                 <div class="flex items-center gap-1">
-                    <span class="material-symbols-outlined text-[16px]">payments</span>
+                    <span class="material-symbols-outlined text-[16px]" aria-hidden="true">payments</span>
                     {{ migration.cost|default('$0.00') }}
                 </div>
                 <span class="text-white/10">&bull;</span>
                 <div class="flex items-center gap-1">
-                    <span class="material-symbols-outlined text-[16px]">schedule</span>
+                    <span class="material-symbols-outlined text-[16px]" aria-hidden="true">schedule</span>
                     {{ migration.time_ago|default('') }}
                 </div>
             </div>
@@ -69,7 +69,7 @@
     {% endfor %}
     {% else %}
     <div class="flex flex-col items-center justify-center py-24 text-center text-on-surface-variant/50">
-        <span class="material-symbols-outlined text-5xl mb-4 opacity-30">swap_horiz</span>
+        <span class="material-symbols-outlined text-5xl mb-4 opacity-30" aria-hidden="true">swap_horiz</span>
         <p class="text-lg font-medium">No migrations yet</p>
         <p class="text-sm mt-2 opacity-70">Run your first migration to see results here.</p>
     </div>
@@ -81,10 +81,10 @@
     <span class="font-['JetBrains_Mono'] text-[12px] uppercase tracking-widest text-[#BDBDBD]">Showing {{ migrations|length }} migrations</span>
     <div class="flex gap-2">
         <button class="p-2 bg-surface-container-high rounded-lg text-on-surface-variant hover:text-on-surface disabled:opacity-30" disabled>
-            <span class="material-symbols-outlined">chevron_left</span>
+            <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
         </button>
         <button class="p-2 bg-surface-container-high rounded-lg text-on-surface-variant hover:text-on-surface">
-            <span class="material-symbols-outlined">chevron_right</span>
+            <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
         </button>
     </div>
 </div>

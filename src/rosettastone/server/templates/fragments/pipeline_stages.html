@@ -1,0 +1,77 @@
+{% if stages %}
+<div class="overflow-x-auto rounded-xl border border-outline-variant/10">
+    <table class="w-full text-sm">
+        <thead class="bg-surface-container-high">
+            <tr>
+                <th class="px-5 py-3 text-left font-['JetBrains_Mono'] text-[11px] uppercase tracking-widest text-on-surface-variant/60 font-medium">Module Name</th>
+                <th class="px-5 py-3 text-left font-['JetBrains_Mono'] text-[11px] uppercase tracking-widest text-on-surface-variant/60 font-medium">Status</th>
+                <th class="px-5 py-3 text-left font-['JetBrains_Mono'] text-[11px] uppercase tracking-widest text-on-surface-variant/60 font-medium">Score</th>
+                <th class="px-5 py-3 text-left font-['JetBrains_Mono'] text-[11px] uppercase tracking-widest text-on-surface-variant/60 font-medium">Duration</th>
+                <th class="px-5 py-3 text-left font-['JetBrains_Mono'] text-[11px] uppercase tracking-widest text-on-surface-variant/60 font-medium">Optimized Prompt</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant/10">
+            {% for stage in stages %}
+            <tr class="hover:bg-surface-container-high/50 transition-colors">
+                <td class="px-5 py-4">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[16px] text-on-surface-variant" aria-hidden="true">memory</span>
+                        <span class="font-medium text-on-surface font-mono text-xs">{{ stage.module_name }}</span>
+                    </div>
+                </td>
+                <td class="px-5 py-4">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider
+                        {% if stage.status == 'complete' %}bg-[#8B9D83]/15 text-[#8B9D83]
+                        {% elif stage.status == 'failed' %}bg-[#D85650]/15 text-[#D85650]
+                        {% elif stage.status == 'running' %}bg-[#D4A373]/15 text-[#D4A373]
+                        {% else %}bg-[#55433e]/30 text-[#dbc1bb]/60{% endif %}">
+                        {% if stage.status == 'running' %}
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#D4A373] animate-pulse"></span>
+                        {% endif %}
+                        {{ stage.status }}
+                    </span>
+                </td>
+                <td class="px-5 py-4">
+                    {% if stage.score is not none %}
+                    <span class="font-mono text-xs
+                        {% if stage.score >= 0.8 %}text-[#8B9D83]
+                        {% elif stage.score >= 0.5 %}text-[#D4A373]
+                        {% else %}text-[#D85650]{% endif %}">
+                        {{ '%.3f' | format(stage.score) }}
+                    </span>
+                    {% else %}
+                    <span class="text-on-surface-variant/40">—</span>
+                    {% endif %}
+                </td>
+                <td class="px-5 py-4">
+                    {% if stage.duration_seconds and stage.duration_seconds > 0 %}
+                    <span class="font-mono text-xs text-on-surface-variant">{{ '%.1f' | format(stage.duration_seconds) }}s</span>
+                    {% else %}
+                    <span class="text-on-surface-variant/40">—</span>
+                    {% endif %}
+                </td>
+                <td class="px-5 py-4 max-w-xs">
+                    {% if stage.optimized_prompt %}
+                    <span class="font-mono text-xs text-on-surface-variant/70 break-all">
+                        {% if stage.optimized_prompt|length > 80 %}
+                            {{ stage.optimized_prompt[:80] }}[...]
+                        {% else %}
+                            {{ stage.optimized_prompt }}
+                        {% endif %}
+                    </span>
+                    {% else %}
+                    <span class="text-on-surface-variant/40 text-xs">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="flex flex-col items-center justify-center py-16 text-center text-on-surface-variant/50 bg-surface-container rounded-xl border border-outline-variant/10">
+    <span class="material-symbols-outlined text-4xl mb-3 opacity-30" aria-hidden="true">hourglass_empty</span>
+    <p class="text-sm font-medium">No modules recorded yet</p>
+    <p class="text-xs mt-1 opacity-70">Stages will appear here as the pipeline runs.</p>
+</div>
+{% endif %}

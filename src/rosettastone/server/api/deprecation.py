@@ -40,7 +40,9 @@ def _load_custom_deprecations() -> dict[str, dict]:
                 overrides: dict[str, dict] = json.load(fh)
             merged.update(overrides)
             logger.debug(
-                "Loaded %d custom deprecation entries from %s", len(overrides), custom_path,
+                "Loaded %d custom deprecation entries from %s",
+                len(overrides),
+                custom_path,
             )
         except (OSError, json.JSONDecodeError) as exc:
             logger.warning("Failed to load custom deprecations from %s: %s", custom_path, exc)
