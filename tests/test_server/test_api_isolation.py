@@ -107,9 +107,7 @@ def _insert_pipeline(engine, owner_id: int | None) -> int:
 
 
 class TestMigrationIsolation:
-    def test_user_cannot_see_other_users_migration_in_list(
-        self, multi_user_client, engine
-    ) -> None:
+    def test_user_cannot_see_other_users_migration_in_list(self, multi_user_client, engine) -> None:
         """User 2 must not see migrations owned by user 1."""
         _insert_migration(engine, owner_id=1)
 
@@ -152,14 +150,10 @@ class TestMigrationIsolation:
         """Admin can retrieve any user's migration by ID."""
         mid = _insert_migration(engine, owner_id=1)
 
-        resp = multi_user_client.get(
-            f"/api/v1/migrations/{mid}", headers=_token(99, "admin")
-        )
+        resp = multi_user_client.get(f"/api/v1/migrations/{mid}", headers=_token(99, "admin"))
         assert resp.status_code == 200
 
-    def test_single_user_mode_returns_all_regardless(
-        self, single_user_client, engine
-    ) -> None:
+    def test_single_user_mode_returns_all_regardless(self, single_user_client, engine) -> None:
         """In single-user mode, all migrations are visible with no filtering."""
         _insert_migration(engine, owner_id=1)
         _insert_migration(engine, owner_id=2)
@@ -175,9 +169,7 @@ class TestMigrationIsolation:
 
 
 class TestPipelineIsolation:
-    def test_user_cannot_see_other_users_pipeline(
-        self, multi_user_client, engine
-    ) -> None:
+    def test_user_cannot_see_other_users_pipeline(self, multi_user_client, engine) -> None:
         """User 2 must not see pipelines owned by user 1."""
         _insert_pipeline(engine, owner_id=1)
 
@@ -185,15 +177,11 @@ class TestPipelineIsolation:
         assert resp.status_code == 200
         assert resp.json()["total"] == 0
 
-    def test_cross_user_pipeline_status_returns_403(
-        self, multi_user_client, engine
-    ) -> None:
+    def test_cross_user_pipeline_status_returns_403(self, multi_user_client, engine) -> None:
         """User 2 accessing user 1's pipeline status must get 403."""
         pid = _insert_pipeline(engine, owner_id=1)
 
-        resp = multi_user_client.get(
-            f"/api/v1/pipelines/{pid}/status", headers=_token(2)
-        )
+        resp = multi_user_client.get(f"/api/v1/pipelines/{pid}/status", headers=_token(2))
         assert resp.status_code == 403
 
     def test_admin_sees_all_pipelines(self, multi_user_client, engine) -> None:
@@ -205,9 +193,7 @@ class TestPipelineIsolation:
         assert resp.status_code == 200
         assert resp.json()["total"] == 2
 
-    def test_single_user_mode_returns_all_pipelines(
-        self, single_user_client, engine
-    ) -> None:
+    def test_single_user_mode_returns_all_pipelines(self, single_user_client, engine) -> None:
         """In single-user mode, all pipelines visible with no filtering."""
         _insert_pipeline(engine, owner_id=1)
         _insert_pipeline(engine, owner_id=2)

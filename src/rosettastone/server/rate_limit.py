@@ -29,6 +29,7 @@ def _get_key(request) -> str:
     Multi-user mode: use user_id. Single-user: use client IP.
     """
     import os as _os
+
     multi_user = _os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
     if multi_user:
         user = getattr(request.state, "user", None)

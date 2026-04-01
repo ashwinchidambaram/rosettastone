@@ -12,9 +12,7 @@ import os
 # Context variable for request ID propagation into background threads/tasks
 # ---------------------------------------------------------------------------
 
-_request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "_request_id_var", default=""
-)
+_request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("_request_id_var", default="")
 
 
 def set_request_id(request_id: str) -> None:
@@ -117,6 +115,7 @@ class JsonFormatter(logging.Formatter):
 # ---------------------------------------------------------------------------
 # Root-logger configuration
 # ---------------------------------------------------------------------------
+
 
 def configure_logging(level: str | None = None) -> None:
     """Configure the root logger to emit JSON-structured log lines.

@@ -75,9 +75,11 @@ class TestTaskLifecycle:
         payload = {"source_model": "openai/gpt-4o", "target_model": "anthropic/claude-sonnet-4"}
 
         with patch("rosettastone.server.task_worker.TaskWorker._execute") as mock_exec:
+
             def fake_execute(task):
                 # Simulate completing the task inline
                 worker._mark_complete(task.id)
+
             mock_exec.side_effect = fake_execute
 
             task_id = worker.enqueue("migration", mid, payload)
@@ -103,8 +105,10 @@ class TestTaskLifecycle:
         payload = {"source_model": "a", "target_model": "b"}
 
         with patch("rosettastone.server.task_worker.TaskWorker._execute") as mock_exec:
+
             def fake_execute(task):
                 worker._mark_failed(task.id, "simulated failure")
+
             mock_exec.side_effect = fake_execute
 
             task_id = worker.enqueue("migration", mid, payload)
@@ -129,8 +133,10 @@ class TestTaskLifecycle:
         mid = _insert_migration(engine)
 
         with patch("rosettastone.server.task_worker.TaskWorker._execute") as mock_exec:
+
             def fake_execute(task):
                 worker._mark_complete(task.id)
+
             mock_exec.side_effect = fake_execute
 
             task_id = worker.enqueue("migration", mid, {})
@@ -189,9 +195,7 @@ class TestRestartRecovery:
         count = worker.recover_stale_tasks()
         assert count == 0
 
-    def test_recover_stale_does_not_touch_queued_or_complete_rows(
-        self, worker, engine
-    ) -> None:
+    def test_recover_stale_does_not_touch_queued_or_complete_rows(self, worker, engine) -> None:
         """recover_stale_tasks() must only affect 'running' rows."""
         mid = _insert_migration(engine)
         task_id = worker.enqueue("migration", mid, {})

@@ -17,10 +17,9 @@ _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 def _csrf_enabled() -> bool:
     """CSRF is only useful when auth is enabled."""
-    return (
-        bool(os.environ.get("ROSETTASTONE_API_KEY"))
-        or os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
-    )
+    return bool(os.environ.get("ROSETTASTONE_API_KEY")) or os.environ.get(
+        "ROSETTASTONE_MULTI_USER", ""
+    ).lower() in ("1", "true", "yes")
 
 
 class CSRFMiddleware(BaseHTTPMiddleware):

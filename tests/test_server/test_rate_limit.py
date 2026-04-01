@@ -51,7 +51,7 @@ def test_rate_limit_blocks_on_limit_exceeded(monkeypatch):
     # First 3 should pass
     for i in range(3):
         is_limited, retry_after = check_rate_limit(request, "test")
-        assert not is_limited, f"Request {i+1} should not be limited"
+        assert not is_limited, f"Request {i + 1} should not be limited"
         assert retry_after == 0
 
     # 4th should be blocked
@@ -91,7 +91,7 @@ def test_rate_limit_different_users_have_independent_limits(monkeypatch):
     # Request 2: should still be able to make 3 requests independently
     for i in range(3):
         is_limited, _ = check_rate_limit(request_2, "test")
-        assert not is_limited, f"User 2 request {i+1} should not be limited"
+        assert not is_limited, f"User 2 request {i + 1} should not be limited"
 
     # Request 1: next request should be blocked
     is_limited_1, _ = check_rate_limit(request_1, "test")

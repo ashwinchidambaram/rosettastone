@@ -1,4 +1,5 @@
 """Tests for backup/restore scripts."""
+
 from __future__ import annotations
 
 import os
@@ -63,9 +64,7 @@ def test_restore_restores_database(tmp_path: Path) -> None:
     _make_test_db(db)
 
     # Create backup first
-    subprocess.run(
-        ["bash", "scripts/backup.sh", str(db), str(backup_dir)], check=True
-    )
+    subprocess.run(["bash", "scripts/backup.sh", str(db), str(backup_dir)], check=True)
     backup_file = next((backup_dir / "daily").glob("*.db"))
 
     # Use a minimal PATH that has bash/sqlite3 but not uv — triggers the "uv not found" warning path

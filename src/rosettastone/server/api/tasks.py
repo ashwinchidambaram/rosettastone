@@ -137,9 +137,7 @@ def _make_progress_writer(migration_id: int, engine: Any) -> Any:
                     sess.add(record)
                     sess.commit()
         except Exception as exc:
-            logger.warning(
-                "Failed to write stage progress for migration %d: %s", migration_id, exc
-            )
+            logger.warning("Failed to write stage progress for migration %d: %s", migration_id, exc)
 
         # Emit to SSE clients
         from rosettastone.server.progress import emit_progress

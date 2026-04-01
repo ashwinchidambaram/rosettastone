@@ -44,6 +44,9 @@ postgres = [
 metrics = [
     "prometheus-client>=0.20",
 ]
+sentry = [
+    "sentry-sdk[fastapi]>=2.0",
+]
 web = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",

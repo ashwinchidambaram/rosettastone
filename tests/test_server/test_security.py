@@ -26,9 +26,7 @@ def _make_client(monkeypatch, env: dict[str, str]) -> TestClient:
 
 
 class TestJWTSecretEnforcement:
-    def test_startup_raises_with_default_jwt_secret_in_multi_user_mode(
-        self, monkeypatch
-    ) -> None:
+    def test_startup_raises_with_default_jwt_secret_in_multi_user_mode(self, monkeypatch) -> None:
         """Server must refuse to start (RuntimeError) when multi-user mode is active
         and JWT_SECRET is the insecure default value."""
         monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
@@ -39,9 +37,7 @@ class TestJWTSecretEnforcement:
         with pytest.raises(RuntimeError, match="insecure default"):
             _check_jwt_secret()
 
-    def test_startup_ok_with_strong_jwt_secret_in_multi_user_mode(
-        self, monkeypatch
-    ) -> None:
+    def test_startup_ok_with_strong_jwt_secret_in_multi_user_mode(self, monkeypatch) -> None:
         """No error when a strong (>= 32 byte) secret is set."""
         monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
         monkeypatch.setenv("ROSETTASTONE_JWT_SECRET", "a" * 64)
@@ -116,9 +112,7 @@ class TestCORSBehavior:
 
     def test_cors_header_present_for_allowed_origin(self, monkeypatch) -> None:
         """ACAO header must echo the allowed origin when configured."""
-        client = _make_client(
-            monkeypatch, {"ROSETTASTONE_CORS_ORIGINS": "https://app.example.com"}
-        )
+        client = _make_client(monkeypatch, {"ROSETTASTONE_CORS_ORIGINS": "https://app.example.com"})
         resp = client.get(
             "/api/v1/health",
             headers={"Origin": "https://app.example.com"},
@@ -127,9 +121,7 @@ class TestCORSBehavior:
 
     def test_cors_header_absent_for_unlisted_origin(self, monkeypatch) -> None:
         """ACAO header must NOT appear for an origin not in the allowlist."""
-        client = _make_client(
-            monkeypatch, {"ROSETTASTONE_CORS_ORIGINS": "https://app.example.com"}
-        )
+        client = _make_client(monkeypatch, {"ROSETTASTONE_CORS_ORIGINS": "https://app.example.com"})
         resp = client.get(
             "/api/v1/health",
             headers={"Origin": "https://evil.com"},

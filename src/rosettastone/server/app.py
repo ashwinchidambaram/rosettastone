@@ -143,6 +143,23 @@ def _check_model_deprecations() -> None:
         logger.debug("Deprecation check skipped: %s", exc)
 
 
+def _init_sentry() -> None:
+    """Initialize Sentry SDK if SENTRY_DSN is configured."""
+    sentry_dsn = os.environ.get("SENTRY_DSN")
+    if not sentry_dsn:
+        return
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=sentry_dsn,
+            traces_sample_rate=0.1,
+            profiles_sample_rate=0.1,
+        )
+    except ImportError:
+        pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize database and task worker on startup."""
@@ -168,6 +185,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     configure_logging()
+    _init_sentry()
 
     app = FastAPI(
         title="RosettaStone",

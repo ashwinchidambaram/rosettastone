@@ -12,6 +12,7 @@ try:
         Histogram,
         generate_latest,
     )
+
     _PROMETHEUS_AVAILABLE = True
 except ImportError:
     _PROMETHEUS_AVAILABLE = False

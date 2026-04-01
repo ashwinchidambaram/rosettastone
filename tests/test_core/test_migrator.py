@@ -49,7 +49,9 @@ def _make_eval_result(is_win: bool = True) -> EvalResult:
     )
 
 
-def _make_preflight_report(warnings=None, blockers=None, dry_run_result=None, estimated_cost_usd=0.0):
+def _make_preflight_report(
+    warnings=None, blockers=None, dry_run_result=None, estimated_cost_usd=0.0
+):
     """Return a mock PreflightReport."""
     report = MagicMock()
     report.warnings = warnings or []

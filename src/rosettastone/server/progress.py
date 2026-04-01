@@ -1,4 +1,5 @@
 """SSE progress hub for migration status streaming."""
+
 from __future__ import annotations
 
 import asyncio

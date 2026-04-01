@@ -160,7 +160,9 @@ class TestCreateMigration:
         assert data["status"] == "pending"
         assert data["id"] is not None
 
-    def test_create_migration_with_cluster_prompts_and_objectives(self, client, tmp_path, monkeypatch, engine):
+    def test_create_migration_with_cluster_prompts_and_objectives(
+        self, client, tmp_path, monkeypatch, engine
+    ):
         """Test that cluster_prompts and improvement_objectives are captured in config."""
         monkeypatch.setenv("HOME", str(tmp_path))
         payload = {

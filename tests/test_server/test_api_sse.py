@@ -51,7 +51,7 @@ class TestStreamEndpoint:
         # Extract the JSON payload from the first line
         first_line = text.split("\n")[0]
         assert first_line.startswith("data: ")
-        payload = json.loads(first_line[len("data: "):])
+        payload = json.loads(first_line[len("data: ") :])
 
         assert payload["type"] == "progress"
         assert payload["migration_id"] == sample_migration.id
@@ -71,9 +71,7 @@ class TestStreamEndpoint:
         with client.stream("GET", f"/api/v1/migrations/{sample_migration.id}/stream") as response:
             assert response.headers.get("cache-control") == "no-cache"
 
-    def test_stream_catchup_includes_progress_fields(
-        self, client: TestClient, engine
-    ):
+    def test_stream_catchup_includes_progress_fields(self, client: TestClient, engine):
         """Catch-up event includes stage progress fields when present in DB."""
         # Use a terminal status so the stream closes immediately after the catch-up event.
         with Session(engine) as session:
@@ -99,7 +97,7 @@ class TestStreamEndpoint:
         text = raw.decode("utf-8")
         first_line = text.split("\n")[0]
         assert first_line.startswith("data: ")
-        payload = json.loads(first_line[len("data: "):])
+        payload = json.loads(first_line[len("data: ") :])
 
         assert payload["type"] == "progress"
         assert payload["migration_id"] == migration_id

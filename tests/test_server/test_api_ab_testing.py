@@ -382,9 +382,7 @@ class TestABAssignmentStable:
         tc_id = 42
         traffic_split = 0.5
         results = [self._assign(tc_id, traffic_split) for _ in range(10)]
-        assert len(set(results)) == 1, (
-            f"Assignment changed across calls: {results}"
-        )
+        assert len(set(results)) == 1, f"Assignment changed across calls: {results}"
 
     def test_ab_assignment_hash_not_process_dependent(self):
         """Assignment must match the expected md5-based value, not Python's built-in hash()."""

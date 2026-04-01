@@ -621,7 +621,9 @@ class TestIterationTrackerThreadSafety:
                 wrapped(example, pred)
 
         calls_per_thread = total_calls // n_threads
-        threads = [threading.Thread(target=worker, args=(calls_per_thread,)) for _ in range(n_threads)]
+        threads = [
+            threading.Thread(target=worker, args=(calls_per_thread,)) for _ in range(n_threads)
+        ]
         for t in threads:
             t.start()
         for t in threads:

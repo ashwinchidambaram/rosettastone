@@ -254,8 +254,7 @@ class TestMakeRecommendation:
         from rosettastone.decision.recommendation import MIN_RELIABLE_SAMPLES, Recommendation
 
         validation = [
-            _make_eval_result(is_win=True, output_type="json")
-            for _ in range(MIN_RELIABLE_SAMPLES)
+            _make_eval_result(is_win=True, output_type="json") for _ in range(MIN_RELIABLE_SAMPLES)
         ]
 
         config = _make_config()

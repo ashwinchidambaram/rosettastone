@@ -254,9 +254,7 @@ def test_migrations_table_exists_after_upgrade(upgraded_db):
 
     engine.dispose()
 
-    assert len(rows) == 1, (
-        f"Expected exactly 1 row in alembic_version, got {len(rows)}"
-    )
+    assert len(rows) == 1, f"Expected exactly 1 row in alembic_version, got {len(rows)}"
     recorded_revision = rows[0][0]
 
     # Discover the head revision using Alembic's ScriptDirectory API so the
@@ -322,9 +320,7 @@ def test_no_pending_migrations(upgraded_db):
         except SystemExit as exc:
             # Exit code 0 means "no pending migrations" in some Alembic versions.
             if exc.code not in (0, None):
-                pytest.fail(
-                    f"alembic check reported pending migrations (exit code {exc.code})"
-                )
+                pytest.fail(f"alembic check reported pending migrations (exit code {exc.code})")
     except ImportError:
         # alembic.command.check not available in this version — fall back to
         # a manual comparison.
@@ -363,6 +359,5 @@ def _assert_no_pending_migrations_manual(db_path: str) -> None:
 
     # The current head must be among the declared revisions.
     assert applied_revisions <= declared_revisions, (
-        f"alembic_version contains unknown revisions: "
-        f"{applied_revisions - declared_revisions}"
+        f"alembic_version contains unknown revisions: {applied_revisions - declared_revisions}"
     )
