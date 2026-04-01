@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from datetime import UTC, datetime
@@ -15,6 +16,7 @@ from sqlmodel import Session, func, select
 from rosettastone.server.api.utils import _get_migration_or_404
 from rosettastone.server.database import get_session
 from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningRecord
+from rosettastone.server.rate_limit import check_rate_limit
 from rosettastone.server.rbac import (
     check_resource_owner,
     get_current_user_id,
@@ -764,6 +766,13 @@ async def create_migration(
     session: Session = Depends(get_session),
 ) -> MigrationSummary:
     """Create a new migration record (status: pending)."""
+    is_limited, retry_after = check_rate_limit(request, "migration_submit")
+    if is_limited:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. Too many migration submissions.",
+            headers={"Retry-After": str(retry_after)},
+        )
     body = await request.json()
     source_model = body.get("source_model")
     target_model = body.get("target_model")
@@ -872,6 +881,84 @@ async def get_test_case(
     if tc is None or tc.migration_id != migration_id:
         raise HTTPException(status_code=404, detail="Test case not found")
     return _test_case_to_detail(tc)
+
+
+@router.get(
+    "/api/v1/migrations/{migration_id}/stream",
+    response_class=None,  # streaming response
+)
+async def stream_migration_progress(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    """SSE endpoint for real-time migration progress.
+
+    Connects the client to the progress hub. On connect, sends current
+    DB state as a catch-up event. Sends keepalive comments every 30s.
+    Closes when migration reaches a terminal state (complete/failed/cancelled).
+    """
+    from rosettastone.server.progress import register_client, unregister_client
+
+    record = _get_migration_or_404(migration_id, session)
+
+    async def event_generator():
+        # Send catch-up: current state from DB
+        catchup = {
+            "type": "progress",
+            "migration_id": migration_id,
+            "status": record.status,
+            "current_stage": record.current_stage or "",
+            "stage_progress": record.stage_progress or 0.0,
+            "overall_progress": record.overall_progress or 0.0,
+        }
+        yield f"data: {json.dumps(catchup)}\n\n"
+
+        # If already terminal, close immediately
+        terminal = {"complete", "failed", "cancelled", "blocked", "dry_run_complete"}
+        if record.status in terminal:
+            return
+
+        q = register_client(migration_id)
+        keepalive_elapsed = 0.0
+        poll_interval = 1.0  # Check disconnect / accumulate keepalive every 1s
+        keepalive_every = 30.0
+        try:
+            while True:
+                if await request.is_disconnected():
+                    return
+                try:
+                    payload = await asyncio.wait_for(q.get(), timeout=poll_interval)
+                    keepalive_elapsed = 0.0
+                    if payload is None:  # Sentinel: close stream
+                        return
+                    yield f"data: {payload}\n\n"
+
+                    # Check if terminal state reached
+                    try:
+                        event_data = json.loads(payload)
+                        if event_data.get("status") in terminal:
+                            return
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
+                except TimeoutError:
+                    keepalive_elapsed += poll_interval
+                    if keepalive_elapsed >= keepalive_every:
+                        yield ": keepalive\n\n"  # SSE comment for keepalive
+                        keepalive_elapsed = 0.0
+        finally:
+            unregister_client(migration_id, q)
+
+    from starlette.responses import StreamingResponse
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
