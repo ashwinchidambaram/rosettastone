@@ -1,0 +1,16 @@
+[
+  {
+    "model": "openai/gpt-4o",
+    "tuning_cost_usd": 0.0468,
+    "production_cost_usd": 0.4678,
+    "total_cost_usd": 0.5146,
+    "pairs_generated": 300
+  },
+  {
+    "model": "anthropic/claude-haiku-4-5-20251001",
+    "tuning_cost_usd": 0.0,
+    "production_cost_usd": 0.4456,
+    "total_cost_usd": 0.4456,
+    "pairs_generated": 300
+  }
+]
