@@ -28,11 +28,11 @@ class TestShadowProxy:
         with patch("litellm.completion", return_value=mock_response):
             from fastapi.testclient import TestClient
 
-            client = TestClient(proxy_module.app_proxy)
-            response = client.post(
-                "/v1/chat/completions",
-                json={"messages": [{"role": "user", "content": "hello"}]},
-            )
+            with TestClient(proxy_module.app_proxy) as client:
+                response = client.post(
+                    "/v1/chat/completions",
+                    json={"messages": [{"role": "user", "content": "hello"}]},
+                )
 
         assert response.status_code == 200
         data = response.json()
@@ -67,11 +67,11 @@ class TestShadowProxy:
         with patch("litellm.completion", side_effect=_litellm_side_effect):
             from fastapi.testclient import TestClient
 
-            client = TestClient(proxy_module.app_proxy)
-            response = client.post(
-                "/v1/chat/completions",
-                json={"messages": [{"role": "user", "content": "test"}]},
-            )
+            with TestClient(proxy_module.app_proxy) as client:
+                response = client.post(
+                    "/v1/chat/completions",
+                    json={"messages": [{"role": "user", "content": "test"}]},
+                )
 
         assert response.status_code == 200
         assert response.json()["choices"][0]["message"]["content"] == "ok"
@@ -97,17 +97,13 @@ class TestShadowProxy:
         with patch("litellm.completion", return_value=mock_resp):
             from fastapi.testclient import TestClient
 
-            client = TestClient(proxy_module.app_proxy)
-            client.post(
-                "/v1/chat/completions",
-                json={"messages": [{"role": "user", "content": "hi"}]},
-            )
+            with TestClient(proxy_module.app_proxy) as client:
+                client.post(
+                    "/v1/chat/completions",
+                    json={"messages": [{"role": "user", "content": "hi"}]},
+                )
 
-        # Wait briefly for background task
-        import time
-
-        time.sleep(0.2)
-
+        # Context manager exit flushes all pending async tasks — no sleep needed
         entries = read_log_entries(tmp_path)
         assert len(entries) >= 1
         assert entries[0].source_model == "openai/gpt-4o"

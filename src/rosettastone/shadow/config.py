@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -20,7 +22,7 @@ class ShadowConfig(BaseModel):
     source_model: str
     target_model: str
     optimized_prompt: str = ""
-    primary: str = "source"  # "source" or "target"
+    primary: Literal["source", "target"] = "source"
     sample_rate: float = Field(default=1.0, ge=0.0, le=1.0)
     duration_hours: int = Field(default=72, ge=1)
     log_path: str = "./shadow_logs/"

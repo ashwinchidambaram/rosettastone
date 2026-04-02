@@ -65,12 +65,7 @@ def score_shadow_logs(
 
     # Evaluate target responses against source responses as baseline
     # Use optimized_prompt="" to signal we're scoring the target model's actual responses
-    results = evaluator.evaluate_multi_run(
-        pairs,
-        optimized_prompt=config.optimized_prompt  # type: ignore[attr-defined]
-        if hasattr(config, "optimized_prompt")
-        else "",
-    )
+    results = evaluator.evaluate_multi_run(pairs, optimized_prompt="")
 
     wins = sum(1 for r in results if r.is_win)
     total = len(results)

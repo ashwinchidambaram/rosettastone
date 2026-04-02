@@ -26,6 +26,7 @@ class ShadowLogEntry(BaseModel):
     source_cost: float = 0.0
     target_cost: float = 0.0
     metadata: dict[str, Any] = {}
+    error: str | None = None  # set if shadow call failed, None on success
 
     def to_prompt_pair_dict(self) -> dict[str, Any]:
         """Convert to PromptPair-compatible dict for RosettaStone ingestion."""

@@ -78,6 +78,7 @@ async def chat_completions(request: Request) -> JSONResponse:
         shadow_latency = 0.0
         shadow_tokens = 0
         shadow_cost = 0.0
+        shadow_error: str | None = None
         try:
             ts = time.monotonic()
             shadow_resp = await asyncio.wait_for(
@@ -90,8 +91,8 @@ async def chat_completions(request: Request) -> JSONResponse:
             shadow_cost = (
                 getattr(shadow_resp, "_hidden_params", {}).get("response_cost", 0.0) or 0.0
             )
-        except Exception:
-            pass  # Shadow failures must never surface to caller
+        except Exception as exc:
+            shadow_error = str(exc)  # Shadow failures must never surface to caller
 
         source_resp = primary_response_text if _shadow_config.primary == "source" else shadow_text
         target_resp = shadow_text if _shadow_config.primary == "source" else primary_response_text
@@ -113,6 +114,7 @@ async def chat_completions(request: Request) -> JSONResponse:
             target_tokens=shadow_tokens if _shadow_config.primary == "source" else primary_tokens,
             source_cost=primary_cost if _shadow_config.primary == "source" else shadow_cost,
             target_cost=shadow_cost if _shadow_config.primary == "source" else primary_cost,
+            error=shadow_error,
         )
         write_log_entry(entry, _log_dir)
 
