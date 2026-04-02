@@ -84,6 +84,15 @@ def migrate(
             "Use only as a safety net for CI/CD pipelines with strict time limits."
         ),
     ),
+    lm_extra_kwargs: str | None = typer.Option(  # noqa: UP007
+        None,
+        "--lm-extra-kwargs",
+        help=(
+            "JSON object of extra kwargs forwarded to dspy.LM() and litellm.completion(). "
+            "Required for custom OpenAI-compatible endpoints. "
+            "Example: '{\"api_base\": \"http://localhost:8123/v1\", \"api_key\": \"dummy\"}'"
+        ),
+    ),
     pipeline: Annotated[
         Path | None,
         typer.Option(
@@ -109,6 +118,15 @@ def migrate(
             "Pipeline optimization is handled server-side via POST /api/v1/pipelines/migrate"
         )
         return
+
+    # Parse lm_extra_kwargs from JSON string
+    parsed_lm_extra_kwargs: dict[str, object] = {}
+    if lm_extra_kwargs:
+        try:
+            parsed_lm_extra_kwargs = json_mod.loads(lm_extra_kwargs)
+        except json_mod.JSONDecodeError:
+            console.print("[red]Error: --lm-extra-kwargs must be valid JSON[/red]")
+            raise typer.Exit(code=1)
 
     # Parse improvement objectives from JSON string
     parsed_objectives = None
@@ -147,6 +165,7 @@ def migrate(
         improvement_objectives=parsed_objectives,
         known_issue_weight=known_issue_weight,
         gepa_timeout_seconds=gepa_timeout_seconds,
+        lm_extra_kwargs=parsed_lm_extra_kwargs,
     )
     migrator = Migrator(config)
     result = migrator.run()
