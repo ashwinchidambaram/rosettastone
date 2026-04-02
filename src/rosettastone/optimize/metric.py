@@ -47,7 +47,13 @@ class IterationTracker:
 
         tracker = self  # avoid closure capture of self in nested def
 
-        def wrapped(example: Any, pred: Any, trace: Any = None) -> Any:
+        def wrapped(
+            example: Any,
+            pred: Any,
+            trace: Any = None,
+            pred_name: Any = None,
+            pred_trace: Any = None,
+        ) -> Any:
             result = metric_fn(example, pred, trace)
             score = result.score if hasattr(result, "score") else float(result or 0)
             fire_callback: tuple[int, int, float] | None = None
