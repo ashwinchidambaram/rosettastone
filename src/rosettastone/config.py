@@ -123,6 +123,13 @@ class MigrationConfig(BaseModel):
     # Phase 4: Improvement mode
     improvement_objectives: list[dict[str, str | float]] | None = None
 
+    # Phase 5 / T4: Multi-run scoring
+    eval_runs: int = Field(
+        default=1,
+        ge=1,
+        description="Number of evaluation runs per pair for multi-run scoring",
+    )
+
     # Phase 5: Known-issue weighting
     known_issue_weight: float = Field(
         default=2.0, gt=0.0, description="Score divisor applied to known-issue pairs in GEPA metric"
