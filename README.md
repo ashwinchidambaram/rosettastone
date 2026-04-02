@@ -13,6 +13,7 @@
   <a href="#get-started">Get Started</a> &nbsp;&nbsp;|&nbsp;&nbsp;
   <a href="#under-the-hood">Under the Hood</a> &nbsp;&nbsp;|&nbsp;&nbsp;
   <a href="#web-dashboard">Web Dashboard</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+  <a href="#enterprise-test-datasets">Datasets</a> &nbsp;&nbsp;|&nbsp;&nbsp;
   <a href="#docker">Docker</a> &nbsp;&nbsp;|&nbsp;&nbsp;
   <a href="#architecture">Architecture</a> &nbsp;&nbsp;|&nbsp;&nbsp;
   <a href="#glossary">Glossary</a> &nbsp;&nbsp;|&nbsp;&nbsp;
@@ -283,6 +284,58 @@ The adapter uses `SCAN` (non-blocking), auto-detects the cache format by samplin
 | Braintrust | `--adapter braintrust` | Ingests logs from a Braintrust project |
 | OpenTelemetry | `--adapter otel` | Ingests spans from an OTLP export file |
 
+### Custom OpenAI-Compatible Endpoints
+
+RosettaStone works with any OpenAI-compatible API endpoint (vLLM, Ollama, Ray Serve, local clusters) via standard LiteLLM env vars:
+
+```bash
+OPENAI_API_BASE=http://10.0.0.1:8000/v1 \
+OPENAI_API_KEY=dummy \
+rosettastone migrate \
+  --data examples/datasets/fintech_extraction/fintech_extraction_gpt4o.jsonl \
+  --from openai/gpt-4o \
+  --to openai/Qwen/Qwen3-30B-A3B \
+  --auto light
+```
+
+The `openai/` prefix in `--to` tells LiteLLM to use the OpenAI-compatible client against your `OPENAI_API_BASE`.
+
+---
+
+## Enterprise Test Datasets
+
+The `examples/datasets/` directory contains five production-quality datasets covering the most common enterprise LLM deployment patterns. Each includes 300–400 prompt/response pairs generated from both GPT-4o and Claude Haiku — giving you real baselines for two common migration scenarios.
+
+| Dataset | Pairs | Use Case | Output Type |
+|:---|:---:|:---|:---|
+| [`fintech_extraction`](examples/datasets/fintech_extraction/) | 400 | Invoice/receipt field extraction from unstructured text | JSON |
+| [`support_classification`](examples/datasets/support_classification/) | 400 | Customer support ticket categorization into 8 labels | JSON |
+| [`sql_generation`](examples/datasets/sql_generation/) | 300 | Natural language → PostgreSQL query generation | Short text |
+| [`ecommerce_products`](examples/datasets/ecommerce_products/) | 300 | Product spec → marketing copy generation | Long text |
+| [`enterprise_rag`](examples/datasets/enterprise_rag/) | 300 | RAG chatbot over a synthetic company knowledge base | Short/long text |
+
+Each dataset ships with two JSONL files (`_gpt4o.jsonl` and `_haiku.jsonl`), a `cost_summary.json`, and a `SOURCES.md` with data provenance and license notes.
+
+**Running a migration with these datasets:**
+
+```bash
+# Migrating off GPT-4o (cost reduction story)
+rosettastone migrate \
+  --data examples/datasets/fintech_extraction/fintech_extraction_gpt4o.jsonl \
+  --from openai/gpt-4o \
+  --to anthropic/claude-sonnet-4 \
+  --auto light
+
+# Migrating off Anthropic (data residency story)
+rosettastone migrate \
+  --data examples/datasets/enterprise_rag/enterprise_rag_haiku.jsonl \
+  --from anthropic/claude-haiku-4-5-20251001 \
+  --to anthropic/claude-sonnet-4 \
+  --auto medium
+```
+
+The `enterprise_rag` dataset includes a synthetic knowledge base in `data/meridian_knowledge_base/` (25 Markdown documents) — a fictional B2B SaaS company covering product docs, API reference, pricing, onboarding, HR policies, and release notes. Generation scripts for all datasets are in `scripts/generate_*.py`.
+
 ---
 
 ## Batch Runner
@@ -337,6 +390,12 @@ For 100 prompt/response pairs using default settings (`--auto light`):
 
 Optimization intensity is configurable via `--auto`: `light` (default), `medium`, or `heavy`.
 Higher intensity = more API calls, better results.
+
+| Intensity | GEPA Iterations | Est. Time (100 pairs) | When to use |
+|:---|:---:|:---|:---|
+| `light` | 25 | 10 – 25 min | Fast iterations, good for initial validation |
+| `medium` | 50 | 25 – 45 min | Production migrations, balanced cost/quality |
+| `heavy` | 100 | 45 – 90 min | High-stakes migrations, maximizes optimization |
 
 > Use `--dry-run` to get a cost estimate before committing. Cost estimates include LLM judge calls and MIPROv2 overhead when applicable.
 
@@ -593,6 +652,26 @@ src/rosettastone/
 | `--from` | required | Source model |
 | `--to` | required | Target model |
 
+### `rosettastone score-shadow`
+
+Evaluate shadow deployment logs after running your target model in shadow mode alongside production.
+
+| Flag | Default | Description |
+|:---|:---|:---|
+| `--log-dir` | `./shadow_logs` | Directory containing shadow log files |
+| `--from` | required | Source (production) model |
+| `--to` | required | Target (shadow) model |
+| `--output`, `-o` | `./shadow_report` | Output directory for JSON summary |
+
+### `rosettastone calibrate`
+
+Calibrate win-rate thresholds from a human-labeled dataset to tune GO/CONDITIONAL/NO_GO decision boundaries for your specific domain.
+
+| Flag | Default | Description |
+|:---|:---|:---|
+| `input_path` | required | Path to labeled calibration dataset JSON |
+| `--output`, `-o` | `calibrated_thresholds.json` | Output path for calibrated thresholds |
+
 ---
 
 ## Roadmap
@@ -605,6 +684,7 @@ src/rosettastone/
 | **4** | LangSmith / Braintrust / OpenTelemetry adapters, batch runner, CI/CD integration | ✅ Complete |
 | **5** | Docker deployment, version history, A/B testing, multi-step pipeline migration, team collaboration (RBAC, annotations, approvals) | ✅ Complete |
 | **6** | Score charts, filterable test case grid, persona toggle (engineer/executive), known-issue GEPA weighting | ✅ Complete |
+| **7** | Shadow deployment tooling, ROC threshold calibration, 5 enterprise test datasets (fintech, support, SQL, e-commerce, RAG) | ✅ Complete |
 
 ---
 
