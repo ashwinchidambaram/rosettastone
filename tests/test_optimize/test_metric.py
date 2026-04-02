@@ -419,7 +419,13 @@ class TestKnownIssueWeight:
 def _make_stub_metric(score: float = 0.8) -> Any:
     """Return a stub metric function that returns a dspy.Prediction with a fixed score."""
 
-    def stub(example: Any, pred: Any, trace: Any = None) -> dspy.Prediction:
+    def stub(
+        example: Any,
+        pred: Any,
+        trace: Any = None,
+        pred_name: Any = None,
+        pred_trace: Any = None,
+    ) -> dspy.Prediction:
         return dspy.Prediction(score=score, feedback="stub")
 
     return stub
@@ -541,7 +547,13 @@ class TestIterationTrackerMeanScore:
         tracker = IterationTracker(trainset_size=1, total_iterations=1, callback=callback)
 
         # Metric returns a plain float rather than dspy.Prediction
-        def plain_metric(example: Any, pred: Any, trace: Any = None) -> float:
+        def plain_metric(
+            example: Any,
+            pred: Any,
+            trace: Any = None,
+            pred_name: Any = None,
+            pred_trace: Any = None,
+        ) -> float:
             return 0.77
 
         wrapped = tracker.wrap(plain_metric)

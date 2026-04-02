@@ -54,7 +54,7 @@ class IterationTracker:
             pred_name: Any = None,
             pred_trace: Any = None,
         ) -> Any:
-            result = metric_fn(example, pred, trace)
+            result = metric_fn(example, pred, trace, pred_name, pred_trace)
             score = result.score if hasattr(result, "score") else float(result or 0)
             fire_callback: tuple[int, int, float] | None = None
             with tracker._lock:
