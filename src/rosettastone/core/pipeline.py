@@ -436,9 +436,9 @@ def build_result(
 
     # T4: Multi-run metadata
     non_deterministic_count = sum(
-        1 for r in validation if getattr(r, "is_non_deterministic", False)
+        1 for r in validation if r.is_non_deterministic
     )
-    eval_runs_value = getattr(config, "eval_runs", 1)
+    eval_runs_value = config.eval_runs
 
     return MigrationResult(
         config=config_dict,

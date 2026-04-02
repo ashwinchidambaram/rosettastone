@@ -64,13 +64,14 @@ class TestMultiRun:
         evaluator = CompositeEvaluator(config)
 
         pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
-        run_evals = [_make_eval(s) for s in [0.8, 0.9, 0.7]]
+        run_scores = [0.8, 0.9, 0.7]
 
         call_count = 0
 
         def fake_evaluate(test_set, optimized_prompt=None):
             nonlocal call_count
-            result = _make_eval(run_evals[call_count].composite_score)
+            # Return result with the original pair object so id() alignment works
+            result = _make_eval(run_scores[call_count], pair=pair)
             call_count += 1
             return [result]
 
@@ -93,14 +94,14 @@ class TestMultiRun:
 
         scores = [0.7, 0.9, 0.8]
         call_count = 0
+        pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
 
         def fake_eval(test_set, optimized_prompt=None):
             nonlocal call_count
-            r = _make_eval(scores[call_count])
+            r = _make_eval(scores[call_count], pair=pair)
             call_count += 1
             return [r]
 
-        pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
         with patch.object(evaluator, "evaluate", side_effect=fake_eval):
             results = evaluator.evaluate_multi_run([pair])
 
@@ -116,14 +117,14 @@ class TestMultiRun:
 
         scores = [0.6, 0.8, 1.0]
         call_count = 0
+        pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
 
         def fake_eval(test_set, optimized_prompt=None):
             nonlocal call_count
-            r = _make_eval(scores[call_count])
+            r = _make_eval(scores[call_count], pair=pair)
             call_count += 1
             return [r]
 
-        pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
         with patch.object(evaluator, "evaluate", side_effect=fake_eval):
             results = evaluator.evaluate_multi_run([pair])
 
@@ -139,19 +140,19 @@ class TestMultiRun:
 
         scores = [0.9, 0.7, 0.6, 0.8]  # sorted: [0.6, 0.7, 0.8, 0.9]
         call_count = 0
+        pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
 
         def fake_eval(test_set, optimized_prompt=None):
             nonlocal call_count
-            r = _make_eval(scores[call_count])
+            r = _make_eval(scores[call_count], pair=pair)
             call_count += 1
             return [r]
 
-        pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
         with patch.object(evaluator, "evaluate", side_effect=fake_eval):
             results = evaluator.evaluate_multi_run([pair])
 
-        # p25 of [0.6, 0.7, 0.8, 0.9]: idx = max(0, 4//4 - 1) = max(0, 0) = 0 -> 0.6
-        assert abs(results[0].composite_score - 0.6) < 1e-9
+        # p25 of [0.6, 0.7, 0.8, 0.9]: idx = int(4 * 0.25) = 1 -> 0.7
+        assert abs(results[0].composite_score - 0.7) < 1e-9
 
 
 class TestVarianceFlagging:
@@ -165,14 +166,14 @@ class TestVarianceFlagging:
         # stdev([0.0, 1.0]) = 0.707 >> 0.05
         scores = [0.0, 1.0]
         call_count = 0
+        pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
 
         def fake_eval(test_set, optimized_prompt=None):
             nonlocal call_count
-            r = _make_eval(scores[call_count])
+            r = _make_eval(scores[call_count], pair=pair)
             call_count += 1
             return [r]
 
-        pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
         with patch.object(evaluator, "evaluate", side_effect=fake_eval):
             results = evaluator.evaluate_multi_run([pair])
 
@@ -189,18 +190,62 @@ class TestVarianceFlagging:
         # stdev([0.9, 0.91, 0.89]) approx 0.01 < 0.1
         scores = [0.9, 0.91, 0.89]
         call_count = 0
+        pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
 
         def fake_eval(test_set, optimized_prompt=None):
             nonlocal call_count
-            r = _make_eval(scores[call_count])
+            r = _make_eval(scores[call_count], pair=pair)
             call_count += 1
             return [r]
 
-        pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
         with patch.object(evaluator, "evaluate", side_effect=fake_eval):
             results = evaluator.evaluate_multi_run([pair])
 
         assert results[0].is_non_deterministic is False
+
+
+class TestRunAlignment:
+    def test_mismatched_skips_align_by_pair_identity(self, tmp_path):
+        """When runs skip different pairs, aggregate only pairs present in ALL runs."""
+        from rosettastone.evaluate.composite import CompositeEvaluator
+
+        config = _make_config(tmp_path, eval_runs=2, eval_aggregation="median")
+        evaluator = CompositeEvaluator(config)
+
+        pair_a = PromptPair(prompt="a", response="a", source_model="openai/gpt-4o")
+        pair_b = PromptPair(prompt="b", response="b", source_model="openai/gpt-4o")
+        pair_c = PromptPair(prompt="c", response="c", source_model="openai/gpt-4o")
+
+        def _eval(pair, score):
+            return EvalResult(
+                prompt_pair=pair,
+                new_response="x",
+                scores={"s": score},
+                composite_score=score,
+                is_win=score >= 0.9,
+                details={},
+            )
+
+        # Run 0: returns pair_a and pair_c (skips pair_b)
+        # Run 1: returns pair_a and pair_b (skips pair_c)
+        # Only pair_a appears in both → 1 aggregated result
+        run_0 = [_eval(pair_a, 0.8), _eval(pair_c, 0.9)]
+        run_1 = [_eval(pair_a, 0.6), _eval(pair_b, 0.7)]
+        call_count = 0
+
+        def fake_eval(test_set, optimized_prompt=None):
+            nonlocal call_count
+            result = [run_0, run_1][call_count]
+            call_count += 1
+            return result
+
+        with patch.object(evaluator, "evaluate", side_effect=fake_eval):
+            results = evaluator.evaluate_multi_run([pair_a, pair_b, pair_c])
+
+        assert len(results) == 1
+        assert results[0].prompt_pair is pair_a
+        # Median of [0.8, 0.6] = 0.7
+        assert abs(results[0].composite_score - 0.7) < 1e-9
 
 
 class TestNonDeterministicCountInResult:

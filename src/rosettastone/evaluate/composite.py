@@ -193,11 +193,13 @@ class CompositeEvaluator:
         test_set: list[PromptPair],
         optimized_prompt: str | None = None,
     ) -> list[EvalResult]:
-        """Run evaluate() N times and aggregate results by index position.
+        """Run evaluate() N times and aggregate results by prompt_pair identity.
 
         Preserves 3-phase BERTScore batching by calling the full evaluate() per run.
+        Uses object identity (id()) to align results across runs, so pairs skipped in
+        different runs do not corrupt the aggregation.
         """
-        n_runs = getattr(self.config, "eval_runs", 1)
+        n_runs = self.config.eval_runs
         if n_runs <= 1:
             return self.evaluate(test_set, optimized_prompt=optimized_prompt)
 
@@ -205,12 +207,27 @@ class CompositeEvaluator:
         for _ in range(n_runs):
             run_results.append(self.evaluate(test_set, optimized_prompt=optimized_prompt))
 
-        # Aggregate by position — zip run_results together
+        # Build index: map prompt_pair object id → test_set position
+        pair_to_idx: dict[int, int] = {id(pair): i for i, pair in enumerate(test_set)}
+
+        # Per-run dicts: {test_set_idx: EvalResult}
+        run_dicts: list[dict[int, EvalResult]] = []
+        for run_result in run_results:
+            rd: dict[int, EvalResult] = {}
+            for r in run_result:
+                idx = pair_to_idx.get(id(r.prompt_pair))
+                if idx is not None:
+                    rd[idx] = r
+            run_dicts.append(rd)
+
+        # Intersect: only aggregate pairs present in every run
+        common_indices = set(run_dicts[0].keys())
+        for rd in run_dicts[1:]:
+            common_indices &= set(rd.keys())
+
         aggregated: list[EvalResult] = []
-        # Find min length across all runs (some may skip pairs)
-        min_len = min(len(r) for r in run_results)
-        for i in range(min_len):
-            run_evals = [run[i] for run in run_results]
+        for idx in sorted(common_indices):
+            run_evals = [rd[idx] for rd in run_dicts]
             aggregated.append(self._aggregate_runs(run_evals))
         return aggregated
 
@@ -218,8 +235,8 @@ class CompositeEvaluator:
         """Aggregate multiple EvalResults for the same prompt into one."""
         import statistics
 
-        strategy = getattr(self.config, "eval_aggregation", "median")
-        threshold = getattr(self.config, "variance_flag_threshold", 0.1)
+        strategy = self.config.eval_aggregation
+        threshold = self.config.variance_flag_threshold
 
         scores_list = [r.composite_score for r in run_evals]
 
@@ -227,7 +244,7 @@ class CompositeEvaluator:
             agg_score = statistics.mean(scores_list)
         elif strategy == "p25":
             sorted_scores = sorted(scores_list)
-            idx = max(0, len(sorted_scores) // 4 - 1)
+            idx = int(len(sorted_scores) * 0.25)
             agg_score = sorted_scores[idx]
         else:  # "median" (default)
             agg_score = statistics.median(scores_list)
