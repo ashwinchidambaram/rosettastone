@@ -47,7 +47,7 @@ class TestCreateRun:
             "/api/v1/dataset-runs",
             json={"dataset_name": "fintech_extraction", "source_model": "openai/gpt-4o"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         data = resp.json()
         assert "id" in data
         run_id = data["id"]

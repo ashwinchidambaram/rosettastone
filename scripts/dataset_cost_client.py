@@ -27,26 +27,26 @@ def report_run_start(dataset_name: str, source_model: str) -> int | None:
 def report_run_update(
     run_id: int,
     *,
-    tuning_cost: float = 0.0,
-    production_cost: float = 0.0,
-    pairs: int = 0,
-    status: str = "running",
-    output_path: str = "",
+    tuning_cost: float | None = None,
+    production_cost: float | None = None,
+    pairs: int | None = None,
+    status: str | None = None,
+    output_path: str | None = None,
 ) -> None:
     """PATCH /api/v1/dataset-runs/{run_id}. Silent no-op if server unavailable."""
     try:
         import httpx
 
         payload: dict = {}
-        if tuning_cost != 0.0:
+        if tuning_cost is not None:
             payload["tuning_cost_usd"] = tuning_cost
-        if production_cost != 0.0:
+        if production_cost is not None:
             payload["production_cost_usd"] = production_cost
-        if pairs != 0:
+        if pairs is not None:
             payload["pairs_generated"] = pairs
-        if status != "running":
+        if status is not None:
             payload["status"] = status
-        if output_path != "":
+        if output_path is not None:
             payload["output_path"] = output_path
 
         if not payload:

@@ -37,7 +37,7 @@ class DatasetRunUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@router.post("/api/v1/dataset-runs")
+@router.post("/api/v1/dataset-runs", status_code=201)
 async def create_dataset_run(
     body: DatasetRunCreate,
     session: Session = Depends(get_session),
