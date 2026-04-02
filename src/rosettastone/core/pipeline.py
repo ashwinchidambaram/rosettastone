@@ -465,7 +465,34 @@ def build_result(
 
 
 def generate_report(result: MigrationResult, output_dir: Path) -> None:
+    import yaml
+
     from rosettastone.report.markdown import generate_markdown_report
 
     output_dir.mkdir(parents=True, exist_ok=True)
     generate_markdown_report(result, output_dir)
+
+    # Generate shadow_config.yaml for GO/CONDITIONAL migrations
+    recommendation = getattr(result, "recommendation", None)
+    if recommendation in ("GO", "CONDITIONAL"):
+        config_dict = result.config if isinstance(result.config, dict) else {}
+        shadow_cfg = {
+            "source_model": config_dict.get("source_model", ""),
+            "target_model": config_dict.get("target_model", ""),
+            "optimized_prompt": result.optimized_prompt,
+            "primary": "source",
+            "sample_rate": 1.0,
+            "duration_hours": 72,
+            "log_path": "./shadow_logs/",
+            "rollback": {
+                "enabled": True,
+                "error_rate_threshold": 0.05,
+                "latency_p99_ms": 5000,
+            },
+            "endpoints": {
+                "source": "http://localhost:8001/v1/chat/completions",
+                "target": "http://localhost:8002/v1/chat/completions",
+            },
+        }
+        shadow_path = output_dir / "shadow_config.yaml"
+        shadow_path.write_text(yaml.dump(shadow_cfg, default_flow_style=False))

@@ -331,5 +331,45 @@ def serve(
     )
 
 
+@app.command(name="score-shadow")
+def score_shadow(
+    log_dir: Path = typer.Option(
+        Path("./shadow_logs"), "--log-dir", help="Shadow logs directory"
+    ),
+    source: str = typer.Option(..., "--from", help="Source model"),
+    target: str = typer.Option(..., "--to", help="Target model"),
+    output: Path = typer.Option(Path("./shadow_report"), "--output", "-o"),
+) -> None:
+    """Score shadow deployment logs: compare target vs source responses."""
+    import json as json_mod
+
+    from rosettastone.config import MigrationConfig
+    from rosettastone.shadow.evaluator import score_shadow_logs
+
+    config = MigrationConfig(
+        source_model=source,
+        target_model=target,
+    )
+    result = score_shadow_logs(log_dir, config)
+    output.mkdir(parents=True, exist_ok=True)
+
+    console.print("\n[bold]Shadow Scoring Results[/bold]")
+    console.print(f"Total pairs analyzed: {result['total_pairs']}")
+    console.print(f"Win rate: {result['win_rate']:.1%}")
+    console.print(f"Wins: {result['wins']}/{result['total_pairs']}")
+    console.print(f"Non-deterministic: {result['non_deterministic_count']}")
+    console.print(f"Cost: ${result['cost_usd']:.4f}")
+
+    if result["warnings"]:
+        console.print("\n[yellow]Warnings:[/yellow]")
+        for w in result["warnings"]:
+            console.print(f"  - {w}")
+
+    # Save JSON summary
+    summary_path = output / "shadow_summary.json"
+    summary_path.write_text(json_mod.dumps(result, indent=2, default=str))
+    console.print(f"\nSummary saved to: {summary_path}")
+
+
 if __name__ == "__main__":
     app()
