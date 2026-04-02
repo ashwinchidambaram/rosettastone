@@ -92,6 +92,73 @@
     </div>
 </section>
 
+<!-- Dataset Generation Costs -->
+<section class="mt-20 mb-16">
+    <h2 class="text-[22px] font-semibold text-[#E8DCC4] mb-8">Dataset generation costs</h2>
+
+    <!-- Summary card -->
+    {% set dataset_total = namespace(value=0.0) %}
+    {% for run in dataset_runs %}
+        {% set dataset_total.value = dataset_total.value + run.total_cost_usd %}
+    {% endfor %}
+    <div class="bg-[#2a2a2a] p-8 rounded-2xl shadow-[0_64px_64px_-12px_rgba(229,226,225,0.06)] flex flex-col justify-between mb-10 max-w-sm">
+        <div>
+            <span class="text-[32px] font-bold text-[#D4A574] block mb-1">${{ "%.2f"|format(dataset_total.value) }}</span>
+            <span class="text-[#BDBDBD] text-sm font-medium">Total dataset generation spend</span>
+        </div>
+        <div class="mt-4 pt-4 border-t border-[#393939] flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#D4A574] text-sm" aria-hidden="true">dataset</span>
+            <span class="text-xs text-[#BDBDBD] font-['JetBrains_Mono']">{{ dataset_runs|length }} run{% if dataset_runs|length != 1 %}s{% endif %} total</span>
+        </div>
+    </div>
+
+    <!-- Per-run table -->
+    {% if dataset_runs %}
+    <div class="bg-surface-container-low rounded-2xl overflow-hidden">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-[#393939]">
+                    <th class="text-left px-6 py-4 text-[#BDBDBD] font-medium">Dataset</th>
+                    <th class="text-left px-6 py-4 text-[#BDBDBD] font-medium">Source Model</th>
+                    <th class="text-right px-6 py-4 text-[#BDBDBD] font-medium">Pairs</th>
+                    <th class="text-right px-6 py-4 text-[#BDBDBD] font-medium">Tuning Cost</th>
+                    <th class="text-right px-6 py-4 text-[#BDBDBD] font-medium">Production Cost</th>
+                    <th class="text-right px-6 py-4 text-[#BDBDBD] font-medium">Total</th>
+                    <th class="text-center px-6 py-4 text-[#BDBDBD] font-medium">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-[#393939]">
+                {% for run in dataset_runs %}
+                <tr class="hover:bg-[#2a2a2a]/60 transition-colors">
+                    <td class="px-6 py-4 font-['JetBrains_Mono'] text-[#E5E2E1]">{{ run.dataset_name }}</td>
+                    <td class="px-6 py-4 font-['JetBrains_Mono'] text-[#BDBDBD] text-xs">{{ run.source_model }}</td>
+                    <td class="px-6 py-4 text-right font-['JetBrains_Mono'] text-[#E8DCC4]">{{ run.pairs_generated }}</td>
+                    <td class="px-6 py-4 text-right font-['JetBrains_Mono'] text-[#E8DCC4]">${{ "%.4f"|format(run.tuning_cost_usd) }}</td>
+                    <td class="px-6 py-4 text-right font-['JetBrains_Mono'] text-[#E8DCC4]">${{ "%.4f"|format(run.production_cost_usd) }}</td>
+                    <td class="px-6 py-4 text-right font-['JetBrains_Mono'] text-[#E8DCC4] font-bold">${{ "%.4f"|format(run.total_cost_usd) }}</td>
+                    <td class="px-6 py-4 text-center">
+                        {% if run.status == "running" %}
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold" style="background-color: #D4A574/15; color: #D4A574; background: rgba(212,165,116,0.15);">running</span>
+                        {% elif run.status == "complete" %}
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold" style="background: rgba(139,157,131,0.15); color: #8B9D83;">complete</span>
+                        {% elif run.status == "failed" %}
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold" style="background: rgba(212,116,94,0.15); color: #D4745E;">failed</span>
+                        {% else %}
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold" style="background: rgba(189,189,189,0.15); color: #BDBDBD;">{{ run.status }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="bg-surface-container-low rounded-2xl p-10 text-center text-[#BDBDBD] text-sm">
+        No dataset generation runs recorded yet.
+    </div>
+    {% endif %}
+</section>
+
 <!-- Background Detail (Visual Interest) -->
 <div class="fixed top-0 right-0 -z-10 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none"></div>
 <div class="fixed bottom-0 left-0 -z-10 w-[400px] h-[400px] bg-secondary/5 blur-[100px] rounded-full pointer-events-none"></div>

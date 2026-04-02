@@ -94,6 +94,24 @@ def _migrate_add_columns(engine: Engine) -> None:
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_approval_workflow_user "
                 "ON approvals (workflow_id, user_id)"
             )
+            # Ensure dataset_generation_runs table exists (created by SQLModel.metadata.create_all
+            # above; this is a belt-and-suspenders guard for pre-existing deployments)
+            conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS dataset_generation_runs (
+                    id SERIAL PRIMARY KEY,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    dataset_name TEXT NOT NULL,
+                    source_model TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'running',
+                    tuning_cost_usd REAL NOT NULL DEFAULT 0.0,
+                    production_cost_usd REAL NOT NULL DEFAULT 0.0,
+                    total_cost_usd REAL NOT NULL DEFAULT 0.0,
+                    pairs_generated INTEGER NOT NULL DEFAULT 0,
+                    output_path TEXT NOT NULL DEFAULT ''
+                )
+                """
+            )
         else:
             # SQLite does not support IF NOT EXISTS for columns; use try/except
             for table, column, col_type in new_columns:
@@ -109,6 +127,26 @@ def _migrate_add_columns(engine: Engine) -> None:
                 )
             except Exception:
                 pass  # Index already exists or table doesn't exist yet
+            # Ensure dataset_generation_runs table exists for existing SQLite DBs
+            try:
+                conn.exec_driver_sql(
+                    """
+                    CREATE TABLE IF NOT EXISTS dataset_generation_runs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        created_at TEXT NOT NULL,
+                        dataset_name TEXT NOT NULL,
+                        source_model TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'running',
+                        tuning_cost_usd REAL NOT NULL DEFAULT 0.0,
+                        production_cost_usd REAL NOT NULL DEFAULT 0.0,
+                        total_cost_usd REAL NOT NULL DEFAULT 0.0,
+                        pairs_generated INTEGER NOT NULL DEFAULT 0,
+                        output_path TEXT NOT NULL DEFAULT ''
+                    )
+                    """
+                )
+            except Exception:
+                pass  # Table already exists
         conn.commit()
 
 

@@ -284,6 +284,7 @@ def create_app() -> FastAPI:
     from rosettastone.server.api.auth import router as auth_router
     from rosettastone.server.api.comparisons import router as comparisons_router
     from rosettastone.server.api.costs import router as costs_router
+    from rosettastone.server.api.dataset_runs import router as dataset_runs_router
     from rosettastone.server.api.migrations import router as migrations_router
     from rosettastone.server.api.models import router as models_router
     from rosettastone.server.api.pipelines import router as pipelines_router
@@ -297,6 +298,7 @@ def create_app() -> FastAPI:
     app.include_router(reports_router)
     app.include_router(models_router)
     app.include_router(costs_router)
+    app.include_router(dataset_runs_router)
     app.include_router(alerts_router)
     app.include_router(auth_router)
     app.include_router(versioning_router)

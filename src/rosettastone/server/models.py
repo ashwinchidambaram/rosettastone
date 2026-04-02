@@ -314,3 +314,23 @@ class UserBudget(SQLModel, table=True):
     monthly_limit_usd: float = Field(default=0.0)  # 0 = unlimited
     current_month_spend_usd: float = Field(default=0.0)
     budget_month: str = Field(default="")  # YYYY-MM format; reset when month changes
+
+
+# ---------------------------------------------------------------------------
+# Dataset Generation Cost Tracking
+# ---------------------------------------------------------------------------
+
+
+class DatasetGenerationRun(SQLModel, table=True):
+    __tablename__ = "dataset_generation_runs"
+
+    id: int | None = Field(default=None, primary_key=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    dataset_name: str  # "fintech_extraction", "support_classification", etc.
+    source_model: str  # "openai/gpt-4o", "anthropic/claude-haiku-4-5-20251001", etc.
+    status: str = "running"  # "running" | "complete" | "failed"
+    tuning_cost_usd: float = 0.0
+    production_cost_usd: float = 0.0
+    total_cost_usd: float = 0.0
+    pairs_generated: int = 0
+    output_path: str = ""

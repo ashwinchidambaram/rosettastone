@@ -1400,15 +1400,21 @@ async def executive_report_page(
 async def costs_page(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
     """Costs overview page."""
     from rosettastone.server.api.costs import _compute_costs
+    from rosettastone.server.models import DatasetGenerationRun
 
     costs = _compute_costs(session)
     if costs is None:
         costs = DUMMY_COSTS  # fallback when no data
 
+    stmt = select(DatasetGenerationRun).order_by(
+        DatasetGenerationRun.created_at.desc()  # type: ignore[attr-defined]
+    )
+    dataset_runs = list(session.exec(stmt).all())
+
     return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "costs.html",
-        {"costs": costs, "active_nav": "costs"},
+        {"costs": costs, "active_nav": "costs", "dataset_runs": dataset_runs},
     )
 
 
