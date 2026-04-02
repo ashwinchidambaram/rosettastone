@@ -1684,6 +1684,18 @@ wheels = [
 ]
 
 [[package]]
+name = "krippendorff"
+version = "0.8.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fd/1c/839234d9b9ca3c2c1f9445bb7f3022662face6cc6f9e3f915d8b7654dea7/krippendorff-0.8.2.tar.gz", hash = "sha256:f975bf4b5d93439d3264c4fc85a45d014aca9f5f9fca17f18fa2f3c89ee158ca", size = 18229, upload-time = "2025-11-03T03:03:39.821Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/01/4f/597b65bc88a031ee68b459fec05f8b40a60c3c3f6d5cde5b1403d965d199/krippendorff-0.8.2-py3-none-any.whl", hash = "sha256:1922ff73f7caa5faab6237a1abcb4f3e6ab605e3f7d39acd7998176873b8cd57", size = 18616, upload-time = "2025-11-03T03:03:38.583Z" },
+]
+
+[[package]]
 name = "langsmith"
 version = "0.7.22"
 source = { registry = "https://pypi.org/simple" }
@@ -3586,6 +3598,10 @@ auth = [
 braintrust = [
     { name = "braintrust" },
 ]
+calibration = [
+    { name = "krippendorff" },
+    { name = "scikit-learn" },
+]
 clustering = [
     { name = "scikit-learn" },
 ]
@@ -3665,6 +3681,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.110" },
     { name = "httpx", marker = "extra == 'web'", specifier = ">=0.27" },
     { name = "jinja2", specifier = ">=3.1" },
+    { name = "krippendorff", marker = "extra == 'calibration'", specifier = ">=0.6" },
     { name = "langsmith", marker = "extra == 'langsmith'" },
     { name = "litellm", specifier = ">=1.50" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
@@ -3688,6 +3705,7 @@ requires-dist = [
     { name = "rosettastone-llm", extras = ["web"], marker = "extra == 'dev'" },
     { name = "rq", marker = "extra == 'rq'", specifier = ">=1.16" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3" },
+    { name = "scikit-learn", marker = "extra == 'calibration'", specifier = ">=1.4" },
     { name = "scikit-learn", marker = "extra == 'clustering'", specifier = ">=1.0" },
     { name = "sentence-transformers", marker = "extra == 'eval'", specifier = ">=3.0" },
     { name = "sentry-sdk", extras = ["fastapi"], marker = "extra == 'sentry'", specifier = ">=2.0" },
@@ -3695,7 +3713,7 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'web'", specifier = ">=0.27" },
 ]
-provides-extras = ["eval", "redis", "rq", "braintrust", "langsmith", "safety", "clustering", "postgres", "metrics", "sentry", "web", "auth", "all", "e2e", "dev"]
+provides-extras = ["eval", "redis", "rq", "braintrust", "langsmith", "safety", "clustering", "postgres", "metrics", "sentry", "web", "auth", "calibration", "all", "e2e", "dev"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -73,6 +73,10 @@ auth = [
     "bcrypt>=3.2.0,<4.0",
     "pyjwt>=2.8.0",
 ]
+calibration = [
+    "scikit-learn>=1.4",
+    "krippendorff>=0.6",
+]
 all = [
     "rosettastone-llm[eval,redis,braintrust,langsmith,safety,clustering,web,postgres,auth,metrics,sentry]",
 ]

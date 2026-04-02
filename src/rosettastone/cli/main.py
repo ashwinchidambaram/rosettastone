@@ -325,5 +325,29 @@ def serve(
     )
 
 
+@app.command()
+def calibrate(
+    input_path: Path = typer.Argument(..., help="Path to labeled calibration dataset JSON"),
+    output: Path = typer.Option(Path("calibrated_thresholds.json"), "--output", "-o"),
+) -> None:
+    """Calibrate win-rate thresholds from a human-labeled dataset."""
+    import json as json_mod
+
+    from rosettastone.calibration.calibrator import ThresholdCalibrator
+    from rosettastone.calibration.types import CalibrationDataset
+
+    dataset = CalibrationDataset.model_validate_json(input_path.read_text())
+    calibrator = ThresholdCalibrator()
+    try:
+        thresholds = calibrator.fit(dataset)
+    except ImportError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1)
+
+    output.write_text(json_mod.dumps(thresholds, indent=2))
+    console.print(f"[green]Calibrated thresholds saved to {output}[/green]")
+    console.print(calibrator.report(dataset, thresholds))
+
+
 if __name__ == "__main__":
     app()
