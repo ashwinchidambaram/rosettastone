@@ -115,37 +115,44 @@ class GEPAOptimizer(Optimizer):
                 "num_threads": config.num_threads,
             }
 
-        timeout = getattr(config, "gepa_timeout_seconds", 600)
+        timeout: int | None = getattr(config, "gepa_timeout_seconds", None)
 
         def _run_gepa() -> dspy.Module:
             with dspy.context(lm=target_lm):
                 optimizer = dspy.GEPA(**gepa_kwargs)
                 return optimizer.compile(program, trainset=trainset)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_run_gepa)
-            try:
-                compiled = future.result(timeout=timeout)
-            except concurrent.futures.TimeoutError:
-                if best_intermediate:
-                    logger.warning(
-                        "GEPA timed out after %ds — using best intermediate result.", timeout
+        if timeout is not None:
+            # Safety-net path: wrap in executor with hard timeout.
+            # Used when the caller explicitly sets gepa_timeout_seconds (e.g. CI pipelines).
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(_run_gepa)
+                try:
+                    compiled = future.result(timeout=timeout)
+                except concurrent.futures.TimeoutError:
+                    if best_intermediate:
+                        logger.warning(
+                            "GEPA timed out after %ds — using best intermediate result.", timeout
+                        )
+                        # best_intermediate is appended inside _iteration_capturing_metric which
+                        # runs in the GEPA thread. The GIL protects the list.append() itself, but
+                        # reads of program state inside extract_optimized_instructions are
+                        # best-effort snapshots (not a guaranteed consistent state).
+                        instructions = best_intermediate[-1]
+                        raise GEPATimeoutWithResult(
+                            instructions=instructions,
+                            message=(
+                                f"GEPA timed out after {timeout}s — using best intermediate "
+                                f"result. Consider increasing gepa_timeout_seconds or reducing "
+                                f"gepa_auto complexity."
+                            ),
+                        )
+                    raise TimeoutError(
+                        f"GEPA timed out after {timeout}s with no intermediate result"
                     )
-                    # best_intermediate is appended inside _iteration_capturing_metric which runs in
-                    # the GEPA thread.  The GIL protects the list.append() itself, but reads of
-                    # program state inside extract_optimized_instructions are best-effort snapshots
-                    # (not a guaranteed consistent state of the compiled program).
-                    instructions = best_intermediate[-1]
-                    raise GEPATimeoutWithResult(
-                        instructions=instructions,
-                        message=(
-                            f"GEPA timed out after {timeout}s — using best intermediate result. "
-                            f"Consider increasing gepa_timeout_seconds or reducing gepa_auto "
-                            f"complexity."
-                        ),
-                    )
-                raise TimeoutError(
-                    f"GEPA timed out after {timeout}s with no intermediate result"
-                )
+        else:
+            # Default path: run GEPA directly — no external timeout.
+            # GEPA terminates naturally when it exhausts its max_metric_calls budget.
+            compiled = _run_gepa()
 
         return extract_optimized_instructions(compiled)

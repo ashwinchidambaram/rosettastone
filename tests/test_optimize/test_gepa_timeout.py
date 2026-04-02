@@ -313,8 +313,8 @@ class TestNormalCompletion:
 
         assert isinstance(result, str)
 
-    def test_default_timeout_is_600(self, tmp_path) -> None:
-        """Default gepa_timeout_seconds must be 600 (no behavior change for existing configs)."""
+    def test_default_timeout_is_none(self, tmp_path) -> None:
+        """Default gepa_timeout_seconds must be None — GEPA runs to natural completion."""
         data_file = tmp_path / "data.jsonl"
         data_file.touch()
         config = MigrationConfig(
@@ -322,7 +322,37 @@ class TestNormalCompletion:
             target_model="anthropic/claude-sonnet-4",
             data_path=data_file,
         )
-        assert config.gepa_timeout_seconds == 600
+        assert config.gepa_timeout_seconds is None
+
+    def test_no_timeout_calls_run_gepa_directly(self, tmp_path) -> None:
+        """When gepa_timeout_seconds=None, _run_gepa() is called directly (no executor)."""
+        data_file = tmp_path / "data.jsonl"
+        data_file.touch()
+        config = MigrationConfig(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            data_path=data_file,
+            gepa_timeout_seconds=None,
+        )
+        train = _make_pairs(2)
+        val = _make_pairs(1)
+        mock_compiled = _make_compiled_mock("Direct run result")
+
+        with (
+            patch("rosettastone.optimize.gepa.dspy.LM"),
+            patch("rosettastone.optimize.gepa.dspy.GEPA") as mock_gepa_cls,
+            patch("rosettastone.optimize.gepa.dspy.context") as mock_ctx,
+            patch("rosettastone.optimize.gepa.concurrent.futures.ThreadPoolExecutor") as mock_exec,
+        ):
+            mock_ctx.return_value.__enter__ = lambda s: s
+            mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
+            mock_gepa_cls.return_value.compile.return_value = mock_compiled
+
+            result = GEPAOptimizer().optimize(train, val, config)
+
+        # Executor must NOT be used when timeout is None
+        mock_exec.assert_not_called()
+        assert result == "Direct run result", f"Got: {result!r}"
 
     def test_future_result_called_with_timeout(self, tmp_path) -> None:
         """future.result() must be called with timeout=config.gepa_timeout_seconds."""

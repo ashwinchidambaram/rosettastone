@@ -75,6 +75,15 @@ def migrate(
         "--improvement-objectives",
         help='JSON array of objectives, e.g. \'[{"description": "be more concise"}]\'',
     ),
+    gepa_timeout_seconds: int | None = typer.Option(  # noqa: UP007
+        None,
+        "--gepa-timeout-seconds",
+        help=(
+            "Hard timeout for GEPA optimization in seconds. "
+            "Default: no timeout (GEPA runs to natural completion). "
+            "Use only as a safety net for CI/CD pipelines with strict time limits."
+        ),
+    ),
     pipeline: Annotated[
         Path | None,
         typer.Option(
@@ -137,6 +146,7 @@ def migrate(
         otel_path=otel_path,
         improvement_objectives=parsed_objectives,
         known_issue_weight=known_issue_weight,
+        gepa_timeout_seconds=gepa_timeout_seconds,
     )
     migrator = Migrator(config)
     result = migrator.run()

@@ -269,9 +269,10 @@ class Migrator:
                     ctx.warnings.append(exc.message)
                     optimized_prompt = exc.instructions
                 except TimeoutError:
-                    timeout = getattr(self.config, "gepa_timeout_seconds", 600)
+                    _timeout_val = getattr(self.config, "gepa_timeout_seconds", None)
+                    _timeout_str = f"{_timeout_val}s" if _timeout_val is not None else "unknown"
                     ctx.warnings.append(
-                        f"GEPA timed out after {timeout}s with no usable intermediate result. "
+                        f"GEPA timed out after {_timeout_str} with no usable intermediate result. "
                         f"Migration failed."
                     )
                     raise
@@ -297,9 +298,10 @@ class Migrator:
                 ctx.warnings.append(exc.message)
                 optimized_prompt = exc.instructions
             except TimeoutError:
-                timeout = getattr(self.config, "gepa_timeout_seconds", 600)
+                _timeout_val2 = getattr(self.config, "gepa_timeout_seconds", None)
+                _timeout_str2 = f"{_timeout_val2}s" if _timeout_val2 is not None else "unknown"
                 ctx.warnings.append(
-                    f"GEPA timed out after {timeout}s with no usable intermediate result. "
+                    f"GEPA timed out after {_timeout_str2} with no usable intermediate result. "
                     f"Migration failed."
                 )
                 raise

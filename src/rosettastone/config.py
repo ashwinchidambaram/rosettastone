@@ -60,12 +60,14 @@ class MigrationConfig(BaseModel):
             "When set, gepa_auto is ignored. Use small values (e.g. 20) for fast E2E tests."
         ),
     )
-    gepa_timeout_seconds: int = Field(
-        default=600,
+    gepa_timeout_seconds: int | None = Field(
+        default=None,
         ge=30,
         description=(
             "Timeout in seconds for GEPA optimizer.compile(). "
-            "Returns best intermediate result if available."
+            "None (default) means no timeout — GEPA runs to natural completion via its own "
+            "rollout budget. Set an explicit value only as a hard safety net (e.g. CI pipelines "
+            "with a strict time limit). Returns best intermediate result if available."
         ),
     )
     reflection_model: str = "openai/gpt-4o"
