@@ -180,6 +180,102 @@ class MigrationDisplay:
         self.console.print(table)
 
     # ------------------------------------------------------------------
+    # Prompt evolution
+    # ------------------------------------------------------------------
+
+    def show_prompt_evolution(
+        self,
+        optimized_prompt: str,
+        baseline_score: float,
+        confidence_score: float,
+        improvement: float,
+        sample_comparisons: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Render a before/after prompt evolution panel.
+
+        Shows the GEPA-generated system instruction alongside score impact and
+        top improvements from the test set.
+        """
+        from rich.rule import Rule
+
+        self.console.print()
+        self.console.print(Rule("[bold]Prompt Evolution[/bold]", style="blue"))
+
+        # Before / after scores
+        before_color = _score_color(baseline_score)
+        after_color = _score_color(confidence_score)
+        delta_str = f"{'+' if improvement >= 0 else ''}{improvement:.0%}"
+        delta_color = "green" if improvement >= 0 else "red"
+
+        self.console.print(
+            f"  [bold]Before[/bold]  [{before_color}]{baseline_score:.0%}[/{before_color}]"
+            f"  →  [{after_color}]{confidence_score:.0%}[/{after_color}]"
+            f"  ([{delta_color}]{delta_str}[/{delta_color}])"
+        )
+        self.console.print()
+
+        # Optimized prompt (truncated)
+        prompt_preview = optimized_prompt.strip()
+        if len(prompt_preview) > 400:
+            prompt_preview = prompt_preview[:397] + "..."
+        self.console.print(
+            Panel(
+                prompt_preview,
+                title="[bold blue]GEPA-Optimized System Instruction[/bold blue]",
+                border_style="blue",
+                padding=(1, 2),
+                subtitle="[dim]full prompt in optimized_prompt.txt[/dim]",
+            )
+        )
+
+        # Top improvements table
+        if sample_comparisons:
+            self.console.print()
+            table = Table(
+                title=f"Top {len(sample_comparisons)} Improvements",
+                show_header=True,
+                header_style="bold",
+                box=None,
+            )
+            table.add_column("#", style="dim", width=4)
+            table.add_column("Type", style="bold")
+            table.add_column("Before", justify="right")
+            table.add_column("After", justify="right")
+            table.add_column("Delta", justify="right")
+            table.add_column("Win?", justify="center")
+
+            for s in sample_comparisons:
+                b_score = s["baseline_score"]
+                v_score = s["optimized_score"]
+                delta = s["delta"]
+                delta_color_cell = "green" if delta >= 0 else "red"
+                win_str = (
+                    "[green]no→YES[/green]"
+                    if (not s["is_win_before"] and s["is_win_after"])
+                    else (
+                        "[green]yes→yes[/green]"
+                        if (s["is_win_before"] and s["is_win_after"])
+                        else (
+                            "[red]YES→no[/red]"
+                            if (s["is_win_before"] and not s["is_win_after"])
+                            else "[dim]no→no[/dim]"
+                        )
+                    )
+                )
+                table.add_row(
+                    str(s["index"]),
+                    str(s["output_type"]),
+                    _fmt_pct(b_score),
+                    _fmt_pct(v_score),
+                    Text(
+                        f"{'+' if delta >= 0 else ''}{delta:.3f}",
+                        style=delta_color_cell,
+                    ),
+                    win_str,
+                )
+            self.console.print(table)
+
+    # ------------------------------------------------------------------
     # Safety warnings
     # ------------------------------------------------------------------
 

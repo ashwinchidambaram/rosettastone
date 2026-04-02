@@ -39,6 +39,8 @@ def _make_migration_result(**overrides) -> MagicMock:
         per_type_scores={},
         safety_warnings=[],
         validation_results=[],
+        baseline_results=[],
+        optimized_prompt="You are a helpful assistant.",
         config={},
     )
     defaults.update(overrides)

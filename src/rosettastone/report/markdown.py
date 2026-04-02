@@ -25,6 +25,30 @@ def _stats_to_dict(stats: Any) -> dict[str, Any]:
     return {}
 
 
+def _build_sample_comparisons(
+    baseline_results: list[Any],
+    validation_results: list[Any],
+    n: int = 3,
+) -> list[dict[str, Any]]:
+    """Return top-N test pairs sorted by score improvement (baseline → optimized)."""
+    pairs = []
+    for i, (b, v) in enumerate(zip(baseline_results, validation_results)):
+        delta = v.composite_score - b.composite_score
+        pairs.append(
+            {
+                "index": i,
+                "output_type": b.details.get("output_type", "unknown"),
+                "baseline_score": b.composite_score,
+                "optimized_score": v.composite_score,
+                "delta": delta,
+                "is_win_before": b.is_win,
+                "is_win_after": v.is_win,
+            }
+        )
+    pairs.sort(key=lambda x: x["delta"], reverse=True)
+    return pairs[:n]
+
+
 def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
     """Generate a markdown migration report and write it to output_dir."""
     env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
@@ -33,6 +57,10 @@ def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
     # Convert per_type_scores dataclasses to plain dicts for Jinja2.
     raw_per_type: dict[str, Any] = getattr(result, "per_type_scores", {}) or {}
     per_type_scores = {k: _stats_to_dict(v) for k, v in raw_per_type.items()}
+
+    sample_comparisons = _build_sample_comparisons(
+        result.baseline_results, result.validation_results, n=3
+    )
 
     report_content = template.render(
         config=result.config,
@@ -61,6 +89,8 @@ def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
         eval_runs=getattr(result, "eval_runs", 1),
         non_deterministic_count=getattr(result, "non_deterministic_count", 0),
         variance_flag_threshold=result.config.get("variance_flag_threshold", 0.1),
+        # Prompt evolution / sample comparisons
+        sample_comparisons=sample_comparisons,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

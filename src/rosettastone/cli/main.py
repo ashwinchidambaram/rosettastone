@@ -143,6 +143,7 @@ def migrate(
 
     # Phase 2: Use Rich display for output
     from rosettastone.cli.display import MigrationDisplay
+    from rosettastone.report.markdown import _build_sample_comparisons
 
     display = MigrationDisplay(console=console)
 
@@ -156,6 +157,19 @@ def migrate(
 
     if result.per_type_scores:
         display.show_summary_table(result.validation_results, result.per_type_scores)
+
+    # Prompt evolution: show before/after system instruction + top improvements
+    if result.optimized_prompt:
+        sample_comparisons = _build_sample_comparisons(
+            result.baseline_results, result.validation_results, n=3
+        )
+        display.show_prompt_evolution(
+            optimized_prompt=result.optimized_prompt,
+            baseline_score=result.baseline_score,
+            confidence_score=result.confidence_score,
+            improvement=result.improvement,
+            sample_comparisons=sample_comparisons,
+        )
 
     if result.safety_warnings:
         display.show_safety_warnings(result.safety_warnings)

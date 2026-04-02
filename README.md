@@ -43,8 +43,26 @@ rosettastone migrate \
   Baseline ············ 61%
   Improvement ········· +31%
   Cost ················ $4.20
-  Duration ············ 18.3m
   Report ·············· ./migration_output/migration_report.md
+
+─────────────────────────── Prompt Evolution ───────────────────────────
+  Before  61%  →  After  92%  (+31%)
+
+  ╭── GEPA-Optimized System Instruction ─────────────────────────────╮
+  │  You are a financial document extraction system. Extract the      │
+  │  following fields from invoice text and return ONLY valid JSON:   │
+  │  vendor_name, invoice_number, invoice_date (YYYY-MM-DD),          │
+  │  due_date, line_items (array), subtotal, tax_rate, tax_amount,    │
+  │  total, currency (ISO 4217). Use null for missing fields.         │
+  │                          full prompt in optimized_prompt.txt      │
+  ╰───────────────────────────────────────────────────────────────────╯
+
+  Top 3 Improvements
+  ─────────────────────────────────────────────────────────────────────
+   #    Type    Before   After   Delta    Win?
+   12   json     0.12    0.97   +0.850   no→YES
+   34   json     0.18    0.94   +0.760   no→YES
+   7    json     0.21    0.91   +0.700   no→YES
 ```
 
 The core insight: your production data already defines how your model should behave. The old model's outputs are the ground truth — RosettaStone uses them as the optimization target.
@@ -195,7 +213,8 @@ flowchart TD
 | **Prompt Safety** | Audits the optimized prompt for training data leakage (verbatim substrings) and checks for PII that may have been injected during optimization. |
 | **Validation** | Runs the same held-out test set through the target model with the optimized prompt. Evaluates with per-output-type metrics including LLM-as-judge for long text. |
 | **Recommendation** | Produces a GO / NO_GO / CONDITIONAL decision based on per-output-type win rates vs configurable thresholds, sample size adequacy (Wilson score CI), and safety findings. |
-| **Migration Report** | Generates a 10-section markdown report: executive summary, recommendation, per-type breakdown with confidence intervals, score distributions, safety findings, cost summary, and configuration. |
+| **Prompt Evolution** | Displays the GEPA-generated system instruction alongside the baseline→optimized score delta and top 3 test cases where optimization helped most — making it clear what changed and why the target model improved. |
+| **Migration Report** | Generates a 10-section markdown report: executive summary, recommendation, prompt evolution, per-type breakdown with confidence intervals, score distributions, safety findings, cost summary, and configuration. |
 
 ### Evaluation Strategy
 

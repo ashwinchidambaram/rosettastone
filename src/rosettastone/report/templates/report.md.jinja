@@ -23,6 +23,38 @@ total cost: ${{ "%.4f" | format(cost_usd) }}.
 
 ---
 
+## Prompt Evolution
+
+> How RosettaStone transformed the system instruction to reach the target model.
+
+**Before** (baseline — no system instruction):
+```
+[none — prompts sent to {{ config.get('target_model', 'target') }} without any system instruction]
+```
+
+**After** (GEPA-optimized):
+```
+{{ optimized_prompt | truncate(600, True, '... [see full prompt in optimized_prompt.txt]') }}
+```
+
+**Score impact:** {{ "%.1f" | format(baseline_score * 100) }}% → {{ "%.1f" | format(confidence_score * 100) }}% ({{ "+" if improvement >= 0 else "" }}{{ "%.1f" | format(improvement * 100) }}pp)
+
+---
+
+{% if sample_comparisons %}
+## Sample Improvements
+
+Top {{ sample_comparisons | length }} test cases by score improvement (content omitted for PII safety — see `--output` dir for full pairs):
+
+| # | Output Type | Before | After | Delta | Win? |
+|---|-------------|--------|-------|-------|------|
+{% for s in sample_comparisons -%}
+| {{ s.index }} | {{ s.output_type }} | {{ "%.3f" | format(s.baseline_score) }} | {{ "%.3f" | format(s.optimized_score) }} | {{ "+" if s.delta >= 0 else "" }}{{ "%.3f" | format(s.delta) }} | {{ "no→yes" if (not s.is_win_before and s.is_win_after) else ("yes→yes" if (s.is_win_before and s.is_win_after) else ("yes→no" if (s.is_win_before and not s.is_win_after) else "no→no")) }} |
+{% endfor %}
+
+---
+
+{% endif %}
 ## Per-Output-Type Breakdown
 
 {% if per_type_scores %}
