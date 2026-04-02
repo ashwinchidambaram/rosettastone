@@ -85,9 +85,9 @@ class GEPAOptimizer(Optimizer):
         else:
             base_metric = metric
 
-        def _iteration_capturing_metric(gold, pred, trace=None):
+        def _iteration_capturing_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
             """Wraps the base metric and captures program state after each call."""
-            result = base_metric(gold, pred, trace)
+            result = base_metric(gold, pred, trace, pred_name, pred_trace)
             # After each metric call, try to snapshot the current program state.
             # Extraction failure must not interrupt the metric callback.
             try:

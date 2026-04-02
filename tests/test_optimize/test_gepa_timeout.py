@@ -186,7 +186,7 @@ class TestTimeoutWithIntermediate:
                 return intermediates[idx]
             return intermediates[-1]
 
-        def fake_base_metric(gold, pred, trace=None):
+        def fake_base_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
             # Simple stub — returns 0.5 score without real evaluation
             return 0.5
 
@@ -369,7 +369,7 @@ class TestTimeoutWithImmediateCallback:
         def fake_extract(prog):
             return immediate_result
 
-        def fake_base_metric(gold, pred, trace=None):
+        def fake_base_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
             return 0.5
 
         def fake_gepa_init(**kwargs):
