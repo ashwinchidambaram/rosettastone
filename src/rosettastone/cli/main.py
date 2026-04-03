@@ -28,6 +28,11 @@ def migrate(
     judge_model: str = typer.Option(
         "openai/gpt-4o", "--judge-model", help="Model for LLM-as-judge evaluation"
     ),
+    reflection_model: str = typer.Option(
+        "openai/gpt-4o",
+        "--reflection-model",
+        help="Model for GEPA reflective optimization (defaults to judge-model if unset)",
+    ),
     no_pii_scan: bool = typer.Option(False, "--no-pii-scan", help="Disable PII scanning"),
     no_prompt_audit: bool = typer.Option(False, "--no-prompt-audit", help="Disable prompt audit"),
     optimizer: str = typer.Option("gepa", "--optimizer", help="Optimizer: gepa or mipro"),
@@ -147,6 +152,7 @@ def migrate(
         local_only=local_only,
         redis_url=redis_url,
         judge_model=judge_model,
+        reflection_model=reflection_model,
         pii_scan=not no_pii_scan,
         prompt_audit=not no_prompt_audit,
         mipro_auto=mipro_auto if optimizer == "mipro" else None,  # type: ignore[arg-type]
