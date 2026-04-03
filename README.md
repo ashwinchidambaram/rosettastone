@@ -5,7 +5,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+" /></a>
-  <img src="https://img.shields.io/badge/tests-1414_passing-brightgreen.svg" alt="Tests: 1414 passing" />
+  <img src="https://img.shields.io/badge/tests-1663_passing-brightgreen.svg" alt="Tests: 1663 passing" />
 </p>
 
 <p align="center">
@@ -714,11 +714,11 @@ git clone https://github.com/ashwinchidambaram/rosettastone.git
 cd rosettastone
 uv sync --dev --all-extras
 
-uv run pytest tests/ -v --ignore=tests/test_e2e   # 1414 unit/integration tests
+uv run pytest tests/ -v --ignore=tests/test_e2e   # 1663 unit/integration tests
 uv run pytest tests/test_e2e/ -m playwright        # browser UI tests (requires server)
 uv run ruff check src/ tests/                      # lint
 uv run ruff format src/ tests/                     # format
-uv run mypy src/rosettastone/                      # type check (0 errors, strict mode)
+uv run mypy src/rosettastone/                      # type check (35 pre-existing errors)
 uv run alembic upgrade head                        # apply DB migrations
 ```
 
@@ -783,5 +783,5 @@ Synthetic test data covers 6 domains (JSON extraction, classification, short Q&A
 ---
 
 <p align="center">
-  <a href="https://github.com/ashwinchidambaram"><img src="assets/ac-logo.svg" alt="Built by Ashwin Chidambaram" width="260" /></a>
+  <a href="https://github.com/ashwinchidambaram"><img src="assets/ac-blackhole-static.svg" alt="Built by Ashwin Chidambaram" width="260" /></a>
 </p>
