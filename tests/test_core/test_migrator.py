@@ -739,6 +739,168 @@ class TestCheckpointParams:
         assert payload["stage_output"]["optimized_prompt"] == expected_prompt
 
 
+class TestCheckpointResumeEvalStages:
+    """Tests that baseline_eval and validation_eval stages restore from checkpoint data."""
+
+    def _run_with_resume(self, resume_stage: str, resume_data: dict, eval_results):
+        """Helper: run Migrator with a given resume checkpoint and return (result, baseline_call_count, validation_call_count)."""
+        import json
+
+        config = _make_config(skip_preflight=True)
+        baseline_call_count = 0
+        validation_call_count = 0
+
+        def counting_baseline(*args, **kwargs):
+            nonlocal baseline_call_count
+            baseline_call_count += 1
+            return eval_results
+
+        def counting_validation(*args, **kwargs):
+            nonlocal validation_call_count
+            validation_call_count += 1
+            return eval_results
+
+        migrator = Migrator(
+            config,
+            resume_checkpoint_stage=resume_stage,
+            resume_checkpoint_data=json.dumps({"stage_output": resume_data}),
+        )
+        pairs = [_make_pair()]
+
+        with (
+            patch("rosettastone.core.pipeline.load_and_split_data", return_value=(pairs, pairs, pairs)),
+            patch("rosettastone.core.pipeline.run_pii_scan"),
+            patch("rosettastone.core.pipeline.evaluate_baseline", side_effect=counting_baseline),
+            patch("rosettastone.core.pipeline.optimize_prompt", return_value="optimized"),
+            patch("rosettastone.core.pipeline.run_pii_scan_text"),
+            patch("rosettastone.core.pipeline.run_prompt_audit"),
+            patch("rosettastone.core.pipeline.evaluate_optimized", side_effect=counting_validation),
+            patch("rosettastone.core.pipeline.make_recommendation", return_value=("GO", "ok", {})),
+            patch("rosettastone.core.pipeline.generate_report"),
+        ):
+            result = migrator.run()
+
+        return result, baseline_call_count, validation_call_count
+
+    def test_baseline_eval_restored_from_checkpoint(self):
+        """When resume_checkpoint_stage='baseline_eval' with eval_results, baseline is not re-run."""
+        eval_results = [_make_eval_result()]
+        serialized = [r.model_dump() for r in eval_results]
+        resume_data = {"baseline_score": 1.0, "eval_results": serialized}
+
+        result, baseline_calls, _ = self._run_with_resume("baseline_eval", resume_data, eval_results)
+
+        assert baseline_calls == 0, "baseline should be restored from checkpoint, not re-run"
+        assert isinstance(result, MigrationResult)
+
+    def test_baseline_eval_reruns_without_eval_results_in_checkpoint(self):
+        """If checkpoint has no eval_results, baseline re-runs normally."""
+        eval_results = [_make_eval_result()]
+        resume_data = {"baseline_score": 1.0}  # no eval_results key
+
+        _, baseline_calls, _ = self._run_with_resume("baseline_eval", resume_data, eval_results)
+
+        assert baseline_calls == 1, "baseline should re-run when checkpoint has no eval_results"
+
+    def test_validation_eval_restored_from_checkpoint(self):
+        """When resume_checkpoint_stage='validation_eval' with eval_results, validation is not re-run."""
+        eval_results = [_make_eval_result()]
+        serialized = [r.model_dump() for r in eval_results]
+        resume_data = {"validation_score": 1.0, "eval_results": serialized}
+
+        result, _, validation_calls = self._run_with_resume("validation_eval", resume_data, eval_results)
+
+        assert validation_calls == 0, "validation should be restored from checkpoint, not re-run"
+        assert isinstance(result, MigrationResult)
+
+    def test_validation_eval_reruns_without_eval_results_in_checkpoint(self):
+        """If checkpoint has no eval_results, validation re-runs normally."""
+        eval_results = [_make_eval_result()]
+        resume_data = {"validation_score": 1.0}  # no eval_results key
+
+        _, _, validation_calls = self._run_with_resume("validation_eval", resume_data, eval_results)
+
+        assert validation_calls == 1, "validation should re-run when checkpoint has no eval_results"
+
+    def test_baseline_checkpoint_data_contains_eval_results(self):
+        """Checkpoint saved for baseline_eval includes serialized eval_results list."""
+        import json
+
+        config = _make_config(skip_preflight=True)
+        checkpoints: dict[str, str] = {}
+
+        def cb(stage: str, data: str) -> None:
+            checkpoints[stage] = data
+
+        migrator = Migrator(config, checkpoint_callback=cb)
+        pairs = [_make_pair()]
+        eval_results = [_make_eval_result()]
+
+        with (
+            patch("rosettastone.core.pipeline.load_and_split_data", return_value=(pairs, pairs, pairs)),
+            patch("rosettastone.core.pipeline.run_pii_scan"),
+            patch("rosettastone.core.pipeline.evaluate_baseline", return_value=eval_results),
+            patch("rosettastone.core.pipeline.optimize_prompt", return_value="optimized"),
+            patch("rosettastone.core.pipeline.run_pii_scan_text"),
+            patch("rosettastone.core.pipeline.run_prompt_audit"),
+            patch("rosettastone.core.pipeline.evaluate_optimized", return_value=eval_results),
+            patch("rosettastone.core.pipeline.make_recommendation", return_value=("GO", "ok", {})),
+            patch("rosettastone.core.pipeline.generate_report"),
+        ):
+            migrator.run()
+
+        assert "baseline_eval" in checkpoints
+        payload = json.loads(checkpoints["baseline_eval"])
+        stage_output = payload["stage_output"]
+        assert "eval_results" in stage_output
+        assert isinstance(stage_output["eval_results"], list)
+        assert len(stage_output["eval_results"]) == len(eval_results)
+
+    def test_validation_checkpoint_data_contains_eval_results(self):
+        """Checkpoint saved for validation_eval includes serialized eval_results list."""
+        import json
+
+        config = _make_config(skip_preflight=True)
+        checkpoints: dict[str, str] = {}
+
+        def cb(stage: str, data: str) -> None:
+            checkpoints[stage] = data
+
+        migrator = Migrator(config, checkpoint_callback=cb)
+        pairs = [_make_pair()]
+        eval_results = [_make_eval_result()]
+
+        with (
+            patch("rosettastone.core.pipeline.load_and_split_data", return_value=(pairs, pairs, pairs)),
+            patch("rosettastone.core.pipeline.run_pii_scan"),
+            patch("rosettastone.core.pipeline.evaluate_baseline", return_value=eval_results),
+            patch("rosettastone.core.pipeline.optimize_prompt", return_value="optimized"),
+            patch("rosettastone.core.pipeline.run_pii_scan_text"),
+            patch("rosettastone.core.pipeline.run_prompt_audit"),
+            patch("rosettastone.core.pipeline.evaluate_optimized", return_value=eval_results),
+            patch("rosettastone.core.pipeline.make_recommendation", return_value=("GO", "ok", {})),
+            patch("rosettastone.core.pipeline.generate_report"),
+        ):
+            migrator.run()
+
+        assert "validation_eval" in checkpoints
+        payload = json.loads(checkpoints["validation_eval"])
+        stage_output = payload["stage_output"]
+        assert "eval_results" in stage_output
+        assert isinstance(stage_output["eval_results"], list)
+        assert len(stage_output["eval_results"]) == len(eval_results)
+
+    def test_resume_from_optimize_reruns_baseline(self):
+        """When resuming from 'optimize', baseline should re-run (checkpoint data is for optimize stage)."""
+        eval_results = [_make_eval_result()]
+        # resume_data has optimize-stage content (optimized prompt), not baseline eval_results
+        resume_data = {"optimized_prompt": "restored prompt"}
+
+        _, baseline_calls, _ = self._run_with_resume("optimize", resume_data, eval_results)
+
+        assert baseline_calls == 1, "baseline must re-run when resuming from optimize (no baseline checkpoint)"
+
+
 class TestGEPARegressionWarning:
     def test_gepa_regression_warning_added(self):
         """When the optimized validation score < baseline score, a regression warning is added."""

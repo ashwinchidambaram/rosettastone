@@ -218,18 +218,30 @@ class Migrator:
         self._emit("pii_scan", 1.0, 0.37)
 
         # Step 2: Baseline — restore from checkpoint or run
-        if _already_done("baseline_eval"):
-            # We don't try to reconstruct full EvalResult objects; re-run is acceptable
-            # but we skip re-checkpointing since we're just passing through
-            t0 = time.time()
-            baseline = evaluate_baseline(test, self.config, ctx=ctx)
-            ctx.timing["baseline_eval"] = time.time() - t0
+        _stage_output = resume_data.get("stage_output", {}) if isinstance(resume_data, dict) else {}
+        _baseline_checkpoint_results = (
+            _stage_output.get("eval_results", [])
+            if resume_stage == "baseline_eval" and isinstance(_stage_output, dict)
+            else []
+        )
+        if _baseline_checkpoint_results:
+            from rosettastone.core.types import EvalResult as _EvalResult
+
+            baseline = [_EvalResult.model_validate(r) for r in _baseline_checkpoint_results]
+            ctx.timing["baseline_eval"] = 0.0
         else:
             t0 = time.time()
             baseline = evaluate_baseline(test, self.config, ctx=ctx)
             ctx.timing["baseline_eval"] = time.time() - t0
-            baseline_score = sum(1 for r in baseline if r.is_win) / max(len(baseline), 1)
-            self._checkpoint("baseline_eval", {"baseline_score": baseline_score})
+            if not _already_done("baseline_eval"):
+                baseline_score = sum(1 for r in baseline if r.is_win) / max(len(baseline), 1)
+                self._checkpoint(
+                    "baseline_eval",
+                    {
+                        "baseline_score": baseline_score,
+                        "eval_results": [r.model_dump() for r in baseline],
+                    },
+                )
         self._emit("baseline_eval", 1.0, 0.50)
 
         import litellm as _litellm
@@ -331,17 +343,33 @@ class Migrator:
         ctx.timing["prompt_safety"] = time.time() - t0
         self._emit("prompt_audit", 1.0, 0.85)
 
-        # Step 4: Validate
-        if not _already_done("validation_eval"):
-            t0 = time.time()
-            validation = evaluate_optimized(test, optimized_prompt, self.config, ctx=ctx)
-            ctx.timing["validation_eval"] = time.time() - t0
-            val_score = sum(1 for r in validation if r.is_win) / max(len(validation), 1)
-            self._checkpoint("validation_eval", {"validation_score": val_score})
+        # Step 4: Validate — restore from checkpoint or run
+        _val_stage_output = (
+            resume_data.get("stage_output", {}) if isinstance(resume_data, dict) else {}
+        )
+        _val_checkpoint_results = (
+            _val_stage_output.get("eval_results", [])
+            if resume_stage == "validation_eval" and isinstance(_val_stage_output, dict)
+            else []
+        )
+        if _val_checkpoint_results:
+            from rosettastone.core.types import EvalResult as _EvalResult2
+
+            validation = [_EvalResult2.model_validate(r) for r in _val_checkpoint_results]
+            ctx.timing["validation_eval"] = 0.0
         else:
             t0 = time.time()
             validation = evaluate_optimized(test, optimized_prompt, self.config, ctx=ctx)
             ctx.timing["validation_eval"] = time.time() - t0
+            if not _already_done("validation_eval"):
+                val_score = sum(1 for r in validation if r.is_win) / max(len(validation), 1)
+                self._checkpoint(
+                    "validation_eval",
+                    {
+                        "validation_score": val_score,
+                        "eval_results": [r.model_dump() for r in validation],
+                    },
+                )
         self._emit("validation_eval", 1.0, 0.95)
 
         # Check for GEPA regression: warn if optimized score < baseline score
