@@ -10,6 +10,8 @@ if TYPE_CHECKING:
     from rosettastone.config import MigrationConfig
     from rosettastone.core.types import MigrationResult
 
+from rosettastone.core.types import CostLimitExceeded
+
 logger = get_logger(__name__)
 
 
@@ -236,6 +238,7 @@ class Migrator:
 
         def _make_gepa_cost_callback(
             gepa_cost_accumulator: list[float],
+            max_cost_usd: float | None = None,
         ) -> Callable[[dict, object, object, object], None]:
             def _gepa_cost_callback(
                 kwargs: dict,
@@ -245,6 +248,8 @@ class Migrator:
             ) -> None:
                 cost = kwargs.get("response_cost", 0.0) or 0.0
                 gepa_cost_accumulator[0] += cost
+                if max_cost_usd is not None and gepa_cost_accumulator[0] > max_cost_usd:
+                    raise CostLimitExceeded(gepa_cost_accumulator[0], max_cost_usd)
 
             return _gepa_cost_callback
 
@@ -259,7 +264,9 @@ class Migrator:
             # Fall back to re-running optimize if checkpoint didn't preserve the prompt
             if not optimized_prompt:
                 _gepa_cost: list[float] = [0.0]
-                _gepa_cb = _make_gepa_cost_callback(_gepa_cost)
+                _gepa_cb = _make_gepa_cost_callback(
+                    _gepa_cost, max_cost_usd=self.config.max_cost_usd
+                )
                 _litellm.success_callback.append(_gepa_cb)
                 t0 = time.time()
                 try:
@@ -288,7 +295,7 @@ class Migrator:
                 ctx.timing["optimize"] = 0.0
         else:
             _gepa_cost2: list[float] = [0.0]
-            _gepa_cb2 = _make_gepa_cost_callback(_gepa_cost2)
+            _gepa_cb2 = _make_gepa_cost_callback(_gepa_cost2, max_cost_usd=self.config.max_cost_usd)
             _litellm.success_callback.append(_gepa_cb2)
             t0 = time.time()
             try:

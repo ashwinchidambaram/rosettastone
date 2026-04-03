@@ -377,12 +377,21 @@ def run_migration_background(
         # Import here to avoid circular import issues in test environments
         try:
             from rosettastone.core.migrator import MigrationBlockedError
+            from rosettastone.core.types import CostLimitExceeded
 
             is_blocked = isinstance(exc, MigrationBlockedError)
+            is_cost_exceeded = isinstance(exc, CostLimitExceeded)
         except ImportError:
             is_blocked = False
+            is_cost_exceeded = False
 
-        error_status = "blocked" if is_blocked else "failed"
+        if is_cost_exceeded:
+            error_status = "failed"
+        elif is_blocked:
+            error_status = "blocked"
+        else:
+            error_status = "failed"
+
         try:
             with Session(engine) as session:
                 record = session.get(MigrationRecord, migration_id)
@@ -395,6 +404,11 @@ def run_migration_background(
                     )
                     logger.debug("Migration %s blocked: %s", migration_id, str(exc))
                     log_audit(session, "migration", migration_id, "blocked")
+                elif is_cost_exceeded:
+                    record.status = "failed"
+                    record.recommendation_reasoning = str(exc)
+                    logger.warning("Migration %s aborted: %s", migration_id, exc)
+                    log_audit(session, "migration", migration_id, "failed")
                 else:
                     record.status = "failed"
                     record.recommendation_reasoning = f"Migration failed: {exc}"

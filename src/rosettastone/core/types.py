@@ -4,6 +4,15 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 
+class CostLimitExceeded(Exception):  # noqa: N818
+    """Raised when actual LLM spend exceeds the configured max_cost_usd cap."""
+
+    def __init__(self, actual: float, limit: float) -> None:
+        super().__init__(f"Cost cap exceeded: ${actual:.4f} > ${limit:.4f}")
+        self.actual = actual
+        self.limit = limit
+
+
 class OutputType(StrEnum):
     JSON = "json"
     CLASSIFICATION = "classification"

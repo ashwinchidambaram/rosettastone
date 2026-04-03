@@ -154,7 +154,7 @@
 </div>
 
 {% if multi_user %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 async function handleMultiUserLogin(e) {
     e.preventDefault();
     const btn = document.getElementById('login-btn');
