@@ -194,3 +194,91 @@ class TestSecureCookieFlag:
         assert resp.status_code == 302
         set_cookie = resp.headers.get("set-cookie", "")
         assert "secure" in set_cookie.lower()
+
+
+# ---------------------------------------------------------------------------
+# CSP nonce-based approach
+# ---------------------------------------------------------------------------
+
+
+class TestCSPNonce:
+    def test_csp_script_src_contains_nonce(self, monkeypatch) -> None:
+        """CSP script-src must include a per-request nonce instead of 'unsafe-inline'."""
+        client = _make_client(monkeypatch, {})
+        resp = client.get("/api/v1/health")
+        csp = resp.headers.get("content-security-policy", "")
+        assert "'nonce-" in csp, f"Expected nonce in CSP script-src, got: {csp}"
+
+    def test_csp_script_src_does_not_contain_unsafe_inline(self, monkeypatch) -> None:
+        """CSP script-src must NOT contain 'unsafe-inline' — nonce replaces it."""
+        client = _make_client(monkeypatch, {})
+        resp = client.get("/api/v1/health")
+        csp = resp.headers.get("content-security-policy", "")
+        # Extract only the script-src directive to avoid false positives from style-src
+        script_src = ""
+        for directive in csp.split(";"):
+            directive = directive.strip()
+            if directive.startswith("script-src"):
+                script_src = directive
+                break
+        assert "'unsafe-inline'" not in script_src, (
+            f"'unsafe-inline' must not appear in script-src, got: {script_src}"
+        )
+
+    def test_csp_nonce_differs_per_request(self, monkeypatch) -> None:
+        """Each request must generate a fresh nonce (not reuse a static value)."""
+        client = _make_client(monkeypatch, {})
+        resp1 = client.get("/api/v1/health")
+        resp2 = client.get("/api/v1/health")
+        csp1 = resp1.headers.get("content-security-policy", "")
+        csp2 = resp2.headers.get("content-security-policy", "")
+        assert csp1 != csp2, "Each request must produce a unique nonce"
+
+    def test_csp_style_src_retains_unsafe_inline(self, monkeypatch) -> None:
+        """style-src must keep 'unsafe-inline' since Tailwind uses inline styles."""
+        client = _make_client(monkeypatch, {})
+        resp = client.get("/api/v1/health")
+        csp = resp.headers.get("content-security-policy", "")
+        style_src = ""
+        for directive in csp.split(";"):
+            directive = directive.strip()
+            if directive.startswith("style-src"):
+                style_src = directive
+                break
+        assert "'unsafe-inline'" in style_src, (
+            f"style-src must retain 'unsafe-inline' for Tailwind, got: {style_src}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# CORS always registered
+# ---------------------------------------------------------------------------
+
+
+class TestCORSAlwaysRegistered:
+    def test_cors_middleware_registered_without_env_var(self, monkeypatch) -> None:
+        """CORSMiddleware must always be registered even when ROSETTASTONE_CORS_ORIGINS is unset.
+        With an empty allow_origins list, no ACAO header is sent for cross-origin requests
+        (same-origin only semantics)."""
+        monkeypatch.delenv("ROSETTASTONE_CORS_ORIGINS", raising=False)
+        client = _make_client(monkeypatch, {})
+        # Same-origin request — should succeed
+        resp = client.get("/api/v1/health")
+        assert resp.status_code == 200
+
+    def test_cors_empty_origins_blocks_cross_origin(self, monkeypatch) -> None:
+        """With ROSETTASTONE_CORS_ORIGINS unset (empty list), cross-origin requests
+        must not receive an Access-Control-Allow-Origin header."""
+        monkeypatch.delenv("ROSETTASTONE_CORS_ORIGINS", raising=False)
+        client = _make_client(monkeypatch, {})
+        resp = client.get("/api/v1/health", headers={"Origin": "https://external.example.com"})
+        assert "access-control-allow-origin" not in resp.headers
+
+    def test_cors_middleware_registered_with_env_var(self, monkeypatch) -> None:
+        """CORSMiddleware must respond correctly to allowed origins when env var is set."""
+        client = _make_client(monkeypatch, {"ROSETTASTONE_CORS_ORIGINS": "https://trusted.example.com"})
+        resp = client.get(
+            "/api/v1/health",
+            headers={"Origin": "https://trusted.example.com"},
+        )
+        assert resp.headers.get("access-control-allow-origin") == "https://trusted.example.com"

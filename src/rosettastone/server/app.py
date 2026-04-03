@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -33,6 +34,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers to all responses."""
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        nonce = secrets.token_urlsafe(16)
+        request.state.csp_nonce = nonce
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
@@ -40,7 +43,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' cdn.tailwindcss.com; "
+            f"script-src 'self' 'nonce-{nonce}' cdn.tailwindcss.com; "
             "style-src 'self' 'unsafe-inline' fonts.googleapis.com; "
             "font-src 'self' fonts.gstatic.com; "
             "img-src 'self' data:; "
@@ -209,14 +212,13 @@ def create_app() -> FastAPI:
 
     cors_origins_env = os.environ.get("ROSETTASTONE_CORS_ORIGINS", "")
     cors_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
-    if cors_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=cors_origins,
-            allow_credentials=True,
-            allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
-            allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
-        )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,  # empty list = same-origin only
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+    )
 
     app.add_middleware(CSRFMiddleware)
     app.add_middleware(AuthMiddleware)

@@ -7,7 +7,7 @@
         display: none;
     }
 </style>
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 function showPersonaView(view) {
   var engineerEl = document.getElementById('engineer-view');
   var executiveEl = document.getElementById('executive-summary');
@@ -316,7 +316,7 @@ function showPersonaView(view) {
               <canvas id="scoreHistChart3" height="180"></canvas>
             </div>
           </div>
-          <script>
+          <script nonce="{{ request.state.csp_nonce }}">
             (function() {
               var winCtx = document.getElementById('winRateChart3');
               if (winCtx) {
@@ -544,7 +544,7 @@ function showPersonaView(view) {
       <canvas id="scoreHistChart" height="180"></canvas>
     </div>
   </div>
-  <script>
+  <script nonce="{{ request.state.csp_nonce }}">
     (function() {
       var winCtx = document.getElementById('winRateChart');
       if (winCtx) {
@@ -696,7 +696,7 @@ function showPersonaView(view) {
       <canvas id="scoreHistChart2" height="180"></canvas>
     </div>
   </div>
-  <script>
+  <script nonce="{{ request.state.csp_nonce }}">
     (function() {
       var winCtx = document.getElementById('winRateChart2');
       if (winCtx) {
@@ -835,7 +835,7 @@ function showPersonaView(view) {
 </div>
 
 {% if migration.status in ['pending', 'running'] %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 (function() {
   var migrationId = {{ migration.id }};
   var es = new EventSource('/api/v1/migrations/' + migrationId + '/stream');
