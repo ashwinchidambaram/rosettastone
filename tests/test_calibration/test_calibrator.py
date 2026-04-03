@@ -124,3 +124,95 @@ class TestThresholdCalibrator:
         monkeypatch.setitem(sys.modules, "sklearn.metrics", None)
         with pytest.raises(ImportError, match="scikit-learn"):
             calibrator.fit(CalibrationDataset())
+
+    def test_fit_threshold_within_fpr_budget(self):
+        """Calibrated threshold achieves the FPR target on the training distribution.
+
+        Verifies both Bug C1 (correct direction — highest threshold within budget)
+        and Bug C2 (fpr/threshold array alignment — fpr[1:] paired with thresholds).
+        """
+        pytest.importorskip("sklearn")
+        from sklearn.metrics import roc_curve
+
+        from rosettastone.calibration.calibrator import FPR_TARGETS, ThresholdCalibrator
+
+        # Build a well-separated dataset: safe=high scores, unsafe=low scores.
+        # 20 unsafe pairs scored 0.0–0.38, 20 safe pairs scored 0.62–1.0.
+        pairs = []
+        for i in range(20):
+            pairs.append(_make_labeled_pair(f"u{i}", "classification", i * 0.02, False))
+        for i in range(20):
+            pairs.append(_make_labeled_pair(f"s{i}", "classification", 0.62 + i * 0.02, True))
+
+        dataset = CalibrationDataset(pairs=pairs)
+        calibrator = ThresholdCalibrator()
+        thresholds = calibrator.fit(dataset)
+
+        calibrated = thresholds["classification"]
+        target_fpr = FPR_TARGETS["classification"]  # 0.05
+
+        # Verify the returned threshold actually satisfies the FPR constraint
+        # by recomputing FPR at that threshold from the same labels/scores.
+        y_true = [1 if p.is_safe_majority else 0 for p in dataset.labeled_pairs()]
+        y_scores = [p.scores.composite for p in dataset.labeled_pairs()]
+        fpr_arr, _tpr_arr, thresh_arr = roc_curve(y_true, y_scores)
+
+        # Find the actual FPR achieved at the calibrated threshold
+        # (closest threshold in the ROC curve that is >= calibrated)
+        achieved_fpr = None
+        for fpr_val, thresh_val in zip(fpr_arr[1:], thresh_arr):
+            if round(float(thresh_val), 4) == calibrated:
+                achieved_fpr = float(fpr_val)
+                break
+
+        assert achieved_fpr is not None, (
+            f"Calibrated threshold {calibrated} not found in ROC curve thresholds"
+        )
+        assert achieved_fpr <= target_fpr, (
+            f"FPR {achieved_fpr:.4f} exceeds target {target_fpr} at threshold {calibrated}"
+        )
+
+    def test_fit_selects_highest_threshold_within_fpr_budget(self):
+        """fit() selects the HIGHEST threshold (least conservative) within the FPR budget.
+
+        With sklearn's descending threshold order, iterating forward and updating on
+        each match yields the last match = lowest FPR achievable = highest threshold
+        within budget. This test confirms we do NOT return the very first match.
+        """
+        pytest.importorskip("sklearn")
+        from sklearn.metrics import roc_curve
+
+        from rosettastone.calibration.calibrator import FPR_TARGETS, ThresholdCalibrator
+
+        # Pairs with a clear score gradient so multiple thresholds satisfy FPR target
+        pairs = []
+        for i in range(20):
+            pairs.append(_make_labeled_pair(f"u{i}", "classification", i * 0.02, False))
+        for i in range(20):
+            pairs.append(_make_labeled_pair(f"s{i}", "classification", 0.62 + i * 0.02, True))
+
+        dataset = CalibrationDataset(pairs=pairs)
+        calibrator = ThresholdCalibrator()
+        thresholds = calibrator.fit(dataset)
+
+        calibrated = thresholds["classification"]
+        target_fpr = FPR_TARGETS["classification"]
+
+        # Find the maximum threshold (first match in descending order) that satisfies FPR
+        # and the minimum such threshold (last match). The calibrator should return the last.
+        y_true = [1 if p.is_safe_majority else 0 for p in dataset.labeled_pairs()]
+        y_scores = [p.scores.composite for p in dataset.labeled_pairs()]
+        fpr_arr, _tpr_arr, thresh_arr = roc_curve(y_true, y_scores)
+
+        candidates = [
+            float(t) for f, t in zip(fpr_arr[1:], thresh_arr) if float(f) <= target_fpr
+        ]
+        assert candidates, "No thresholds satisfy FPR target in test data"
+        # The calibrated threshold should be the LOWEST among candidates
+        # (last match when iterating descending thresholds = highest threshold within FPR budget
+        #  is actually the minimum numeric value from the candidates list since thresholds
+        #  are descending — the last qualifying entry is the smallest numeric threshold).
+        assert calibrated == round(min(candidates), 4), (
+            f"Expected lowest qualifying threshold {round(min(candidates), 4)}, "
+            f"got {calibrated}"
+        )

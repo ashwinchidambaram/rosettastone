@@ -67,10 +67,14 @@ class ThresholdCalibrator:
 
             target_fpr = effective_fpr_targets.get(output_type, 0.05)
 
-            # Find the threshold where FPR first exceeds target_fpr
-            # (i.e., the highest threshold that keeps FPR <= target)
+            # sklearn roc_curve returns fpr/tpr of length n+1 (prepends a (0,0) point)
+            # and thresholds of length n — skip fpr[0] to align indices correctly.
+            # Thresholds are sorted descending (high→low), fpr ascending (low→high).
+            # Iterate forward and keep updating calibrated on each match so that
+            # the last match is the lowest threshold still satisfying fpr <= target
+            # (i.e. the least conservative threshold within the FPR budget).
             calibrated = 0.5  # fallback
-            for fpr_val, thresh_val in zip(fpr_arr, thresh_arr):
+            for fpr_val, thresh_val in zip(fpr_arr[1:], thresh_arr):
                 if fpr_val <= target_fpr:
                     calibrated = float(thresh_val)
 

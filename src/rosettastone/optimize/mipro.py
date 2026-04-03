@@ -32,8 +32,11 @@ class MIPROv2Optimizer(Optimizer):
         val_set: list[PromptPair],
         config: MigrationConfig,
     ) -> str:
-        # Configure target LM
-        target_lm = dspy.LM(config.target_model)
+        # Configure target LM — merge any provider-specific extra kwargs from config
+        extra_kwargs: dict[str, object] = (
+            dict(config.lm_extra_kwargs) if config.lm_extra_kwargs else {}
+        )
+        target_lm = dspy.LM(config.target_model, **extra_kwargs)
 
         # Build DSPy program
         program = MigrationProgram()

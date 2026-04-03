@@ -93,8 +93,8 @@ class GEPAOptimizer(Optimizer):
             try:
                 snapshot = extract_optimized_instructions(program)
                 best_intermediate.append(snapshot)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Snapshot extraction failed: %s", type(e).__name__)
             return result
 
         # Run GEPA — use explicit max_metric_calls if provided, otherwise use auto preset

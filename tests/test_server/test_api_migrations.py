@@ -297,6 +297,65 @@ class TestGetTestCase:
 
 
 # ---------------------------------------------------------------------------
+# Config field filtering
+# ---------------------------------------------------------------------------
+
+
+class TestMigrationDetailConfigFiltering:
+    def test_lm_extra_kwargs_stripped_from_response(self, client, engine, session):
+        """lm_extra_kwargs (may contain API keys) must not appear in the API response."""
+        migration = MigrationRecord(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+            config_json=json.dumps(
+                {
+                    "source_model": "openai/gpt-4o",
+                    "target_model": "anthropic/claude-sonnet-4",
+                    "lm_extra_kwargs": {"api_key": "secret"},
+                }
+            ),
+            per_type_scores_json=json.dumps({}),
+            warnings_json=json.dumps([]),
+            safety_warnings_json=json.dumps([]),
+        )
+        session.add(migration)
+        session.commit()
+        session.refresh(migration)
+
+        response = client.get(f"/api/v1/migrations/{migration.id}")
+        assert response.status_code == 200
+        config = response.json()["config"]
+        assert "lm_extra_kwargs" not in config
+        assert config["source_model"] == "openai/gpt-4o"
+        assert config["target_model"] == "anthropic/claude-sonnet-4"
+
+    def test_lm_extra_kwargs_stays_in_db(self, engine, session):
+        """The DB record must not be modified — only the API response is filtered."""
+        migration = MigrationRecord(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+            config_json=json.dumps(
+                {
+                    "source_model": "openai/gpt-4o",
+                    "lm_extra_kwargs": {"api_key": "secret"},
+                }
+            ),
+            per_type_scores_json=json.dumps({}),
+            warnings_json=json.dumps([]),
+            safety_warnings_json=json.dumps([]),
+        )
+        session.add(migration)
+        session.commit()
+        session.refresh(migration)
+
+        raw_config = json.loads(migration.config_json)
+        assert "lm_extra_kwargs" in raw_config
+        assert raw_config["lm_extra_kwargs"] == {"api_key": "secret"}
+
+
+# ---------------------------------------------------------------------------
 # UI endpoints — template rendering with dummy data
 # ---------------------------------------------------------------------------
 

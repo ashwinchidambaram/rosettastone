@@ -84,7 +84,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 return await call_next(request)
 
         # Multi-user mode: JWT Bearer token cascade
-        if multi_user and path.startswith("/api/"):
+        if multi_user and (path.startswith("/api/") or path.startswith("/metrics")):
             auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
                 token = auth_header[len("Bearer ") :]
@@ -104,7 +104,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         # Legacy single-key mode (unchanged behavior)
         if api_key is not None:
-            if path.startswith("/api/"):
+            if path.startswith("/api/") or path.startswith("/metrics"):
                 auth_header = request.headers.get("Authorization", "")
                 if not auth_header.startswith("Bearer "):
                     return JSONResponse(

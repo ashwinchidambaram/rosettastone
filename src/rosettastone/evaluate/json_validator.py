@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from rosettastone.evaluate.base import Evaluator
 
 
+def _strip_fences(text: str) -> str:
+    """Strip markdown code fences before JSON parsing."""
+    text = text.strip()
+    match = re.match(r"^```(?:json)?\s*\n?(.*?)\n?```$", text, re.DOTALL)
+    return match.group(1).strip() if match else text
+
+
 class JSONEvaluator(Evaluator):
     def score(self, expected: str, actual: str, **kwargs: Any) -> dict[str, float]:
         try:
-            expected_obj = json.loads(expected)
-            actual_obj = json.loads(actual)
+            expected_obj = json.loads(_strip_fences(expected))
+            actual_obj = json.loads(_strip_fences(actual))
         except json.JSONDecodeError:
             return {"json_valid": 0.0, "json_field_match": 0.0}
 

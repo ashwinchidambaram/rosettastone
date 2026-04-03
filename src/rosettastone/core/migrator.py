@@ -83,8 +83,8 @@ class Migrator:
                     record.estimated_cost_usd = estimated_cost_usd
                     session.add(record)
                     session.commit()
-        except Exception:
-            pass  # Silently swallow DB errors — preflight estimate is non-critical
+        except Exception as e:
+            logger.warning("Failed to persist preflight estimate: %s", type(e).__name__)
 
     def _update_migration_failed(self, error_message: str) -> None:
         """Mark migration as failed with error message."""
@@ -102,8 +102,8 @@ class Migrator:
                     record.recommendation_reasoning = error_message
                     session.add(record)
                     session.commit()
-        except Exception:
-            pass  # Silently swallow DB errors
+        except Exception as e:
+            logger.warning("Failed to update migration status to failed: %s", type(e).__name__)
 
     def run(self) -> MigrationResult:
         import json
@@ -124,22 +124,23 @@ class Migrator:
         )
         from rosettastone.core.types import MigrationResult
 
-        # Respect dry_run regardless of skip_preflight
-        if self.config.dry_run and self.config.skip_preflight:
-            return MigrationResult(
-                config=self.config.model_dump(),
-                optimized_prompt="",
-                baseline_results=[],
-                validation_results=[],
-                confidence_score=0.0,
-                baseline_score=0.0,
-                improvement=0.0,
-                cost_usd=0.0,
-                duration_seconds=0.0,
-                warnings=[],
-                recommendation="NO_GO",
-                recommendation_reasoning="Dry run — no migration performed.",
-            )
+        if self.config.dry_run:
+            if self.config.skip_preflight:
+                return MigrationResult(
+                    config=self.config.model_dump(),
+                    optimized_prompt="",
+                    baseline_results=[],
+                    validation_results=[],
+                    confidence_score=0.0,
+                    baseline_score=0.0,
+                    improvement=0.0,
+                    cost_usd=0.0,
+                    duration_seconds=0.0,
+                    warnings=[],
+                    recommendation="NO_GO",
+                    recommendation_reasoning="Dry run — no migration performed.",
+                )
+            # dry_run with preflight — preflight block returns via as_dry_run_result()
 
         # Determine which stage to resume from (if any)
         resume_stage = self.resume_checkpoint_stage

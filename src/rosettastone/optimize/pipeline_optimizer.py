@@ -103,8 +103,17 @@ def optimize_pipeline(
 
     Returns a dict mapping module_name -> optimized instructions for each module.
     """
-    target_lm = dspy.LM(config.target_model)
-    reflection_lm = dspy.LM(config.reflection_model, temperature=1.0, max_tokens=16000)
+    # Configure LMs — merge any provider-specific extra kwargs from config
+    extra_kwargs: dict[str, object] = (
+        dict(migration_config.lm_extra_kwargs) if migration_config.lm_extra_kwargs else {}
+    )
+    target_lm = dspy.LM(config.target_model, **extra_kwargs)
+    # Filter out keys that conflict with reflection_lm's explicit temperature/max_tokens args
+    _conflict_keys = ("temperature", "max_tokens")
+    reflection_extra = {k: v for k, v in extra_kwargs.items() if k not in _conflict_keys}
+    reflection_lm = dspy.LM(
+        config.reflection_model, temperature=1.0, max_tokens=16000, **reflection_extra
+    )
 
     program = PipelineProgram(config)
 

@@ -35,6 +35,8 @@ from rosettastone.server.schemas import (
 
 router = APIRouter()
 
+_SENSITIVE_CONFIG_KEYS = frozenset({"lm_extra_kwargs"})
+
 
 # ---------------------------------------------------------------------------
 # Dummy data for UI shell
@@ -608,6 +610,7 @@ def _migration_to_detail(record: MigrationRecord, session: Session) -> Migration
     """Convert a MigrationRecord to a MigrationDetail response with nested data."""
     # Parse JSON columns
     config = json.loads(record.config_json)
+    config = {k: v for k, v in config.items() if k not in _SENSITIVE_CONFIG_KEYS}
     per_type_scores_raw = json.loads(record.per_type_scores_json)
     warnings = json.loads(record.warnings_json)
     safety_warnings_raw = json.loads(record.safety_warnings_json)

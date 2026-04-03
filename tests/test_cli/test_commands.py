@@ -354,3 +354,105 @@ def test_serve_app_factory_reference():
         assert result.exit_code == 0
         # First positional arg is the app reference
         assert mock_uvicorn.call_args[0][0] == "rosettastone.server.app:create_app"
+
+
+# ---------------------------------------------------------------------------
+# --lm-extra-kwargs flag tests
+# ---------------------------------------------------------------------------
+
+
+def test_migrate_lm_extra_kwargs_valid_json():
+    """--lm-extra-kwargs with valid JSON is parsed into config.lm_extra_kwargs."""
+    with patch("rosettastone.core.migrator.Migrator") as mock_cls:
+        mock_cls.return_value.run.return_value = _make_migration_result()
+
+        lm_kwargs = '{"api_base": "http://localhost:8000/v1"}'
+        result = runner.invoke(app, ["migrate"] + BASE_ARGS + ["--lm-extra-kwargs", lm_kwargs])
+
+        assert result.exit_code == 0, result.output
+        config = mock_cls.call_args[0][0]
+        assert config.lm_extra_kwargs == {"api_base": "http://localhost:8000/v1"}
+
+
+def test_migrate_lm_extra_kwargs_multiple_keys():
+    """--lm-extra-kwargs with multiple keys is parsed correctly."""
+    with patch("rosettastone.core.migrator.Migrator") as mock_cls:
+        mock_cls.return_value.run.return_value = _make_migration_result()
+
+        lm_kwargs = '{"api_base": "http://localhost:8000/v1", "api_key": "sk-test", "timeout": 60}'
+        result = runner.invoke(app, ["migrate"] + BASE_ARGS + ["--lm-extra-kwargs", lm_kwargs])
+
+        assert result.exit_code == 0, result.output
+        config = mock_cls.call_args[0][0]
+        assert config.lm_extra_kwargs == {
+            "api_base": "http://localhost:8000/v1",
+            "api_key": "sk-test",
+            "timeout": 60,
+        }
+
+
+def test_migrate_lm_extra_kwargs_invalid_json():
+    """--lm-extra-kwargs with invalid JSON exits with error."""
+    result = runner.invoke(
+        app, ["migrate"] + BASE_ARGS + ["--lm-extra-kwargs", "not json"]
+    )
+
+    assert result.exit_code != 0
+    assert "must be valid JSON" in result.output
+
+
+def test_migrate_lm_extra_kwargs_omitted():
+    """--lm-extra-kwargs omitted results in empty dict in config."""
+    with patch("rosettastone.core.migrator.Migrator") as mock_cls:
+        mock_cls.return_value.run.return_value = _make_migration_result()
+
+        result = runner.invoke(app, ["migrate"] + BASE_ARGS)
+
+        assert result.exit_code == 0, result.output
+        config = mock_cls.call_args[0][0]
+        assert config.lm_extra_kwargs == {}
+
+
+# ---------------------------------------------------------------------------
+# --gepa-timeout-seconds flag tests
+# ---------------------------------------------------------------------------
+
+
+def test_migrate_gepa_timeout_seconds_set():
+    """--gepa-timeout-seconds sets gepa_timeout_seconds on config."""
+    with patch("rosettastone.core.migrator.Migrator") as mock_cls:
+        mock_cls.return_value.run.return_value = _make_migration_result()
+
+        result = runner.invoke(
+            app, ["migrate"] + BASE_ARGS + ["--gepa-timeout-seconds", "60"]
+        )
+
+        assert result.exit_code == 0, result.output
+        config = mock_cls.call_args[0][0]
+        assert config.gepa_timeout_seconds == 60
+
+
+def test_migrate_gepa_timeout_seconds_different_value():
+    """--gepa-timeout-seconds accepts different integer values."""
+    with patch("rosettastone.core.migrator.Migrator") as mock_cls:
+        mock_cls.return_value.run.return_value = _make_migration_result()
+
+        result = runner.invoke(
+            app, ["migrate"] + BASE_ARGS + ["--gepa-timeout-seconds", "120"]
+        )
+
+        assert result.exit_code == 0, result.output
+        config = mock_cls.call_args[0][0]
+        assert config.gepa_timeout_seconds == 120
+
+
+def test_migrate_gepa_timeout_seconds_omitted():
+    """--gepa-timeout-seconds omitted results in None in config."""
+    with patch("rosettastone.core.migrator.Migrator") as mock_cls:
+        mock_cls.return_value.run.return_value = _make_migration_result()
+
+        result = runner.invoke(app, ["migrate"] + BASE_ARGS)
+
+        assert result.exit_code == 0, result.output
+        config = mock_cls.call_args[0][0]
+        assert config.gepa_timeout_seconds is None

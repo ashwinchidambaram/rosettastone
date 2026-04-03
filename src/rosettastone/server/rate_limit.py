@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 from collections import defaultdict
 
@@ -21,6 +22,7 @@ def _get_limit() -> int:
 
 # keyed by (user_id_or_ip, endpoint) -> list of timestamps
 _windows: dict[tuple[str, str], list[float]] = defaultdict(list)
+_lock = threading.Lock()
 
 
 def _get_key(request) -> str:
@@ -56,21 +58,23 @@ def check_rate_limit(request, endpoint: str = "submit") -> tuple[bool, int]:
     now = time.time()
     key = (_get_key(request), endpoint)
 
-    # Prune expired entries
-    cutoff = now - window
-    _windows[key] = [t for t in _windows[key] if t > cutoff]
+    with _lock:
+        # Prune expired entries
+        cutoff = now - window
+        _windows[key] = [t for t in _windows[key] if t > cutoff]
 
-    if len(_windows[key]) >= limit:
-        # Calculate retry-after: when the oldest entry expires
-        oldest = min(_windows[key])
-        retry_after = int(oldest + window - now) + 1
-        return True, retry_after
+        if len(_windows[key]) >= limit:
+            # Calculate retry-after: when the oldest entry expires
+            oldest = min(_windows[key])
+            retry_after = int(oldest + window - now) + 1
+            return True, retry_after
 
-    # Record this attempt
-    _windows[key].append(now)
-    return False, 0
+        # Record this attempt
+        _windows[key].append(now)
+        return False, 0
 
 
 def reset_for_testing() -> None:
     """Clear all windows — for test isolation only."""
-    _windows.clear()
+    with _lock:
+        _windows.clear()

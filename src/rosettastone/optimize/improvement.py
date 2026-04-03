@@ -26,6 +26,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _escape_xml(text: str) -> str:
+    """Escape XML special characters in user-supplied content."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
@@ -125,7 +130,7 @@ def _score_objective(
     baseline_section = ""
     if expected_response:
         baseline_section = (
-            f"<expected_baseline>{expected_response}</expected_baseline>\n"
+            f"<expected_baseline>{_escape_xml(expected_response)}</expected_baseline>\n"
             "When available, compare the response to the expected baseline in "
             "<expected_baseline> tags.\n"
         )
@@ -138,8 +143,8 @@ def _score_objective(
                 "Rate on a scale of 1-5 how well the following response "
                 "achieves this objective:\n"
                 f"<objective>{objective}</objective>\n"
-                f"<prompt>{prompt}</prompt>\n"
-                f"<response>{actual_response}</response>\n"
+                f"<prompt>{_escape_xml(prompt)}</prompt>\n"
+                f"<response>{_escape_xml(actual_response)}</response>\n"
                 f"{baseline_section}"
                 "\nScore (1-5):\nFeedback:"
             ),
