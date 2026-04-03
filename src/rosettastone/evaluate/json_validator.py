@@ -10,10 +10,40 @@ from rosettastone.evaluate.base import Evaluator
 
 
 def _strip_fences(text: str) -> str:
-    """Strip markdown code fences before JSON parsing."""
+    """Strip markdown code fences and thinking prefixes before JSON parsing.
+
+    Handles:
+    - Plain JSON response
+    - JSON wrapped in ```json ... ``` at start of response
+    - Thinking prefix + JSON fence block (e.g. Qwen CoT mode)
+    - Thinking prefix + bare JSON object at end
+    """
     text = text.strip()
-    match = re.match(r"^```(?:json)?\s*\n?(.*?)\n?```$", text, re.DOTALL)
-    return match.group(1).strip() if match else text
+    # 1. Whole response is a fence block (simple case)
+    match = re.match(r"^```(?:json)?\s*\n?(.*?)\n?```\s*$", text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    # 2. Find any JSON fence block in the text (handles thinking prefix)
+    fence_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
+    if fence_match:
+        return fence_match.group(1).strip()
+    # 3. Find the last bare JSON object or array in the text
+    for bracket in ("{", "["):
+        last_pos = text.rfind(bracket)
+        if last_pos != -1:
+            candidate = text[last_pos:]
+            if _looks_like_json(candidate):
+                return candidate
+    return text
+
+
+def _looks_like_json(text: str) -> bool:
+    """Return True if text can be parsed as JSON."""
+    try:
+        json.loads(text)
+        return True
+    except json.JSONDecodeError:
+        return False
 
 
 class JSONEvaluator(Evaluator):
