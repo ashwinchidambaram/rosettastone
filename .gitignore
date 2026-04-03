@@ -39,6 +39,7 @@ htmlcov/
 
 # Migration output
 migration_output/
+migration_output_*/
 
 # OS
 .DS_Store
