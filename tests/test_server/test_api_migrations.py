@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlmodel import Session, select  # noqa: E402
 
 from rosettastone.server.app import create_app  # noqa: E402
-from rosettastone.server.models import MigrationRecord  # noqa: E402
+from rosettastone.server.models import MigrationRecord, TestCaseRecord  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # UI-only client fixture (no database needed for dummy-data UI tests)
@@ -840,3 +840,146 @@ class TestScoreCharts:
         assert isinstance(histogram, list)
         assert len(histogram) == 10
         assert sum(histogram) == len(scores)
+
+
+# ---------------------------------------------------------------------------
+# HTMX fragments: migration-list and eval-grid
+# ---------------------------------------------------------------------------
+
+
+class TestMigrationListFragment:
+    """Tests for GET /ui/fragments/migration-list."""
+
+    def test_migration_list_fragment_returns_200(self, ui_client: TestClient) -> None:
+        """Fragment endpoint returns 200 with HTML content."""
+        resp = ui_client.get("/ui/fragments/migration-list")
+        assert resp.status_code == 200
+        body = resp.text
+        assert len(body) > 0
+
+    def test_migration_list_fragment_not_placeholder(self, ui_client: TestClient) -> None:
+        """Response is not the original placeholder string."""
+        resp = ui_client.get("/ui/fragments/migration-list")
+        assert resp.status_code == 200
+        assert "Template pending integration" not in resp.text
+
+    def test_migration_list_fragment_shows_dummy_data(self, ui_client: TestClient) -> None:
+        """When DB is empty the fragment falls back to dummy migration cards."""
+        resp = ui_client.get("/ui/fragments/migration-list")
+        assert resp.status_code == 200
+        body = resp.text
+        # Dummy data contains cards linking to /ui/migrations/<id>
+        assert "/ui/migrations/" in body
+
+    def test_migration_list_fragment_with_db_data(
+        self, client: TestClient, sample_migration: MigrationRecord
+    ) -> None:
+        """When DB has a migration the fragment renders a card for it."""
+        resp = client.get("/ui/fragments/migration-list")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "Template pending integration" not in body
+        assert f"/ui/migrations/{sample_migration.id}" in body
+        assert "gpt-4o" in body
+
+    def test_migration_list_fragment_empty_db_shows_no_migrations(
+        self, client: TestClient
+    ) -> None:
+        """When DB is empty the fragment falls back to dummy cards (not empty-state, since
+        DUMMY_MIGRATIONS is non-empty), so we still get card links."""
+        resp = client.get("/ui/fragments/migration-list")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "Template pending integration" not in body
+
+
+class TestEvalGridFragment:
+    """Tests for GET /ui/fragments/eval-grid/{migration_id}."""
+
+    def test_eval_grid_returns_200(self, client: TestClient, sample_migration: MigrationRecord) -> None:
+        """Fragment endpoint returns 200."""
+        resp = client.get(f"/ui/fragments/eval-grid/{sample_migration.id}")
+        assert resp.status_code == 200
+
+    def test_eval_grid_not_placeholder(
+        self, client: TestClient, sample_migration: MigrationRecord
+    ) -> None:
+        """Response is not the original placeholder string."""
+        resp = client.get(f"/ui/fragments/eval-grid/{sample_migration.id}")
+        assert resp.status_code == 200
+        assert "Template pending integration" not in resp.text
+
+    def test_eval_grid_empty_state(
+        self, client: TestClient, sample_migration: MigrationRecord
+    ) -> None:
+        """Migration with no test cases returns the empty-state row."""
+        resp = client.get(f"/ui/fragments/eval-grid/{sample_migration.id}")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "No test cases found for this migration" in body
+
+    def test_eval_grid_with_test_cases(
+        self,
+        client: TestClient,
+        sample_migration: MigrationRecord,
+        sample_test_cases: list,
+    ) -> None:
+        """With test cases present, the fragment returns table rows with scores."""
+        resp = client.get(f"/ui/fragments/eval-grid/{sample_migration.id}")
+        assert resp.status_code == 200
+        body = resp.text
+        # Should contain <tr> elements
+        assert "<tr>" in body
+        # WIN badge present (sample_test_cases are all is_win=True)
+        assert "WIN" in body
+        # Score percentage present
+        assert "%" in body
+
+    def test_eval_grid_shows_output_type(
+        self,
+        client: TestClient,
+        sample_migration: MigrationRecord,
+        sample_test_cases: list,
+    ) -> None:
+        """Test case rows include the output type."""
+        resp = client.get(f"/ui/fragments/eval-grid/{sample_migration.id}")
+        assert resp.status_code == 200
+        body = resp.text
+        # sample_test_cases use output_type="json" → displayed as "Json"
+        assert "Json" in body
+
+    def test_eval_grid_shows_phase(
+        self,
+        client: TestClient,
+        sample_migration: MigrationRecord,
+        sample_test_cases: list,
+    ) -> None:
+        """Test case rows include the phase."""
+        resp = client.get(f"/ui/fragments/eval-grid/{sample_migration.id}")
+        assert resp.status_code == 200
+        body = resp.text
+        # sample_test_cases use phase="validation" → displayed as "Validation"
+        assert "Validation" in body
+
+    def test_eval_grid_loss_badge(
+        self, client: TestClient, engine, session, sample_migration: MigrationRecord
+    ) -> None:
+        """A losing test case shows a LOSS badge."""
+        import json as _json
+
+        tc = TestCaseRecord(
+            migration_id=sample_migration.id,
+            phase="baseline",
+            output_type="short_text",
+            composite_score=0.30,
+            is_win=False,
+            scores_json=_json.dumps({"bertscore": 0.3}),
+            details_json=_json.dumps({}),
+        )
+        session.add(tc)
+        session.commit()
+
+        resp = client.get(f"/ui/fragments/eval-grid/{sample_migration.id}")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "LOSS" in body

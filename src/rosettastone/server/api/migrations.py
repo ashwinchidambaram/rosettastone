@@ -1447,15 +1447,162 @@ async def alerts_page(request: Request, session: Session = Depends(get_session))
 
 
 @router.get("/ui/fragments/migration-list", response_class=HTMLResponse)
-async def migration_list_fragment(request: Request) -> HTMLResponse:
-    """HTMX partial for migration list."""
-    return HTMLResponse("<div>Template pending integration</div>")
+async def migration_list_fragment(
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """HTMX partial for migration list — returns card rows for the migrations table."""
+    from rosettastone.server.rbac import _is_multi_user
+
+    owner_filter = None
+    if _is_multi_user() and not is_admin_user(request):
+        owner_filter = get_current_user_id(request)
+
+    base = select(MigrationRecord)
+    if owner_filter is not None:
+        base = base.where(MigrationRecord.owner_id == owner_filter)
+
+    stmt = base.order_by(MigrationRecord.created_at.desc()).limit(50)  # type: ignore[attr-defined]
+    records = list(session.exec(stmt).all())
+
+    if records:
+        migrations = [_migration_to_template_dict(r, session) for r in records]
+    else:
+        migrations = DUMMY_MIGRATIONS
+
+    rows: list[str] = []
+    for m in migrations:
+        rec_val = m.get("recommendation", "")
+        if rec_val == "Safe to ship":
+            border_color = "#8B9D83"
+            badge_class = "bg-[#8B9D83] text-[#131313]"
+            icon_color = "text-[#8B9D83]"
+            icon_name = "verified"
+            card_hover = "card-glow-sage"
+        elif rec_val == "Do not ship":
+            border_color = "#D85650"
+            badge_class = "bg-[#D85650] text-white"
+            icon_color = "text-[#D85650]"
+            icon_name = "cancel"
+            card_hover = "hover:shadow-xl hover:shadow-[#D85650]/5"
+        else:
+            border_color = "#D4A574"
+            badge_class = "bg-[#D4A574] text-[#131313]"
+            icon_color = "text-[#D4A574]"
+            icon_name = "warning"
+            card_hover = "hover:shadow-xl hover:shadow-[#D4A574]/5"
+
+        mid = m.get("id", "")
+        source = m.get("source", "")
+        target = m.get("target", "")
+        confidence = m.get("confidence", 0)
+        test_cases = m.get("test_cases", 0)
+        cost = m.get("cost", "$0.00")
+        time_ago = m.get("time_ago", "")
+
+        rows.append(
+            f'<a href="/ui/migrations/{mid}" class="block">'
+            '<div class="group relative bg-[#3D3D3D] rounded-xl overflow-hidden cursor-pointer'
+            f' transition-all duration-300 {card_hover} active:scale-[0.99]">'
+            f'<div class="absolute left-0 top-0 bottom-0 w-1" style="background:{border_color}">'
+            "</div>"
+            '<div class="p-6 pl-8">'
+            '<div class="flex justify-between items-start mb-6">'
+            '<div class="flex items-center gap-3">'
+            '<h3 class="font-headline font-medium text-[18px] text-on-surface">'
+            f"{source}"
+            ' <span class="text-on-surface-variant/40 mx-2">&rarr;</span>'
+            f" {target}</h3>"
+            "</div>"
+            f'<span class="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider'
+            f' {badge_class}">{rec_val}</span>'
+            "</div>"
+            '<div class="flex items-center gap-4 text-[#BDBDBD] font-label text-[13px]">'
+            '<div class="flex items-center gap-1.5">'
+            f'<span class="material-symbols-outlined text-[16px] {icon_color}">{icon_name}</span>'
+            f" {confidence}% confidence"
+            "</div>"
+            '<span class="text-white/10">&bull;</span>'
+            f"<span>{test_cases} test cases</span>"
+            '<span class="text-white/10">&bull;</span>'
+            '<div class="flex items-center gap-1">'
+            '<span class="material-symbols-outlined text-[16px]">payments</span>'
+            f" {cost}"
+            "</div>"
+            '<span class="text-white/10">&bull;</span>'
+            '<div class="flex items-center gap-1">'
+            '<span class="material-symbols-outlined text-[16px]">schedule</span>'
+            f" {time_ago}"
+            "</div>"
+            "</div>"
+            "</div>"
+            "</div>"
+            "</a>"
+        )
+
+    if not rows:
+        html = (
+            '<div class="flex flex-col items-center justify-center py-24 text-center'
+            ' text-on-surface-variant/50">'
+            '<span class="material-symbols-outlined text-5xl mb-4 opacity-30">swap_horiz</span>'
+            '<p class="text-lg font-medium">No migrations yet</p>'
+            '<p class="text-sm mt-2 opacity-70">Run your first migration to see results here.</p>'
+            "</div>"
+        )
+    else:
+        html = "\n".join(rows)
+
+    return HTMLResponse(html)
 
 
 @router.get("/ui/fragments/eval-grid/{migration_id}", response_class=HTMLResponse)
-async def eval_grid_fragment(migration_id: int, request: Request) -> HTMLResponse:
-    """HTMX partial for evaluation grid."""
-    return HTMLResponse("<div>Template pending integration</div>")
+async def eval_grid_fragment(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """HTMX partial for evaluation grid — returns test case rows for a migration."""
+    stmt = (
+        select(TestCaseRecord)
+        .where(TestCaseRecord.migration_id == migration_id)
+        .order_by(TestCaseRecord.id.asc())  # type: ignore[attr-defined]
+        .limit(100)
+    )
+    test_cases = list(session.exec(stmt).all())
+
+    if not test_cases:
+        html = (
+            '<tr><td colspan="4" class="px-4 py-8 text-center text-on-surface-variant/50'
+            ' text-sm">No test cases found for this migration.</td></tr>'
+        )
+        return HTMLResponse(html)
+
+    rows: list[str] = []
+    for tc in test_cases:
+        score_pct = round(tc.composite_score * 100)
+        if tc.is_win:
+            badge = (
+                '<span class="px-2 py-0.5 rounded text-[10px] font-bold'
+                ' bg-success/20 text-success">WIN</span>'
+            )
+        else:
+            badge = (
+                '<span class="px-2 py-0.5 rounded text-[10px] font-bold'
+                ' bg-error/20 text-error">LOSS</span>'
+            )
+        output_type_display = tc.output_type.replace("_", " ").title()
+        phase_display = tc.phase.replace("_", " ").title()
+        rows.append(
+            "<tr>"
+            f'<td class="px-4 py-3 text-sm font-mono text-on-surface">{score_pct}%</td>'
+            f'<td class="px-4 py-3 text-sm text-on-surface-variant">{phase_display}</td>'
+            f'<td class="px-4 py-3 text-sm text-on-surface-variant">{output_type_display}</td>'
+            f'<td class="px-4 py-3">{badge}</td>'
+            "</tr>"
+        )
+
+    html = "\n".join(rows)
+    return HTMLResponse(html)
 
 
 @router.get("/ui/fragments/test-case/{migration_id}/{tc_id}", response_class=HTMLResponse)

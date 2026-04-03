@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal
@@ -39,7 +40,9 @@ class MigrationConfig(BaseModel):
     data_path: Path | None = None
 
     # Optional with smart defaults
-    output_dir: Path = Path("./migration_output")
+    output_dir: Path = Field(
+        default_factory=lambda: Path(f"./outputs/{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+    )
     eval_strategy: EvalStrategy = EvalStrategy.AUTO
     optimizer: OptimizerChoice = OptimizerChoice.GEPA
     train_split: float = Field(default=0.2, ge=0.1, le=0.5)

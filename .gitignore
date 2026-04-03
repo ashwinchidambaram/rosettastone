@@ -37,7 +37,8 @@ htmlcov/
 # DSPy cache
 .dspy_cache/
 
-# Migration output
+# Migration output directories
+outputs/
 migration_output/
 migration_output_*/
 
