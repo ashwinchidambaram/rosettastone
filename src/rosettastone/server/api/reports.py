@@ -7,13 +7,21 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+import yaml
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import Response
 from sqlmodel import Session, select
 
 from rosettastone.server.api.utils import _get_migration_or_404
 from rosettastone.server.database import get_session
 from rosettastone.server.models import MigrationRecord, TestCaseRecord
+
+try:
+    from rosettastone.shadow.config import ShadowConfig as _ShadowConfig  # noqa: F401
+
+    _SHADOW_CONFIG_AVAILABLE = True
+except ImportError:
+    _SHADOW_CONFIG_AVAILABLE = False
 
 router = APIRouter()
 
@@ -256,3 +264,93 @@ async def get_executive_report(
             "Content-Disposition": (f'attachment; filename="migration_{migration_id}_executive.md"')
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Shadow deployment endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/api/v1/migrations/{migration_id}/shadow/config.yaml")
+async def get_shadow_config(
+    migration_id: int,
+    session: Session = Depends(get_session),
+) -> Response:
+    """Download a shadow deployment config YAML for a migration."""
+    record = _get_migration_or_404(migration_id, session)
+
+    shadow_dict: dict[str, Any] = {
+        "source_model": record.source_model,
+        "target_model": record.target_model,
+        "primary": "source",
+        "sample_rate": 1.0,
+        "duration_hours": 72,
+        "log_path": "./shadow_logs/",
+        "optimized_prompt": record.optimized_prompt or "",
+        "rollback": {
+            "enabled": True,
+            "error_rate_threshold": 0.05,
+            "latency_p99_ms": 5000,
+        },
+        "endpoints": {
+            "source": "http://localhost:8001/v1/chat/completions",
+            "target": "http://localhost:8002/v1/chat/completions",
+        },
+    }
+
+    yaml_content = yaml.dump(shadow_dict, default_flow_style=False)
+
+    return Response(
+        content=yaml_content,
+        media_type="text/yaml",
+        headers={"Content-Disposition": "attachment; filename=shadow_config.yaml"},
+    )
+
+
+@router.post("/api/v1/migrations/{migration_id}/shadow/evaluate")
+async def evaluate_shadow_logs(
+    migration_id: int,
+    file: UploadFile,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Upload a shadow log JSONL file and score target vs source responses."""
+    record = _get_migration_or_404(migration_id, session)
+
+    try:
+        from rosettastone.shadow.evaluator import score_shadow_logs
+    except ImportError:
+        raise HTTPException(
+            status_code=501,
+            detail="Shadow evaluator requires rosettastone[shadow] dependencies.",
+        )
+
+    try:
+        from rosettastone.config import MigrationConfig
+    except ImportError:
+        raise HTTPException(
+            status_code=501,
+            detail="MigrationConfig not available.",
+        )
+
+    file_content = await file.read()
+    if not file_content.strip():
+        raise HTTPException(status_code=422, detail="Uploaded file is empty.")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        log_path = Path(tmp_dir) / "shadow_upload.jsonl"
+        log_path.write_bytes(file_content)
+
+        config = MigrationConfig(
+            source_model=record.source_model,
+            target_model=record.target_model,
+        )
+
+        try:
+            results = score_shadow_logs(log_path.parent, config)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Failed to evaluate shadow logs: {exc}",
+            )
+
+    return results
