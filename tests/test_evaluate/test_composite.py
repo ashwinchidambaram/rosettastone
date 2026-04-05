@@ -364,7 +364,7 @@ class TestCompositeEvaluatorEvaluate:
 
         call_count = 0
 
-        def side_effect(*args, **kwargs):
+        def side_effect(*_, **__):
             nonlocal call_count
             call_count += 1
             # Fail for pairs 0, 2, 4 (indices 0, 2, 4); succeed for 1 and 3
@@ -409,10 +409,10 @@ class TestCompositeEvaluatorEvaluate:
         """EvalResult.failure_reason is 'api_error' when litellm raises a generic exception."""
         pair = make_pair("Q1", "positive", OutputType.CLASSIFICATION)
 
-        def side_effect(*args, **kwargs):
-            raise ConnectionError("Connection refused")
-
-        with patch("rosettastone.evaluate.composite.litellm.completion", side_effect=side_effect):
+        with patch(
+            "rosettastone.evaluate.composite.litellm.completion",
+            side_effect=ConnectionError("Connection refused"),
+        ):
             results = self.evaluator.evaluate([pair])
 
         assert len(results) == 1
@@ -427,10 +427,10 @@ class TestCompositeEvaluatorEvaluate:
         class FakeTimeoutError(Exception):
             pass
 
-        def side_effect(*args, **kwargs):
-            raise FakeTimeoutError("Request timed out")
-
-        with patch("rosettastone.evaluate.composite.litellm.completion", side_effect=side_effect):
+        with patch(
+            "rosettastone.evaluate.composite.litellm.completion",
+            side_effect=FakeTimeoutError("Request timed out"),
+        ):
             results = self.evaluator.evaluate([pair])
 
         assert len(results) == 1
@@ -450,3 +450,39 @@ class TestCompositeEvaluatorEvaluate:
         assert len(results) == 1
         assert results[0].failure_reason == "json_gate_failed"
         assert results[0].composite_score == 0.0
+
+    def test_failure_reason_rate_limit_on_ratelimit_exception(self) -> None:
+        """EvalResult.failure_reason is 'rate_limit' when a rate-limit exception is raised."""
+        pair = make_pair("Q1", "positive", OutputType.CLASSIFICATION)
+
+        class FakeRateLimitError(Exception):
+            pass
+
+        with patch(
+            "rosettastone.evaluate.composite.litellm.completion",
+            side_effect=FakeRateLimitError("quota exceeded"),
+        ):
+            results = self.evaluator.evaluate([pair])
+
+        assert len(results) == 1
+        assert results[0].failure_reason == "rate_limit"
+        assert results[0].composite_score == 0.0
+        assert results[0].is_win is False
+
+    def test_failure_reason_no_response_on_empty_choices(self) -> None:
+        """EvalResult.failure_reason is 'no_response' when response has empty choices list."""
+        pair = make_pair("Q1", "positive", OutputType.CLASSIFICATION)
+
+        mock_response = MagicMock()
+        mock_response.choices = []
+        mock_response._hidden_params = {}
+
+        with patch(
+            "rosettastone.evaluate.composite.litellm.completion", return_value=mock_response
+        ):
+            results = self.evaluator.evaluate([pair])
+
+        assert len(results) == 1
+        assert results[0].failure_reason == "no_response"
+        assert results[0].composite_score == 0.0
+        assert results[0].is_win is False
