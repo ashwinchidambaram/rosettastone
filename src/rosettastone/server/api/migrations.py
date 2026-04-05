@@ -485,10 +485,12 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
     )
     _baseline_tcs = list(session.exec(_baseline_stmt).all())
     _val_tcs_ordered = list(session.exec(_val_order_stmt).all())
-    # Map: validation tc.id → baseline scores dict (positional match by insertion order)
+    # Map: validation tc.id → baseline scores dict (positional match by insertion order).
+    # Guard: if counts differ (e.g. due to checkpoint resume), skip positional matching entirely
+    # so that delta badges are absent rather than silently wrong.
     _baseline_scores_by_val_id: dict[int, dict[str, float]] = {}
-    for _idx, _val_tc in enumerate(_val_tcs_ordered):
-        if _idx < len(_baseline_tcs):
+    if len(_baseline_tcs) == len(_val_tcs_ordered):
+        for _idx, _val_tc in enumerate(_val_tcs_ordered):
             _b_raw = _baseline_tcs[_idx].scores_json
             _b_scores = json.loads(_b_raw) if _b_raw else {}
             _baseline_scores_by_val_id[_val_tc.id] = {
@@ -565,26 +567,14 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
 
 def _test_case_to_diff_dict(tc: TestCaseRecord, migration: MigrationRecord) -> dict[str, Any]:
     """Convert TestCaseRecord to the diff dict shape the template expects."""
-    scores = json.loads(tc.scores_json)
+    _raw_scores = json.loads(tc.scores_json) if tc.scores_json else {}
+    scores = {k: round(v, 2) for k, v in _raw_scores.items() if isinstance(v, (int, float))}
     return {
         "tc_id": tc.id,
         "is_win": tc.is_win,
         "composite_score": round(tc.composite_score, 2),
         "output_type": tc.output_type.replace("_", " ").title(),
-        "scores": {
-            "bertscore": round(
-                scores.get("bertscore_f1", scores.get("bertscore", scores.get("bert_score", 0))),
-                2,
-            ),
-            "embedding": round(
-                scores.get(
-                    "embedding_sim",
-                    scores.get("embedding_similarity", scores.get("embedding", 0)),
-                ),
-                2,
-            ),
-            "composite": round(tc.composite_score, 2),
-        },
+        "scores": scores,
         "source_model": (
             migration.source_model.split("/")[-1]
             if "/" in migration.source_model
