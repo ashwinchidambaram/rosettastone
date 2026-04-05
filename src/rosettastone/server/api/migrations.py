@@ -491,6 +491,10 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
         else:
             reg["expected"] = "Content not stored"
             reg["got"] = "Content not stored"
+        stored_scores = json.loads(tc.scores_json) if tc.scores_json else {}
+        reg["metric_scores"] = {
+            k: round(v, 2) for k, v in stored_scores.items() if isinstance(v, (int, float))
+        }
         regressions.append(reg)
     result["regressions"] = regressions
 
@@ -1646,29 +1650,21 @@ async def test_case_fragment(
     db_tc = session.get(TestCaseRecord, tc_id) if migration else None
 
     if db_tc and db_tc.migration_id == migration_id:
-        scores = json.loads(db_tc.scores_json)
+        raw_scores: dict[str, float] = json.loads(db_tc.scores_json) if db_tc.scores_json else {}
+        # Build dynamic scores dict: all stored per-metric scores rounded to 2 dp,
+        # with composite appended last if not already present.
+        dynamic_scores: dict[str, float] = {
+            k: round(v, 2) for k, v in raw_scores.items() if isinstance(v, (int, float))
+        }
+        if "composite" not in dynamic_scores and "composite_score" not in dynamic_scores:
+            dynamic_scores["composite"] = round(db_tc.composite_score, 2)
         tc = {
             "tc_id": db_tc.id,
             "is_win": db_tc.is_win,
             "composite_score": round(db_tc.composite_score, 2),
             "output_type": db_tc.output_type.replace("_", " ").title(),
             "phase": db_tc.phase,
-            "scores": {
-                "bertscore": round(
-                    scores.get(
-                        "bertscore_f1", scores.get("bertscore", scores.get("bert_score", 0))
-                    ),
-                    2,
-                ),
-                "embedding": round(
-                    scores.get(
-                        "embedding_sim",
-                        scores.get("embedding_similarity", scores.get("embedding", 0)),
-                    ),
-                    2,
-                ),
-                "composite": round(db_tc.composite_score, 2),
-            },
+            "scores": dynamic_scores,
             "prompt": db_tc.prompt_text,
             "source_response": db_tc.response_text,
             "target_response": db_tc.new_response_text,

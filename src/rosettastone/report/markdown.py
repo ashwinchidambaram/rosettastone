@@ -34,6 +34,17 @@ def _build_sample_comparisons(
     pairs = []
     for i, (b, v) in enumerate(zip(baseline_results, validation_results)):
         delta = v.composite_score - b.composite_score
+        # Compute per-metric deltas for the top improved metric annotation.
+        base_scores: dict[str, float] = getattr(b, "scores", {}) or {}
+        val_scores: dict[str, float] = getattr(v, "scores", {}) or {}
+        metric_deltas = {m: val_scores[m] - base_scores[m] for m in base_scores if m in val_scores}
+        # Pick the single metric with the largest positive delta for the summary note.
+        top_metric: str | None = None
+        top_delta: float = 0.0
+        for m, d in metric_deltas.items():
+            if d > top_delta:
+                top_delta = d
+                top_metric = m
         pairs.append(
             {
                 "index": i,
@@ -43,6 +54,8 @@ def _build_sample_comparisons(
                 "delta": delta,
                 "is_win_before": b.is_win,
                 "is_win_after": v.is_win,
+                "top_metric": top_metric,
+                "top_metric_delta": top_delta,
             }
         )
     pairs.sort(key=lambda x: x["delta"], reverse=True)

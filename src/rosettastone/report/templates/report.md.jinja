@@ -46,10 +46,10 @@ total cost: ${{ "%.4f" | format(cost_usd) }}.
 
 Top {{ sample_comparisons | length }} test cases by score improvement (content omitted for PII safety — see `--output` dir for full pairs):
 
-| # | Output Type | Before | After | Delta | Win? |
-|---|-------------|--------|-------|-------|------|
+| # | Output Type | Before | After | Delta | Win? | Top Metric |
+|---|-------------|--------|-------|-------|------|------------|
 {% for s in sample_comparisons -%}
-| {{ s.index }} | {{ s.output_type }} | {{ "%.3f" | format(s.baseline_score) }} | {{ "%.3f" | format(s.optimized_score) }} | {{ "+" if s.delta >= 0 else "" }}{{ "%.3f" | format(s.delta) }} | {{ "no→yes" if (not s.is_win_before and s.is_win_after) else ("yes→yes" if (s.is_win_before and s.is_win_after) else ("yes→no" if (s.is_win_before and not s.is_win_after) else "no→no")) }} |
+| {{ s.index }} | {{ s.output_type }} | {{ "%.3f" | format(s.baseline_score) }} | {{ "%.3f" | format(s.optimized_score) }} | {{ "+" if s.delta >= 0 else "" }}{{ "%.3f" | format(s.delta) }} | {{ "no→yes" if (not s.is_win_before and s.is_win_after) else ("yes→yes" if (s.is_win_before and s.is_win_after) else ("yes→no" if (s.is_win_before and not s.is_win_after) else "no→no")) }} | {{ (s.top_metric ~ ": +" ~ "%.2f" | format(s.top_metric_delta)) if s.top_metric else "—" }} |
 {% endfor %}
 
 ---
@@ -123,20 +123,22 @@ _No validation results available._
 {% if at_risk_list %}
 ### At Risk (Below Threshold After Optimization)
 
-| # | Output Type | Baseline | Optimized | Delta | Win Before | Win After |
-|---|-------------|----------|-----------|-------|------------|-----------|
+| # | Output Type | Baseline | Optimized | Delta | Win Before | Win After | Key Metric Changes |
+|---|-------------|----------|-----------|-------|------------|-----------|-------------------|
 {% for r in at_risk_list -%}
-| {{ r.prompt_index }} | {{ r.output_type }} | {{ "%.3f" | format(r.baseline_score) }} | {{ "%.3f" | format(r.optimized_score) }} | {{ "%+.3f" | format(r.delta) }} | {{ "yes" if r.baseline_is_win else "no" }} | {{ "yes" if r.optimized_is_win else "no" }} |
+{% set sig_deltas = [] %}{% for m, d in (r.metric_deltas.items() if r.metric_deltas else []) %}{% if d | abs > 0.03 %}{% set _ = sig_deltas.append(m ~ ": " ~ ("%+.2f" | format(d))) %}{% endif %}{% endfor %}
+| {{ r.prompt_index }} | {{ r.output_type }} | {{ "%.3f" | format(r.baseline_score) }} | {{ "%.3f" | format(r.optimized_score) }} | {{ "%+.3f" | format(r.delta) }} | {{ "yes" if r.baseline_is_win else "no" }} | {{ "yes" if r.optimized_is_win else "no" }} | {{ sig_deltas | join(" · ") if sig_deltas else "—" }} |
 {% endfor %}
 {% endif %}
 
 {% if regressed_list %}
 ### Regressed (Score Dropped, Still Above Threshold)
 
-| # | Output Type | Baseline | Optimized | Delta | Win Before | Win After |
-|---|-------------|----------|-----------|-------|------------|-----------|
+| # | Output Type | Baseline | Optimized | Delta | Win Before | Win After | Key Metric Changes |
+|---|-------------|----------|-----------|-------|------------|-----------|-------------------|
 {% for r in regressed_list[:10] -%}
-| {{ r.prompt_index }} | {{ r.output_type }} | {{ "%.3f" | format(r.baseline_score) }} | {{ "%.3f" | format(r.optimized_score) }} | {{ "%+.3f" | format(r.delta) }} | {{ "yes" if r.baseline_is_win else "no" }} | {{ "yes" if r.optimized_is_win else "no" }} |
+{% set sig_deltas = [] %}{% for m, d in (r.metric_deltas.items() if r.metric_deltas else []) %}{% if d | abs > 0.03 %}{% set _ = sig_deltas.append(m ~ ": " ~ ("%+.2f" | format(d))) %}{% endif %}{% endfor %}
+| {{ r.prompt_index }} | {{ r.output_type }} | {{ "%.3f" | format(r.baseline_score) }} | {{ "%.3f" | format(r.optimized_score) }} | {{ "%+.3f" | format(r.delta) }} | {{ "yes" if r.baseline_is_win else "no" }} | {{ "yes" if r.optimized_is_win else "no" }} | {{ sig_deltas | join(" · ") if sig_deltas else "—" }} |
 {% endfor %}
 {% if regressed_list | length > 10 %}
 _...and {{ regressed_list | length - 10 }} more regressed prompts not shown._

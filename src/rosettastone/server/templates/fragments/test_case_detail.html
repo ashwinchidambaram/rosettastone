@@ -14,33 +14,40 @@
 
 <!-- Metric Bars -->
 <div class="px-8 py-6 space-y-5">
+    {% if tc.scores %}
+    {% for metric_name, score in tc.scores.items() %}
+    {% set is_composite = metric_name in ('composite', 'composite_score') %}
     <div class="space-y-2">
         <div class="flex justify-between text-[11px] font-mono text-on-surface/60 uppercase tracking-widest">
-            <span>BERTScore</span>
-            <span class="text-on-surface">{{ tc.scores.bertscore }}</span>
+            <span>{{ metric_name | replace('_', ' ') | title }}</span>
+            <span class="{% if is_composite %}text-[#D4A574] font-bold{% else %}text-on-surface{% endif %}">{{ score }}</span>
         </div>
         <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-            <div class="h-full bg-[#8B9D83]/40 rounded-full" style="width: {{ (tc.scores.bertscore * 100)|int }}%"></div>
+            {% set bar_pct = [score * 100, 100] | min | int %}
+            {% if is_composite %}
+            <div class="h-full bg-[#D4A574] rounded-full" style="width: {{ bar_pct }}%"></div>
+            {% elif score >= 0.8 %}
+            <div class="h-full bg-[#8B9D83] rounded-full" style="width: {{ bar_pct }}%"></div>
+            {% elif score >= 0.6 %}
+            <div class="h-full bg-[#D4A574]/70 rounded-full" style="width: {{ bar_pct }}%"></div>
+            {% else %}
+            <div class="h-full bg-[#D85650]/70 rounded-full" style="width: {{ bar_pct }}%"></div>
+            {% endif %}
         </div>
     </div>
-    <div class="space-y-2">
-        <div class="flex justify-between text-[11px] font-mono text-on-surface/60 uppercase tracking-widest">
-            <span>Embedding similarity</span>
-            <span class="text-on-surface">{{ tc.scores.embedding }}</span>
-        </div>
-        <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-            <div class="h-full bg-[#8B9D83] rounded-full" style="width: {{ (tc.scores.embedding * 100)|int }}%"></div>
-        </div>
-    </div>
+    {% endfor %}
+    {% else %}
+    {# Fallback: show composite score only when scores dict is empty #}
     <div class="space-y-2">
         <div class="flex justify-between text-[11px] font-mono text-on-surface/60 uppercase tracking-widest">
             <span>Composite</span>
-            <span class="text-[#D4A574] font-bold">{{ tc.scores.composite }}</span>
+            <span class="text-[#D4A574] font-bold">{{ tc.composite_score }}</span>
         </div>
         <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-            <div class="h-full bg-[#D4A574] rounded-full" style="width: {{ (tc.scores.composite * 100)|int }}%"></div>
+            <div class="h-full bg-[#D4A574] rounded-full" style="width: {{ (tc.composite_score * 100)|int }}%"></div>
         </div>
     </div>
+    {% endif %}
 </div>
 
 <!-- Content Section -->

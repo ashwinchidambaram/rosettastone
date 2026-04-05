@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from rosettastone.core.types import EvalResult, MigrationResult, PromptPair
+from rosettastone.core.types import EvalResult, MigrationResult, PromptPair, PromptRegression
 from rosettastone.report.markdown import generate_markdown_report
 
 
@@ -42,6 +42,9 @@ def _base_result(**kwargs) -> MigrationResult:
         stage_timing=kwargs.get("stage_timing", {}),
         eval_runs=int(kwargs.get("eval_runs", 1)),
         non_deterministic_count=int(kwargs.get("non_deterministic_count", 0)),
+        prompt_regressions=kwargs.get("prompt_regressions", []),
+        regression_count=int(kwargs.get("regression_count", 0)),
+        at_risk_count=int(kwargs.get("at_risk_count", 0)),
     )
 
 
@@ -176,3 +179,119 @@ def test_eval_reliability_section_absent_when_baseline(tmp_path):
     assert "## Evaluation Reliability" not in content
     assert "Evaluation runs:" not in content
     assert "Non-deterministic pairs:" not in content
+
+
+# ---------------------------------------------------------------------------
+# Feature 4: Dynamic per-pair metric breakdown
+# ---------------------------------------------------------------------------
+
+
+def _make_eval_result(scores: dict[str, float], composite: float, is_win: bool) -> EvalResult:
+    """Build a minimal EvalResult for testing."""
+    return EvalResult(
+        prompt_pair=PromptPair(prompt="test", response="expected", source_model="openai/gpt-4o"),
+        new_response="actual",
+        scores=scores,
+        composite_score=composite,
+        is_win=is_win,
+        details={"output_type": "json"},
+    )
+
+
+def test_regression_section_shows_metric_deltas_when_non_empty(tmp_path):
+    """Regression table shows 'Key Metric Changes' column with significant per-metric deltas."""
+    regression = PromptRegression(
+        prompt_index=2,
+        output_type="json",
+        baseline_score=0.82,
+        optimized_score=0.61,
+        delta=-0.21,
+        baseline_is_win=True,
+        optimized_is_win=False,
+        status="at_risk",
+        metric_deltas={
+            "bertscore_f1": -0.12,
+            "embedding_sim": -0.08,
+            "json_validator": -0.01,  # abs < 0.03, should be filtered
+        },
+    )
+    result = _base_result(
+        prompt_regressions=[regression],
+        at_risk_count=1,
+        regression_count=0,
+    )
+    output_path = generate_markdown_report(result, tmp_path)
+    content = output_path.read_text()
+
+    # Column header must be present
+    assert "Key Metric Changes" in content
+    # Significant deltas (abs > 0.03) should appear
+    assert "bertscore_f1" in content
+    assert "embedding_sim" in content
+    # Small delta (abs <= 0.03) should be filtered out
+    assert "json_validator" not in content
+
+
+def test_regression_section_shows_dash_when_metric_deltas_empty(tmp_path):
+    """Regression table shows '—' in Key Metric Changes when metric_deltas is empty."""
+    regression = PromptRegression(
+        prompt_index=5,
+        output_type="short_text",
+        baseline_score=0.75,
+        optimized_score=0.60,
+        delta=-0.15,
+        baseline_is_win=True,
+        optimized_is_win=False,
+        status="at_risk",
+        metric_deltas={},
+    )
+    result = _base_result(
+        prompt_regressions=[regression],
+        at_risk_count=1,
+        regression_count=0,
+    )
+    output_path = generate_markdown_report(result, tmp_path)
+    content = output_path.read_text()
+
+    assert "Key Metric Changes" in content
+    # When metric_deltas is empty the cell should render the em-dash fallback
+    assert "—" in content
+
+
+def test_sample_improvements_shows_top_metric_column(tmp_path):
+    """Sample Improvements table has a 'Top Metric' column populated from scores."""
+    baseline = _make_eval_result(
+        scores={"bertscore_f1": 0.60, "embedding_sim": 0.55},
+        composite=0.58,
+        is_win=False,
+    )
+    validation = _make_eval_result(
+        scores={"bertscore_f1": 0.85, "embedding_sim": 0.70},
+        composite=0.80,
+        is_win=True,
+    )
+    result = _base_result(
+        baseline_results=[baseline],
+        validation_results=[validation],
+    )
+    output_path = generate_markdown_report(result, tmp_path)
+    content = output_path.read_text()
+
+    assert "Top Metric" in content
+    # bertscore_f1 improved by +0.25; embedding_sim by +0.15 → bertscore_f1 wins
+    assert "bertscore_f1" in content
+
+
+def test_sample_improvements_shows_dash_when_no_scores(tmp_path):
+    """Sample Improvements top metric shows '—' when EvalResult.scores is empty."""
+    baseline = _make_eval_result(scores={}, composite=0.50, is_win=False)
+    validation = _make_eval_result(scores={}, composite=0.75, is_win=True)
+    result = _base_result(
+        baseline_results=[baseline],
+        validation_results=[validation],
+    )
+    output_path = generate_markdown_report(result, tmp_path)
+    content = output_path.read_text()
+
+    assert "Top Metric" in content
+    assert "—" in content
