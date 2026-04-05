@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rosettastone.utils.logging import get_logger
 
@@ -261,6 +261,7 @@ class Migrator:
 
         def _make_gepa_cost_callback(
             gepa_cost_accumulator: list[float],
+            ctx: Any = None,
             max_cost_usd: float | None = None,
         ) -> Callable[[dict, object, object, object], None]:
             def _gepa_cost_callback(
@@ -271,6 +272,16 @@ class Migrator:
             ) -> None:
                 cost = kwargs.get("response_cost", 0.0) or 0.0
                 gepa_cost_accumulator[0] += cost
+                # Accumulate token counts if ctx is available
+                if ctx is not None:
+                    try:
+                        _usage = getattr(completion_response, "usage", None)
+                        if _usage is not None:
+                            _pt = getattr(_usage, "prompt_tokens", 0) or 0
+                            _ct = getattr(_usage, "completion_tokens", 0) or 0
+                            ctx.add_tokens("optimization", int(_pt), int(_ct))
+                    except Exception:
+                        pass
                 if max_cost_usd is not None and gepa_cost_accumulator[0] > max_cost_usd:
                     raise CostLimitExceeded(gepa_cost_accumulator[0], max_cost_usd)
 
@@ -288,7 +299,7 @@ class Migrator:
             if not optimized_prompt:
                 _gepa_cost: list[float] = [0.0]
                 _gepa_cb = _make_gepa_cost_callback(
-                    _gepa_cost, max_cost_usd=self.config.max_cost_usd
+                    _gepa_cost, ctx=ctx, max_cost_usd=self.config.max_cost_usd
                 )
                 _litellm.success_callback.append(_gepa_cb)
                 t0 = time.time()
@@ -319,7 +330,9 @@ class Migrator:
                 ctx.timing["optimize"] = 0.0
         else:
             _gepa_cost2: list[float] = [0.0]
-            _gepa_cb2 = _make_gepa_cost_callback(_gepa_cost2, max_cost_usd=self.config.max_cost_usd)
+            _gepa_cb2 = _make_gepa_cost_callback(
+                _gepa_cost2, ctx=ctx, max_cost_usd=self.config.max_cost_usd
+            )
             _litellm.success_callback.append(_gepa_cb2)
             t0 = time.time()
             try:

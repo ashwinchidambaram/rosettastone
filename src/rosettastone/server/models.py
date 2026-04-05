@@ -64,6 +64,10 @@ class MigrationRecord(SQLModel, table=True):
     estimated_cost_usd: float | None = None
     owner_id: int | None = None
 
+    # F5: Token tracking
+    total_tokens: int = Field(default=0)
+    token_breakdown_json: str = Field(default="{}")
+
     test_cases: list["TestCaseRecord"] = Relationship(back_populates="migration")
     warning_records: list["WarningRecord"] = Relationship(back_populates="migration")
 

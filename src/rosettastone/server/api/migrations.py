@@ -412,6 +412,10 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
     result["projected_source_cost_per_call"] = record.projected_source_cost_per_call
     result["projected_target_cost_per_call"] = record.projected_target_cost_per_call
 
+    # Token tracking
+    result["total_tokens"] = record.total_tokens
+    result["token_breakdown"] = json.loads(record.token_breakdown_json or "{}")
+
     # Checkpoint info
     result["checkpoint_stage"] = record.checkpoint_stage
 

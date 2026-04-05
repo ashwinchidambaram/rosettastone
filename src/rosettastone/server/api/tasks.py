@@ -266,6 +266,8 @@ def run_migration_background(
             record.duration_seconds = result.duration_seconds
             record.recommendation = result.recommendation
             record.recommendation_reasoning = result.recommendation_reasoning
+            record.total_tokens = result.total_tokens
+            record.token_breakdown_json = json.dumps(result.token_breakdown)
             # Store latency and cost data
             if latency_data:
                 record.source_latency_p50 = latency_data.get("source_p50")
@@ -363,6 +365,21 @@ def run_migration_background(
                     logger.warning("Failed to create version/audit: %s", ver_err)
 
             session.commit()
+
+        if not is_dry_run:
+            logger.info(
+                "migration_complete",
+                extra={
+                    "migration_id": migration_id,
+                    "total_tokens": result.total_tokens,
+                    "cost_usd": result.cost_usd,
+                    "baseline_score": result.baseline_score,
+                    "confidence_score": result.confidence_score,
+                    "recommendation": result.recommendation,
+                    "duration_ms": round(result.duration_seconds * 1000),
+                    "stage_durations": {k: round(v * 1000) for k, v in result.stage_timing.items()},
+                },
+            )
 
         # Emit final status to SSE clients
         final_status = "dry_run_complete" if is_dry_run else "complete"

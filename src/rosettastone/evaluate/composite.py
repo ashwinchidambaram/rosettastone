@@ -96,6 +96,15 @@ class CompositeEvaluator:
                 cost = getattr(response, "_hidden_params", {}).get("response_cost", 0.0) or 0.0
                 if self._ctx is not None:
                     self._ctx.add_cost("evaluation", cost)
+                if self._ctx is not None:
+                    try:
+                        _usage = getattr(response, "usage", None)
+                        if _usage is not None:
+                            _pt = getattr(_usage, "prompt_tokens", 0) or 0
+                            _ct = getattr(_usage, "completion_tokens", 0) or 0
+                            self._ctx.add_tokens("evaluation", int(_pt), int(_ct))
+                    except Exception:
+                        pass
                 if not response.choices:
                     logger.warning("Pair %d: empty choices in response, skipping", i)
                     skipped_count += 1

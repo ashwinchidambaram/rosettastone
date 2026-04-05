@@ -81,6 +81,8 @@ def _migrate_add_columns(engine: Engine) -> None:
         ("migrations", "target_latency_p95", "REAL"),
         ("migrations", "projected_source_cost_per_call", "REAL"),
         ("migrations", "projected_target_cost_per_call", "REAL"),
+        ("migrations", "total_tokens", "INTEGER DEFAULT 0"),
+        ("migrations", "token_breakdown_json", "TEXT DEFAULT '{}'"),
     ]
     with engine.connect() as conn:
         if _is_postgres(engine):

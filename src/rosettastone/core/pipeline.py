@@ -371,6 +371,9 @@ def build_result(
 
     total_cost = sum(ctx.costs.values()) if ctx else 0.0
     cost_breakdown = dict(ctx.costs) if ctx else {}
+    total_tokens = sum(ctx.token_counts.values()) if ctx else 0
+    token_breakdown = dict(ctx.token_counts) if ctx else {}
+    stage_timing = dict(ctx.timing) if ctx else {}
 
     # Build config dict and add cluster_summary if available
     config_dict = config.model_dump(mode="json")
@@ -461,6 +464,9 @@ def build_result(
         at_risk_count=at_risk_count,
         non_deterministic_count=non_deterministic_count,
         eval_runs=eval_runs_value,
+        total_tokens=total_tokens,
+        token_breakdown=token_breakdown,
+        stage_timing=stage_timing,
     )
 
 

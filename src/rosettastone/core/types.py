@@ -85,3 +85,8 @@ class MigrationResult(BaseModel):
     # T4: Multi-run metadata
     non_deterministic_count: int = 0
     eval_runs: int = 1
+
+    # F5: Token tracking
+    total_tokens: int = 0
+    token_breakdown: dict[str, int] = {}
+    stage_timing: dict[str, float] = {}

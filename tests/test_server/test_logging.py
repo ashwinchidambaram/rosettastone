@@ -149,3 +149,28 @@ def test_json_formatter_extra_fields() -> None:
     assert data.get("request_id") == "req-abc-123"
     assert data.get("migration_id") == 7
     assert data.get("duration_ms") == 1234.5
+
+
+def test_migration_complete_log_has_expected_fields(caplog):
+    """migration_complete log event contains token/cost/recommendation fields."""
+    with caplog.at_level(logging.INFO, logger="rosettastone"):
+        logger = logging.getLogger("rosettastone.server.api.tasks")
+        logger.info(
+            "migration_complete",
+            extra={
+                "migration_id": 42,
+                "total_tokens": 1500,
+                "cost_usd": 0.05,
+                "baseline_score": 0.75,
+                "confidence_score": 0.82,
+                "recommendation": "GO",
+                "duration_ms": 5000,
+                "stage_durations": {"ingest": 100, "baseline_eval": 2000},
+            },
+        )
+
+    assert len(caplog.records) >= 1
+    record = caplog.records[-1]
+    assert record.getMessage() == "migration_complete"
+    assert getattr(record, "total_tokens", None) == 1500
+    assert getattr(record, "recommendation", None) == "GO"

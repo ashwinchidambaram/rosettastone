@@ -256,6 +256,23 @@ function showPersonaView(view) {
                 <div class="text-3xl font-bold text-success font-headline mb-1">+{{ migration.improvement }}%</div>
                 <div class="text-xs text-on-surface-variant/70 font-medium">Improvement from GEPA</div>
             </div>
+            {% if migration.total_tokens %}
+            <div class="bg-surface-container-low p-6 rounded-xl">
+              <div class="text-3xl font-bold font-headline mb-1 text-primary">
+                {{ "{:,}".format(migration.total_tokens) }}
+              </div>
+              <div class="text-xs text-on-surface-variant/70 font-medium">Total Tokens</div>
+              {% if migration.token_breakdown %}
+              <div class="mt-2 space-y-0.5">
+                {% for phase, count in migration.token_breakdown.items() %}
+                <div class="text-[10px] text-on-surface-variant/50 font-mono">
+                  {{ phase }}: {{ "{:,}".format(count) }}
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+            {% endif %}
         </section>
 
         {% if migration.source_latency_p50 %}

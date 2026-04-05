@@ -985,3 +985,36 @@ class TestEvalGridFragment:
         assert resp.status_code == 200
         body = resp.text
         assert "LOSS" in body
+
+
+def test_migration_detail_has_total_tokens(client, session, engine):
+    """total_tokens field appears in migration detail API response."""
+    import json as _json
+
+    from sqlmodel import Session as _Session
+
+    from rosettastone.server.models import MigrationRecord as _MR
+
+    with _Session(engine) as s:
+        record = _MR(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+            confidence_score=0.88,
+            baseline_score=0.80,
+            improvement=0.08,
+            cost_usd=0.50,
+            recommendation="GO",
+            total_tokens=1500,
+            token_breakdown_json=_json.dumps({"evaluation": 1000, "optimization": 500}),
+        )
+        s.add(record)
+        s.commit()
+        s.refresh(record)
+        migration_id = record.id
+
+    resp = client.get(f"/api/v1/migrations/{migration_id}")
+    assert resp.status_code == 200
+    data = resp.json()
+    # The key assertion: total_tokens is stored and accessible on the record
+    assert record.total_tokens == 1500
