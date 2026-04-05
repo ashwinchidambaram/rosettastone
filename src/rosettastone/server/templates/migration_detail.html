@@ -243,7 +243,7 @@ function showPersonaView(view) {
         </section>
 
         <!-- KPI Grid -->
-        <section class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <section class="grid grid-cols-1 sm:grid-cols-3 {% if migration.non_deterministic_count > 0 %}lg:grid-cols-4{% endif %} gap-6">
             <div class="bg-surface-container-low p-6 rounded-xl">
                 <div class="text-3xl font-bold text-success font-headline mb-1">{{ migration.confidence }}%</div>
                 <div class="text-xs text-on-surface-variant/70 font-medium">Parity Score</div>
@@ -256,6 +256,12 @@ function showPersonaView(view) {
                 <div class="text-3xl font-bold text-success font-headline mb-1">+{{ migration.improvement }}%</div>
                 <div class="text-xs text-on-surface-variant/70 font-medium">Improvement from GEPA</div>
             </div>
+            {% if migration.non_deterministic_count > 0 %}
+            <div class="bg-surface-container-low p-6 rounded-xl border border-[#D4A574]/30" title="{{ migration.non_deterministic_count }} test pair(s) showed high score variance across evaluation runs">
+                <div class="text-3xl font-bold text-[#D4A574] font-headline mb-1">{{ migration.non_deterministic_count }} unstable</div>
+                <div class="text-xs text-on-surface-variant/70 font-medium">High-variance test pairs</div>
+            </div>
+            {% endif %}
         </section>
 
         {% if migration.source_latency_p50 %}
@@ -296,9 +302,17 @@ function showPersonaView(view) {
                     <div>
                         <div class="text-sm font-semibold text-on-surface-variant mb-1">{{ pt.type }}</div>
                         <div class="text-2xl font-bold font-headline">{{ pt.wins }}/{{ pt.total }} <span class="text-sm text-on-surface-variant font-normal">({{ (pt.wins / pt.total * 100)|int if pt.total else 0 }}%)</span></div>
+                        {% if pt.ci_lower is defined and (pt.ci_lower != 0.0 or pt.ci_upper != 0.0) %}
+                        <div class="text-[11px] text-on-surface-variant/60 mt-1">CI: [{{ "%.0f"|format(pt.ci_lower * 100) }}% – {{ "%.0f"|format(pt.ci_upper * 100) }}%]</div>
+                        {% endif %}
                     </div>
-                    <span class="px-3 py-1 text-[10px] font-bold rounded
-                        {% if pt.badge == 'PASS' %}bg-success/10 text-success border border-success/30{% elif pt.badge == 'WARN' %}bg-warn/10 text-warn border border-warn/30{% else %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% endif %}">{{ pt.badge }}</span>
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="px-3 py-1 text-[10px] font-bold rounded
+                            {% if pt.badge == 'PASS' %}bg-success/10 text-success border border-success/30{% elif pt.badge == 'WARN' %}bg-warn/10 text-warn border border-warn/30{% else %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% endif %}">{{ pt.badge }}</span>
+                        {% if pt.p90 is defined and pt.p10 is defined and (pt.p90 - pt.p10) > 0.25 %}
+                        <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/30">high variance</span>
+                        {% endif %}
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -423,6 +437,34 @@ function showPersonaView(view) {
             </div>
         </section>
 
+        <!-- Pipeline Stages Section -->
+        {% if migration.stage_timing %}
+        <details class="mt-4">
+          <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400 select-none">Pipeline Stages</summary>
+          <div class="mt-2 bg-surface-container-low rounded-xl p-4">
+            <table class="w-full text-xs">
+              <thead>
+                <tr>
+                  <th class="text-left text-on-surface-variant pb-2">Stage</th>
+                  <th class="text-right text-on-surface-variant pb-2">Duration</th>
+                  <th class="text-right text-on-surface-variant pb-2">Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% set total = migration.duration_seconds if migration.duration_seconds is defined else 0 %}
+                {% for stage, secs in migration.stage_timing.items() %}
+                <tr>
+                  <td class="text-gray-700 dark:text-gray-300 py-1">{{ stage }}</td>
+                  <td class="text-right text-gray-600 dark:text-gray-400">{{ "%.1f"|format(secs) }}s</td>
+                  <td class="text-right text-gray-500">{{ "%.0f"|format(secs / total * 100) if total > 0 else "—" }}%</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </details>
+        {% endif %}
+
         <!-- Quick Stats -->
         <section class="bg-gradient-to-br from-surface-container-low to-surface-container-lowest p-6 rounded-xl border border-outline-variant/5">
             <h4 class="text-[10px] font-label uppercase tracking-[0.2em] text-on-surface-variant mb-6">Model Metadata</h4>
@@ -524,9 +566,17 @@ function showPersonaView(view) {
                 <p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant mb-2">{{ pt.type }}</p>
                 <p class="text-2xl font-bold mb-1">{{ pt.wins }}/{{ pt.total }} ({{ (pt.wins / pt.total * 100)|int if pt.total else 0 }}%)</p>
                 <p class="text-sm {% if pt.badge == 'FAIL' %}text-[#D85650]{% elif pt.badge == 'WARN' %}text-tertiary-container{% else %}text-secondary{% endif %}">{{ pt.desc }}</p>
+                {% if pt.ci_lower is defined and (pt.ci_lower != 0.0 or pt.ci_upper != 0.0) %}
+                <p class="text-[11px] text-on-surface-variant/60 mt-1">CI: [{{ "%.0f"|format(pt.ci_lower * 100) }}% – {{ "%.0f"|format(pt.ci_upper * 100) }}%]</p>
+                {% endif %}
             </div>
-            <span class="px-2 py-1 rounded text-[10px] font-bold tracking-tighter
-                {% if pt.badge == 'FAIL' %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% elif pt.badge == 'WARN' %}bg-tertiary-container/10 text-tertiary-container border border-tertiary-container/20{% else %}bg-secondary/10 text-secondary border border-secondary/20{% endif %}">{{ pt.badge }}</span>
+            <div class="flex flex-col items-end gap-2">
+                <span class="px-2 py-1 rounded text-[10px] font-bold tracking-tighter
+                    {% if pt.badge == 'FAIL' %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% elif pt.badge == 'WARN' %}bg-tertiary-container/10 text-tertiary-container border border-tertiary-container/20{% else %}bg-secondary/10 text-secondary border border-secondary/20{% endif %}">{{ pt.badge }}</span>
+                {% if pt.p90 is defined and pt.p10 is defined and (pt.p90 - pt.p10) > 0.25 %}
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/30">high variance</span>
+                {% endif %}
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -676,9 +726,17 @@ function showPersonaView(view) {
                 <p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant mb-2">{{ pt.type }}</p>
                 <p class="text-2xl font-bold mb-1">{{ pt.wins }}/{{ pt.total }} ({{ (pt.wins / pt.total * 100)|int if pt.total else 0 }}%)</p>
                 <p class="text-sm {% if pt.badge == 'FAIL' %}text-[#D85650]{% elif pt.badge == 'WARN' %}text-[#D4A574]{% else %}text-secondary{% endif %}">{{ pt.desc }}</p>
+                {% if pt.ci_lower is defined and (pt.ci_lower != 0.0 or pt.ci_upper != 0.0) %}
+                <p class="text-[11px] text-on-surface-variant/60 mt-1">CI: [{{ "%.0f"|format(pt.ci_lower * 100) }}% – {{ "%.0f"|format(pt.ci_upper * 100) }}%]</p>
+                {% endif %}
             </div>
-            <span class="px-2 py-1 rounded text-[10px] font-bold tracking-tighter
-                {% if pt.badge == 'FAIL' %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% elif pt.badge == 'WARN' %}bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/20{% else %}bg-secondary/10 text-secondary border border-secondary/20{% endif %}">{{ pt.badge }}</span>
+            <div class="flex flex-col items-end gap-2">
+                <span class="px-2 py-1 rounded text-[10px] font-bold tracking-tighter
+                    {% if pt.badge == 'FAIL' %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% elif pt.badge == 'WARN' %}bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/20{% else %}bg-secondary/10 text-secondary border border-secondary/20{% endif %}">{{ pt.badge }}</span>
+                {% if pt.p90 is defined and pt.p10 is defined and (pt.p90 - pt.p10) > 0.25 %}
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/30">high variance</span>
+                {% endif %}
+            </div>
         </div>
         {% endfor %}
     </div>

@@ -89,6 +89,8 @@ def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
         eval_runs=getattr(result, "eval_runs", 1),
         non_deterministic_count=getattr(result, "non_deterministic_count", 0),
         variance_flag_threshold=result.config.get("variance_flag_threshold", 0.1),
+        # Phase A: stage timing breakdown
+        stage_timing=getattr(result, "stage_timing", {}),
         # Prompt evolution / sample comparisons
         sample_comparisons=sample_comparisons,
     )

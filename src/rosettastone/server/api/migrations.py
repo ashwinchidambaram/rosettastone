@@ -445,6 +445,11 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
         else:
             desc = "Strong semantic match"
 
+        ci = stats.get("confidence_interval", [0.0, 0.0])
+        if not isinstance(ci, (list, tuple)) or len(ci) < 2:
+            ci = [0.0, 0.0]
+        p10 = stats.get("p10", 0.0)
+        p90 = stats.get("p90", 0.0)
         per_type.append(
             {
                 "type": type_name.replace("_", " ").title(),
@@ -452,6 +457,10 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
                 "total": sample_count,
                 "badge": badge,
                 "desc": desc,
+                "ci_lower": ci[0],
+                "ci_upper": ci[1],
+                "p10": p10,
+                "p90": p90,
             }
         )
     result["per_type"] = per_type
@@ -497,6 +506,17 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
     result["wins"] = chart_wins
     result["losses"] = chart_losses
     result["score_histogram"] = score_histogram
+
+    # Phase A observability: stage timing and eval reliability
+    _raw_config = json.loads(record.config_json) if record.config_json else {}
+    _stage_timing_raw = _raw_config.get("_stage_timing", {})
+    result["stage_timing"] = (
+        {k: float(v) for k, v in _stage_timing_raw.items()}
+        if isinstance(_stage_timing_raw, dict)
+        else {}
+    )
+    result["non_deterministic_count"] = int(_raw_config.get("_non_deterministic_count", 0) or 0)
+    result["eval_runs"] = int(_raw_config.get("_eval_runs", 1) or 1)
 
     return result
 
@@ -678,6 +698,14 @@ def _migration_to_detail(record: MigrationRecord, session: Session) -> Migration
                 "representative_pairs": cluster_info.get("representative_pairs"),
             }
 
+    # Extract Phase A observability fields stored in config_json
+    stage_timing: dict[str, float] = {}
+    _stage_timing_raw = config.pop("_stage_timing", None)
+    if isinstance(_stage_timing_raw, dict):
+        stage_timing = {k: float(v) for k, v in _stage_timing_raw.items()}
+    non_deterministic_count: int = int(config.pop("_non_deterministic_count", 0) or 0)
+    eval_runs: int = int(config.pop("_eval_runs", 1) or 1)
+
     return MigrationDetail(
         id=record.id,  # type: ignore[arg-type]
         source_model=record.source_model,
@@ -703,6 +731,9 @@ def _migration_to_detail(record: MigrationRecord, session: Session) -> Migration
         warnings=warnings,
         safety_warnings=safety_warnings,
         cluster_summary=cluster_summary,
+        stage_timing=stage_timing,
+        non_deterministic_count=non_deterministic_count,
+        eval_runs=eval_runs,
         test_cases=test_case_summaries,
     )
 
@@ -960,9 +991,7 @@ async def get_migration_regressions(
         base_scores = json.loads(base_tc.scores_json) if base_tc.scores_json else {}
         val_scores = json.loads(val_tc.scores_json) if val_tc.scores_json else {}
         metric_deltas: dict[str, float] = {
-            m: val_scores[m] - base_scores[m]
-            for m in base_scores
-            if m in val_scores
+            m: val_scores[m] - base_scores[m] for m in base_scores if m in val_scores
         }
 
         prompt_regressions.append(

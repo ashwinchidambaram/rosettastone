@@ -106,6 +106,10 @@ def make_recommendation(
         else:
             stats = compute_type_stats(validation_results, ot, threshold)
         per_type[ot] = stats
+    # Note: TypeStats.confidence_interval is a tuple[float, float].
+    # dataclasses.asdict() converts it to a list[float], which is fine —
+    # JSON serialization preserves the values and API/template code accesses
+    # via index (ci[0], ci[1]), so tuple-vs-list is transparent.
 
     # ── Rule 1: HIGH-severity safety blocker ────────────────────────────────
     high_warnings = [w for w in safety_warnings if _has_high_severity(w)]

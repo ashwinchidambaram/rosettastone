@@ -120,6 +120,11 @@ class MigrationDetail(BaseModel):
 
     cluster_summary: dict[str, object] | None = None
 
+    # Phase A observability fields
+    stage_timing: dict[str, float] = {}
+    non_deterministic_count: int = 0
+    eval_runs: int = 1
+
     test_cases: list[TestCaseSummary]
 
 

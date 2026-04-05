@@ -68,7 +68,8 @@ class MigrationDisplay:
         Args:
             results: List of evaluation results.
             per_type_scores: Mapping of output type label → dict with keys
-                ``win_rate``, ``sample_count``, ``avg_score``, ``threshold``.
+                ``win_rate``, ``sample_count``, ``avg_score``, ``threshold``,
+                and optionally ``confidence_interval``.
         """
         table = Table(
             title="Evaluation Summary",
@@ -81,9 +82,10 @@ class MigrationDisplay:
         table.add_column("Sample Count", justify="right")
         table.add_column("Avg Score", justify="right")
         table.add_column("Threshold", justify="right")
+        table.add_column("95% CI", justify="right")
 
         if not results and not per_type_scores:
-            table.add_row("—", "—", "—", "—", "—")
+            table.add_row("—", "—", "—", "—", "—", "—")
             self.console.print(table)
             return
 
@@ -92,6 +94,11 @@ class MigrationDisplay:
             sample_count: int = stats.get("sample_count", 0)
             avg_score: float = stats.get("avg_score", 0.0)
             threshold: float = stats.get("threshold", _THRESHOLD_GREEN)
+            ci = stats.get("confidence_interval", (0.0, 0.0))
+            if isinstance(ci, (list, tuple)) and len(ci) >= 2 and (ci[0] != 0.0 or ci[1] != 0.0):
+                ci_str = f"[{ci[0]:.0%}–{ci[1]:.0%}]"
+            else:
+                ci_str = "—"
 
             table.add_row(
                 str(output_type),
@@ -99,6 +106,7 @@ class MigrationDisplay:
                 str(sample_count),
                 _fmt_pct(avg_score),
                 _fmt_pct(threshold),
+                ci_str,
             )
 
         # Aggregate row when there is more than one type
@@ -114,7 +122,38 @@ class MigrationDisplay:
                 str(total),
                 _fmt_pct(overall_avg),
                 "—",
+                "—",
             )
+
+        self.console.print(table)
+
+    # ------------------------------------------------------------------
+    # Stage timing table
+    # ------------------------------------------------------------------
+
+    def show_timing_table(self, stage_timing: dict[str, float]) -> None:
+        """Render a stage timing breakdown table sorted by duration descending.
+
+        Args:
+            stage_timing: Mapping of stage name → elapsed seconds.
+        """
+        if not stage_timing:
+            return
+
+        table = Table(
+            title="Stage Timing",
+            show_header=True,
+            header_style="bold",
+            box=None,
+        )
+        table.add_column("Stage", style="bold")
+        table.add_column("Duration", justify="right")
+
+        total = sum(stage_timing.values())
+        sorted_stages = sorted(stage_timing.items(), key=lambda x: x[1], reverse=True)
+        for stage, secs in sorted_stages:
+            share = f"({secs / total:.0%})" if total > 0 else ""
+            table.add_row(stage, f"{secs:.1f}s {share}")
 
         self.console.print(table)
 
@@ -274,6 +313,28 @@ class MigrationDisplay:
                     win_str,
                 )
             self.console.print(table)
+
+    # ------------------------------------------------------------------
+    # Safety warnings
+    # ------------------------------------------------------------------
+
+    def show_variance_warning(self, non_deterministic_count: int) -> None:
+        """Render an amber warning panel if any test pairs showed high score variance.
+
+        Args:
+            non_deterministic_count: Number of test pairs with high score variance.
+        """
+        if non_deterministic_count <= 0:
+            return
+        self.console.print(
+            Panel(
+                f"{non_deterministic_count} test pair{'s' if non_deterministic_count != 1 else ''}"
+                " showed high score variance across evaluation runs",
+                title="[bold yellow]Evaluation Reliability Warning[/bold yellow]",
+                border_style="yellow",
+                padding=(1, 2),
+            )
+        )
 
     # ------------------------------------------------------------------
     # Safety warnings

@@ -371,6 +371,48 @@ class TestResultShape:
 
         assert result.optimized_prompt == expected_prompt
 
+    def test_result_stage_timing_is_dict_and_non_empty(self):
+        """MigrationResult.stage_timing must be a non-empty dict after a full pipeline run."""
+        config = _make_config(dry_run=False, skip_preflight=False)
+        migrator = Migrator(config)
+
+        pairs = [_make_pair()]
+        preflight_report = _make_preflight_report()
+        eval_results = [_make_eval_result(is_win=True)]
+
+        with (
+            patch("rosettastone.core.pipeline.run_preflight", return_value=preflight_report),
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data",
+                return_value=(pairs, pairs, pairs),
+            ),
+            patch("rosettastone.core.pipeline.run_pii_scan"),
+            patch("rosettastone.core.pipeline.evaluate_baseline", return_value=eval_results),
+            patch(
+                "rosettastone.core.pipeline.optimize_prompt",
+                return_value="You are helpful.",
+            ),
+            patch("rosettastone.core.pipeline.run_pii_scan_text"),
+            patch("rosettastone.core.pipeline.run_prompt_audit"),
+            patch("rosettastone.core.pipeline.evaluate_optimized", return_value=eval_results),
+            patch(
+                "rosettastone.core.pipeline.make_recommendation",
+                return_value=("GO", "ok", {}),
+            ),
+            patch("rosettastone.core.pipeline.generate_report"),
+        ):
+            result = migrator.run()
+
+        # stage_timing should be a dict
+        assert isinstance(result.stage_timing, dict)
+        # The pipeline records timing for several stages; should have at least one entry
+        assert len(result.stage_timing) > 0
+        # All values should be non-negative floats
+        for stage, duration in result.stage_timing.items():
+            assert isinstance(stage, str)
+            assert isinstance(duration, float)
+            assert duration >= 0.0
+
 
 class TestProgressCallback:
     def test_progress_callback_invoked(self):
@@ -768,7 +810,9 @@ class TestCheckpointResumeEvalStages:
         pairs = [_make_pair()]
 
         with (
-            patch("rosettastone.core.pipeline.load_and_split_data", return_value=(pairs, pairs, pairs)),
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data", return_value=(pairs, pairs, pairs)
+            ),
             patch("rosettastone.core.pipeline.run_pii_scan"),
             patch("rosettastone.core.pipeline.evaluate_baseline", side_effect=counting_baseline),
             patch("rosettastone.core.pipeline.optimize_prompt", return_value="optimized"),
@@ -788,7 +832,9 @@ class TestCheckpointResumeEvalStages:
         serialized = [r.model_dump() for r in eval_results]
         resume_data = {"baseline_score": 1.0, "eval_results": serialized}
 
-        result, baseline_calls, _ = self._run_with_resume("baseline_eval", resume_data, eval_results)
+        result, baseline_calls, _ = self._run_with_resume(
+            "baseline_eval", resume_data, eval_results
+        )
 
         assert baseline_calls == 0, "baseline should be restored from checkpoint, not re-run"
         assert isinstance(result, MigrationResult)
@@ -808,7 +854,9 @@ class TestCheckpointResumeEvalStages:
         serialized = [r.model_dump() for r in eval_results]
         resume_data = {"validation_score": 1.0, "eval_results": serialized}
 
-        result, _, validation_calls = self._run_with_resume("validation_eval", resume_data, eval_results)
+        result, _, validation_calls = self._run_with_resume(
+            "validation_eval", resume_data, eval_results
+        )
 
         assert validation_calls == 0, "validation should be restored from checkpoint, not re-run"
         assert isinstance(result, MigrationResult)
@@ -837,7 +885,9 @@ class TestCheckpointResumeEvalStages:
         eval_results = [_make_eval_result()]
 
         with (
-            patch("rosettastone.core.pipeline.load_and_split_data", return_value=(pairs, pairs, pairs)),
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data", return_value=(pairs, pairs, pairs)
+            ),
             patch("rosettastone.core.pipeline.run_pii_scan"),
             patch("rosettastone.core.pipeline.evaluate_baseline", return_value=eval_results),
             patch("rosettastone.core.pipeline.optimize_prompt", return_value="optimized"),
@@ -871,7 +921,9 @@ class TestCheckpointResumeEvalStages:
         eval_results = [_make_eval_result()]
 
         with (
-            patch("rosettastone.core.pipeline.load_and_split_data", return_value=(pairs, pairs, pairs)),
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data", return_value=(pairs, pairs, pairs)
+            ),
             patch("rosettastone.core.pipeline.run_pii_scan"),
             patch("rosettastone.core.pipeline.evaluate_baseline", return_value=eval_results),
             patch("rosettastone.core.pipeline.optimize_prompt", return_value="optimized"),
@@ -898,7 +950,9 @@ class TestCheckpointResumeEvalStages:
 
         _, baseline_calls, _ = self._run_with_resume("optimize", resume_data, eval_results)
 
-        assert baseline_calls == 1, "baseline must re-run when resuming from optimize (no baseline checkpoint)"
+        assert baseline_calls == 1, (
+            "baseline must re-run when resuming from optimize (no baseline checkpoint)"
+        )
 
 
 class TestGEPARegressionWarning:

@@ -85,3 +85,6 @@ class MigrationResult(BaseModel):
     # T4: Multi-run metadata
     non_deterministic_count: int = 0
     eval_runs: int = 1
+
+    # Phase A: Stage timing breakdown (stage name → seconds elapsed)
+    stage_timing: dict[str, float] = {}

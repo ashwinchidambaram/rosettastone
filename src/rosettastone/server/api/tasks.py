@@ -276,7 +276,15 @@ def run_migration_background(
                 record.projected_source_cost_per_call = cost_data.get("source_cost")
                 record.projected_target_cost_per_call = cost_data.get("target_cost")
 
-            record.config_json = json.dumps(config_dict)
+            # Embed observability fields into config_json for persistence
+            # (no new DB columns needed — values are numeric/categorical only, no PII)
+            config_dict_with_obs = dict(config_dict)
+            config_dict_with_obs["_stage_timing"] = getattr(result, "stage_timing", {})
+            config_dict_with_obs["_non_deterministic_count"] = getattr(
+                result, "non_deterministic_count", 0
+            )
+            config_dict_with_obs["_eval_runs"] = getattr(result, "eval_runs", 1)
+            record.config_json = json.dumps(config_dict_with_obs)
             record.per_type_scores_json = json.dumps(result.per_type_scores)
             record.warnings_json = json.dumps(result.warnings)
             record.safety_warnings_json = json.dumps(
@@ -399,9 +407,7 @@ def run_migration_background(
                     return
                 if is_blocked:
                     record.status = "blocked"
-                    record.recommendation_reasoning = (
-                        f"Blocked by preflight: {type(exc).__name__}"
-                    )
+                    record.recommendation_reasoning = f"Blocked by preflight: {type(exc).__name__}"
                     logger.debug("Migration %s blocked: %s", migration_id, str(exc))
                     log_audit(session, "migration", migration_id, "blocked")
                 elif is_cost_exceeded:
