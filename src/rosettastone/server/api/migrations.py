@@ -465,11 +465,41 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
         )
     result["per_type"] = per_type
 
-    # Regressions: worst non-winning test cases (up to 5)
+    # Regressions: worst non-winning validation test cases (up to 5), with metric deltas
+    # Build a positional map: validation TC id → corresponding baseline scores
+    _baseline_stmt = (
+        select(TestCaseRecord)
+        .where(
+            TestCaseRecord.migration_id == record.id,
+            TestCaseRecord.phase == "baseline",
+        )
+        .order_by(TestCaseRecord.id)  # type: ignore[attr-defined]
+    )
+    _val_order_stmt = (
+        select(TestCaseRecord)
+        .where(
+            TestCaseRecord.migration_id == record.id,
+            TestCaseRecord.phase == "validation",
+        )
+        .order_by(TestCaseRecord.id)  # type: ignore[attr-defined]
+    )
+    _baseline_tcs = list(session.exec(_baseline_stmt).all())
+    _val_tcs_ordered = list(session.exec(_val_order_stmt).all())
+    # Map: validation tc.id → baseline scores dict (positional match by insertion order)
+    _baseline_scores_by_val_id: dict[int, dict[str, float]] = {}
+    for _idx, _val_tc in enumerate(_val_tcs_ordered):
+        if _idx < len(_baseline_tcs):
+            _b_raw = _baseline_tcs[_idx].scores_json
+            _b_scores = json.loads(_b_raw) if _b_raw else {}
+            _baseline_scores_by_val_id[_val_tc.id] = {
+                k: v for k, v in _b_scores.items() if isinstance(v, (int, float))
+            }
+
     tc_stmt = (
         select(TestCaseRecord)
         .where(
             TestCaseRecord.migration_id == record.id,
+            TestCaseRecord.phase == "validation",
             TestCaseRecord.is_win == False,  # noqa: E712
         )
         .order_by(TestCaseRecord.composite_score.asc())  # type: ignore[attr-defined]
@@ -491,10 +521,18 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
         else:
             reg["expected"] = "Content not stored"
             reg["got"] = "Content not stored"
-        stored_scores = json.loads(tc.scores_json) if tc.scores_json else {}
-        reg["metric_scores"] = {
-            k: round(v, 2) for k, v in stored_scores.items() if isinstance(v, (int, float))
-        }
+        val_scores = json.loads(tc.scores_json) if tc.scores_json else {}
+        baseline_scores = _baseline_scores_by_val_id.get(tc.id, {})
+        # Compute per-metric deltas; only include those with abs(delta) > 0.05
+        metric_deltas: dict[str, float] = {}
+        for m, v_score in val_scores.items():
+            if not isinstance(v_score, (int, float)):
+                continue
+            if m in baseline_scores:
+                delta = float(v_score) - float(baseline_scores[m])
+                if abs(delta) > 0.05:
+                    metric_deltas[m] = round(delta, 3)
+        reg["metric_deltas"] = metric_deltas
         regressions.append(reg)
     result["regressions"] = regressions
 

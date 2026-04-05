@@ -405,11 +405,11 @@ function showPersonaView(view) {
                         <div class="text-on-surface-variant/50 mb-1">Expected: <span class="text-success/70">{{ reg.expected }}</span></div>
                         <div class="text-on-surface">Got: <span class="text-error/70">{{ reg.got }}</span></div>
                     </div>
-                    {% if reg.metric_scores %}
+                    {% if reg.metric_deltas %}
                     <div class="flex flex-wrap gap-1">
-                        {% for metric, score in reg.metric_scores.items() %}
-                        <span class="text-[10px] px-1.5 py-0.5 rounded font-mono {% if score < 0.5 %}bg-error/10 text-error/80{% elif score < 0.7 %}bg-[#D4A574]/10 text-[#D4A574]/80{% else %}bg-success/10 text-success/80{% endif %}">
-                            {{ metric | replace('_', ' ') }}: {{ score }}
+                        {% for metric, delta in reg.metric_deltas.items() %}
+                        <span class="text-[10px] px-1.5 py-0.5 rounded font-mono {% if delta < 0 %}bg-error/10 text-error/80{% else %}bg-success/10 text-success/80{% endif %}">
+                            {{ metric | replace('_', ' ') }}: {% if delta > 0 %}+{% endif %}{{ delta }}
                         </span>
                         {% endfor %}
                     </div>
@@ -711,11 +711,11 @@ function showPersonaView(view) {
                    hx-target="#diff-content"
                    hx-swap="innerHTML">View diff &rarr;</a>
             </div>
-            {% if reg.metric_scores %}
+            {% if reg.metric_deltas %}
             <div class="flex flex-wrap gap-1 mt-3 ml-10">
-                {% for metric, score in reg.metric_scores.items() %}
-                <span class="text-[10px] px-1.5 py-0.5 rounded font-mono {% if score < 0.5 %}bg-[#D85650]/10 text-[#D85650]/80{% elif score < 0.7 %}bg-[#D4A574]/10 text-[#D4A574]/80{% else %}bg-[#8B9D83]/10 text-[#8B9D83]/80{% endif %}">
-                    {{ metric | replace('_', ' ') }}: {{ score }}
+                {% for metric, delta in reg.metric_deltas.items() %}
+                <span class="text-[10px] px-1.5 py-0.5 rounded font-mono {% if delta < 0 %}bg-[#D85650]/10 text-[#D85650]/80{% else %}bg-[#8B9D83]/10 text-[#8B9D83]/80{% endif %}">
+                    {{ metric | replace('_', ' ') }}: {% if delta > 0 %}+{% endif %}{{ delta }}
                 </span>
                 {% endfor %}
             </div>
@@ -916,11 +916,11 @@ function showPersonaView(view) {
                    hx-target="#diff-content"
                    hx-swap="innerHTML">View diff &rarr;</a>
             </div>
-            {% if reg.metric_scores %}
+            {% if reg.metric_deltas %}
             <div class="flex flex-wrap gap-1 mt-3 ml-10">
-                {% for metric, score in reg.metric_scores.items() %}
-                <span class="text-[10px] px-1.5 py-0.5 rounded font-mono {% if score < 0.5 %}bg-[#D85650]/10 text-[#D85650]/80{% elif score < 0.7 %}bg-[#D4A574]/10 text-[#D4A574]/80{% else %}bg-[#8B9D83]/10 text-[#8B9D83]/80{% endif %}">
-                    {{ metric | replace('_', ' ') }}: {{ score }}
+                {% for metric, delta in reg.metric_deltas.items() %}
+                <span class="text-[10px] px-1.5 py-0.5 rounded font-mono {% if delta < 0 %}bg-[#D85650]/10 text-[#D85650]/80{% else %}bg-[#8B9D83]/10 text-[#8B9D83]/80{% endif %}">
+                    {{ metric | replace('_', ' ') }}: {% if delta > 0 %}+{% endif %}{{ delta }}
                 </span>
                 {% endfor %}
             </div>
