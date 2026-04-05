@@ -152,6 +152,26 @@ function showPersonaView(view) {
         <span class="material-symbols-outlined text-sm">schedule</span>
         Auto-refreshing every 5 seconds
     </div>
+    <!-- GEPA Optimizer Progress Panel (shown when gepa_iteration SSE events arrive) -->
+    <div id="gepa-progress-panel" class="hidden mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 w-full max-w-md text-left">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Optimizer Progress</span>
+        <span id="gepa-iteration-counter" class="text-xs text-gray-500 font-mono">0 / &#8212;</span>
+      </div>
+      <!-- Sparkline -->
+      <div id="gepa-sparkline" class="flex items-end h-10 mb-2 gap-px"></div>
+      <!-- Table -->
+      <table class="w-full">
+        <thead>
+          <tr class="text-xs text-gray-500 border-b border-gray-200 dark:border-gray-700">
+            <th class="text-left px-2 py-1">Iter</th>
+            <th class="text-left px-2 py-1">Score</th>
+            <th class="text-left px-2 py-1">&#916;</th>
+          </tr>
+        </thead>
+        <tbody id="gepa-iterations-tbody" data-prev-score=""></tbody>
+      </table>
+    </div>
 </div>
 </div>
 
@@ -474,6 +494,17 @@ function showPersonaView(view) {
         </details>
         {% endif %}
 
+        <!-- Optimizer History Section -->
+        <details class="mt-4" id="optimizer-history-details">
+          <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400">Optimizer History</summary>
+          <div id="optimizer-history-content"
+               hx-get="/ui/migrations/{{ migration.id }}/optimizer-history"
+               hx-trigger="revealed"
+               hx-swap="innerHTML">
+            <span class="text-xs text-gray-400">Loading...</span>
+          </div>
+        </details>
+
         <!-- Quick Stats -->
         <section class="bg-gradient-to-br from-surface-container-low to-surface-container-lowest p-6 rounded-xl border border-outline-variant/5">
             <h4 class="text-[10px] font-label uppercase tracking-[0.2em] text-on-surface-variant mb-6">Model Metadata</h4>
@@ -688,6 +719,17 @@ function showPersonaView(view) {
 </details>
 {% endif %}
 
+<!-- Optimizer History Section -->
+<details class="mt-4 mb-8" id="optimizer-history-details">
+  <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400">Optimizer History</summary>
+  <div id="optimizer-history-content"
+       hx-get="/ui/migrations/{{ migration.id }}/optimizer-history"
+       hx-trigger="revealed"
+       hx-swap="innerHTML">
+    <span class="text-xs text-gray-400">Loading...</span>
+  </div>
+</details>
+
 <!-- Critical Regressions List -->
 {% if migration.regressions %}
 <div>
@@ -893,6 +935,17 @@ function showPersonaView(view) {
 </details>
 {% endif %}
 
+<!-- Optimizer History Section -->
+<details class="mt-4 mb-8" id="optimizer-history-details">
+  <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400">Optimizer History</summary>
+  <div id="optimizer-history-content"
+       hx-get="/ui/migrations/{{ migration.id }}/optimizer-history"
+       hx-trigger="revealed"
+       hx-swap="innerHTML">
+    <span class="text-xs text-gray-400">Loading...</span>
+  </div>
+</details>
+
 <!-- Regressions (Needs Review) -->
 {% if migration.regressions %}
 <div>
@@ -1019,6 +1072,42 @@ function showPersonaView(view) {
       // Ignore parse errors
     }
   };
+
+  es.addEventListener('gepa_iteration', function(e) {
+    try {
+      var data = JSON.parse(e.data);
+      var panel = document.getElementById('gepa-progress-panel');
+      if (panel) {
+        panel.classList.remove('hidden');
+        // Update counter
+        document.getElementById('gepa-iteration-counter').textContent =
+          data.iteration + ' / ' + data.total_iterations;
+        // Add row to table
+        var tbody = document.getElementById('gepa-iterations-tbody');
+        var prevScore = tbody.dataset.prevScore ? parseFloat(tbody.dataset.prevScore) : null;
+        var delta = prevScore !== null ? (data.running_mean_score - prevScore).toFixed(3) : '\u2014';
+        var sign = delta !== '\u2014' && parseFloat(delta) >= 0 ? '+' : '';
+        var row = '<tr>' +
+          '<td class="text-xs px-2 py-1 text-gray-600">' + data.iteration + '</td>' +
+          '<td class="text-xs px-2 py-1 font-mono">' + (data.running_mean_score * 100).toFixed(1) + '%</td>' +
+          '<td class="text-xs px-2 py-1 font-mono ' + (delta !== '\u2014' && parseFloat(delta) < 0 ? 'text-red-500' : 'text-green-600') + '">' + sign + delta + '</td>' +
+          '</tr>';
+        tbody.insertAdjacentHTML('beforeend', row);
+        tbody.dataset.prevScore = data.running_mean_score;
+        // Add sparkline bar
+        var sparkline = document.getElementById('gepa-sparkline');
+        if (sparkline) {
+          var bar = document.createElement('span');
+          bar.className = 'inline-block w-2 bg-blue-400 dark:bg-blue-600 rounded-sm mx-px';
+          bar.style.height = Math.round(data.running_mean_score * 40) + 'px';
+          bar.title = (data.running_mean_score * 100).toFixed(1) + '%';
+          sparkline.appendChild(bar);
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  });
 
   es.onerror = function() {
     es.close();

@@ -15,7 +15,12 @@ from sqlmodel import Session, func, select
 
 from rosettastone.server.api.utils import _get_migration_or_404
 from rosettastone.server.database import get_session
-from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningRecord
+from rosettastone.server.models import (
+    GEPAIterationRecord,
+    MigrationRecord,
+    TestCaseRecord,
+    WarningRecord,
+)
 from rosettastone.server.rate_limit import check_rate_limit
 from rosettastone.server.rbac import (
     check_resource_owner,
@@ -24,6 +29,7 @@ from rosettastone.server.rbac import (
     require_role,
 )
 from rosettastone.server.schemas import (
+    GEPAIterationOut,
     MigrationDetail,
     MigrationSummary,
     PaginatedResponse,
@@ -822,6 +828,23 @@ async def get_migration(
     record = _get_migration_or_404(migration_id, session)
     check_resource_owner(record.owner_id, request)
     return _migration_to_detail(record, session)
+
+
+@router.get(
+    "/api/v1/migrations/{migration_id}/optimizer-history",
+    response_model=list[GEPAIterationOut],
+)
+async def get_optimizer_history(
+    migration_id: int,
+    session: Session = Depends(get_session),
+) -> list[GEPAIterationOut]:
+    """Get GEPA optimizer iteration history for a migration, sorted by iteration asc."""
+    records = session.exec(
+        select(GEPAIterationRecord)
+        .where(GEPAIterationRecord.migration_id == migration_id)
+        .order_by(GEPAIterationRecord.iteration)
+    ).all()
+    return [GEPAIterationOut(**r.model_dump()) for r in records]
 
 
 @router.post(
@@ -1848,3 +1871,27 @@ async def ui_resume_migration(
         },
     )
     return RedirectResponse(url=f"/ui/migrations/{migration_id}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# GEPA optimizer history UI fragment
+# ---------------------------------------------------------------------------
+
+
+@router.get("/ui/migrations/{migration_id}/optimizer-history", response_class=HTMLResponse)
+async def optimizer_history_fragment(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """HTMX fragment: optimizer iteration history for a completed migration."""
+    records = session.exec(
+        select(GEPAIterationRecord)
+        .where(GEPAIterationRecord.migration_id == migration_id)
+        .order_by(GEPAIterationRecord.iteration)
+    ).all()
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
+        request,
+        "fragments/optimizer_history.html",
+        {"records": records, "migration_id": migration_id},
+    )

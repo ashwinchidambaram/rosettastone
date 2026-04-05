@@ -376,3 +376,10 @@ class ApprovalSummary(BaseModel):
     decision: str
     comment: str | None
     created_at: datetime
+
+
+class GEPAIterationOut(BaseModel):
+    iteration: int
+    total_iterations: int
+    mean_score: float
+    recorded_at: datetime

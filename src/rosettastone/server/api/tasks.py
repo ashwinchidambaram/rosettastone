@@ -16,7 +16,12 @@ from rosettastone.server.api.audit import log_audit
 from rosettastone.server.api.versioning import create_version
 from rosettastone.server.database import get_engine
 from rosettastone.server.logging_config import set_request_id
-from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningRecord
+from rosettastone.server.models import (
+    GEPAIterationRecord,
+    MigrationRecord,
+    TestCaseRecord,
+    WarningRecord,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +130,7 @@ def _make_checkpoint_writer(migration_id: int, engine: Any) -> Callable[[str, st
     return write_checkpoint
 
 
-def _make_gepa_callback(migration_id: int) -> Callable[[int, int, float], None]:
+def _make_gepa_callback(migration_id: int, engine: Any = None) -> Callable[[int, int, float], None]:
     """Return a callback that emits SSE gepa_iteration events from the GEPA optimizer thread."""
 
     def on_iteration(iteration: int, total_iterations: int, mean_score: float) -> None:
@@ -141,6 +146,22 @@ def _make_gepa_callback(migration_id: int) -> Callable[[int, int, float], None]:
                 "running_mean_score": mean_score,
             },
         )
+
+        # Fire-and-forget DB write — swallow any error so SSE is unaffected
+        try:
+            _eng = engine if engine is not None else get_engine()
+            with Session(_eng) as _s:
+                _s.add(
+                    GEPAIterationRecord(
+                        migration_id=migration_id,
+                        iteration=iteration,
+                        total_iterations=total_iterations,
+                        mean_score=mean_score,
+                    )
+                )
+                _s.commit()
+        except Exception:
+            pass
 
     return on_iteration
 
@@ -226,7 +247,7 @@ def run_migration_background(
         config = MigrationConfig(**config_dict)
 
         progress_cb = _make_progress_writer(migration_id, engine)
-        gepa_cb = _make_gepa_callback(migration_id)
+        gepa_cb = _make_gepa_callback(migration_id, engine)
         checkpoint_cb = _make_checkpoint_writer(migration_id, engine)
         result = Migrator(
             config,
