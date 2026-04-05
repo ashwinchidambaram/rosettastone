@@ -1,0 +1,150 @@
+{# HTMX fragment — migration diagnostics. Scores, counts, and types only. No prompt/response text. #}
+<div class="space-y-6 p-2">
+
+  {# 1. Per-type results table #}
+  <div>
+    <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Results by Output Type</p>
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-[10px] text-on-surface-variant/60 font-mono uppercase border-b border-outline-variant/20">
+          <th class="pb-2 pr-4">Type</th><th class="pb-2 pr-3">Win%</th>
+          <th class="pb-2 pr-3">CI Low</th><th class="pb-2 pr-3">CI High</th>
+          <th class="pb-2 pr-3">P50</th><th class="pb-2 pr-3">n</th>
+          <th class="pb-2 pr-3">Threshold</th><th class="pb-2">Pass</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in diag.per_type %}
+        <tr class="border-b border-outline-variant/10 hover:bg-surface-container-high/30">
+          <td class="py-2 pr-4 font-mono text-xs">{{ t.output_type }}</td>
+          <td class="py-2 pr-3">{{ "%.1f"|format(t.win_rate*100) }}%</td>
+          <td class="py-2 pr-3 {% if not t.passes %}text-error font-semibold{% endif %}">{{ "%.3f"|format(t.ci_lower) }}</td>
+          <td class="py-2 pr-3">{{ "%.3f"|format(t.ci_upper) }}</td>
+          <td class="py-2 pr-3">{{ "%.3f"|format(t.p50) }}</td>
+          <td class="py-2 pr-3">{{ t.sample_count }}</td>
+          <td class="py-2 pr-3 font-mono text-xs">{{ "%.2f"|format(t.threshold) }}</td>
+          <td class="py-2">
+            <span class="material-symbols-outlined text-base {% if t.passes %}text-success{% else %}text-error{% endif %}">
+              {% if t.passes %}check_circle{% else %}cancel{% endif %}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  {# 2. Metric win rates bar chart #}
+  {% if diag.metric_win_rates %}
+  <div>
+    <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Metric Mean Values (Validation)</p>
+    <canvas id="metricWinChart" height="{% if diag.metric_win_rates|length > 4 %}220{% else %}160{% endif %}"></canvas>
+    <script nonce="{{ request.state.csp_nonce }}">
+    (function() {
+      var c = document.getElementById('metricWinChart').getContext('2d');
+      new Chart(c, {
+        type: 'bar',
+        data: {
+          labels: {{ diag.metric_win_rates | map(attribute='metric_name') | list | tojson }},
+          datasets: [{ data: {{ diag.metric_win_rates | map(attribute='mean_value') | list | tojson }},
+            backgroundColor: 'rgba(212,116,94,0.6)', borderColor: 'rgba(212,116,94,0.9)', borderWidth: 1 }]
+        },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { min: 0, max: 1, ticks: { color: '#a89984' }, grid: { color: 'rgba(168,153,132,0.15)' } },
+            y: { ticks: { color: '#a89984', font: { family: 'JetBrains Mono, monospace', size: 11 } } }
+          }
+        }
+      });
+    })();
+    </script>
+  </div>
+  {% endif %}
+
+  {# 3. Border cases #}
+  {% if diag.border_cases %}
+  <div>
+    <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-2">Border Cases <span class="normal-case text-on-surface-variant/50">(within ±5% of threshold)</span></p>
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-[10px] text-on-surface-variant/60 font-mono uppercase border-b border-outline-variant/20">
+          <th class="pb-2 pr-4">Type</th><th class="pb-2 pr-4">Score</th>
+          <th class="pb-2 pr-4">Threshold</th><th class="pb-2">Delta</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in diag.border_cases %}
+        <tr class="border-b border-outline-variant/10">
+          <td class="py-2 pr-4 font-mono text-xs">{{ b.output_type }}</td>
+          <td class="py-2 pr-4 font-mono">{{ "%.4f"|format(b.composite_score) }}</td>
+          <td class="py-2 pr-4 font-mono">{{ "%.2f"|format(b.threshold) }}</td>
+          <td class="py-2 font-mono {% if b.delta_to_threshold < 0 %}text-error{% else %}text-success{% endif %}">
+            {{ "%+.4f"|format(b.delta_to_threshold) }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {# 4. Regression summary #}
+  <div>
+    <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Regression Summary</p>
+    <div class="grid grid-cols-4 gap-3 mb-4">
+      {% for label, count, color in [
+        ('Improved', diag.regression_summary.improved_count, 'text-success'),
+        ('Stable', diag.regression_summary.stable_count, 'text-on-surface-variant'),
+        ('Regressed', diag.regression_summary.regressed_count, 'text-warn'),
+        ('At Risk', diag.regression_summary.at_risk_count, 'text-error')
+      ] %}
+      <div class="bg-surface-container-low rounded-xl p-4 text-center">
+        <div class="text-2xl font-bold {{ color }} font-headline">{{ count }}</div>
+        <div class="text-[10px] text-on-surface-variant/70 mt-1 font-mono uppercase">{{ label }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% if diag.regression_summary.worst_regressed %}
+    <p class="text-[10px] text-on-surface-variant/50 font-mono uppercase mb-2">Worst Regressions</p>
+    <table class="w-full text-xs font-mono">
+      <thead><tr class="text-left text-[10px] text-on-surface-variant/60 uppercase border-b border-outline-variant/20">
+        <th class="pb-2 pr-4">Type</th><th class="pb-2 pr-4">Delta</th>
+        <th class="pb-2 pr-4">Status</th><th class="pb-2">Metric Deltas</th>
+      </tr></thead>
+      <tbody>
+        {% for r in diag.regression_summary.worst_regressed %}
+        <tr class="border-b border-outline-variant/10">
+          <td class="py-2 pr-4">{{ r.output_type }}</td>
+          <td class="py-2 pr-4 text-error">{{ "%+.3f"|format(r.delta) }}</td>
+          <td class="py-2 pr-4">{{ r.status }}</td>
+          <td class="py-2 text-on-surface-variant/60">
+            {% for k, v in r.metric_deltas.items() %}
+            <span class="{% if v < 0 %}text-error{% endif %}">{{ k }}:{{ "%+.2f"|format(v) }}</span>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+
+  {# 5. Safety summary — counts and IDs only, no text #}
+  {% if diag.safety.high_count or diag.safety.medium_count or diag.safety.low_count %}
+  <div class="bg-surface-container-low rounded-xl p-4">
+    <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Safety Findings</p>
+    <div class="flex gap-6">
+      <div class="text-center"><div class="text-xl font-bold text-error">{{ diag.safety.high_count }}</div><div class="text-[10px] text-on-surface-variant/70 font-mono">HIGH</div></div>
+      <div class="text-center"><div class="text-xl font-bold text-warn">{{ diag.safety.medium_count }}</div><div class="text-[10px] text-on-surface-variant/70 font-mono">MEDIUM</div></div>
+      <div class="text-center"><div class="text-xl font-bold text-on-surface-variant/60">{{ diag.safety.low_count }}</div><div class="text-[10px] text-on-surface-variant/70 font-mono">LOW</div></div>
+    </div>
+    {% if diag.safety.high_count %}
+    <p class="text-xs text-error mt-3">{{ diag.safety.high_count }} HIGH severity finding(s) — blocking recommendation.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>

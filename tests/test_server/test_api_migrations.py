@@ -884,9 +884,7 @@ class TestMigrationListFragment:
         assert f"/ui/migrations/{sample_migration.id}" in body
         assert "gpt-4o" in body
 
-    def test_migration_list_fragment_empty_db_shows_no_migrations(
-        self, client: TestClient
-    ) -> None:
+    def test_migration_list_fragment_empty_db_shows_no_migrations(self, client: TestClient) -> None:
         """When DB is empty the fragment falls back to dummy cards (not empty-state, since
         DUMMY_MIGRATIONS is non-empty), so we still get card links."""
         resp = client.get("/ui/fragments/migration-list")
@@ -898,7 +896,9 @@ class TestMigrationListFragment:
 class TestEvalGridFragment:
     """Tests for GET /ui/fragments/eval-grid/{migration_id}."""
 
-    def test_eval_grid_returns_200(self, client: TestClient, sample_migration: MigrationRecord) -> None:
+    def test_eval_grid_returns_200(
+        self, client: TestClient, sample_migration: MigrationRecord
+    ) -> None:
         """Fragment endpoint returns 200."""
         resp = client.get(f"/ui/fragments/eval-grid/{sample_migration.id}")
         assert resp.status_code == 200
@@ -1095,3 +1095,278 @@ def test_get_optimization_trace_with_data(client, engine):
     assert data["iterations"][0]["iteration_num"] == 1
     assert data["iterations"][2]["mean_score"] == 0.8012
     assert data["final_prompt_length"] == len("Optimized system prompt here.")
+
+
+# ---------------------------------------------------------------------------
+# F1: Migration Diagnostics API
+# ---------------------------------------------------------------------------
+
+
+def test_diagnostics_returns_structure(client, engine):
+    """Completed migration with test cases returns 200 with all expected keys."""
+    import json as _json
+
+    from sqlmodel import Session
+
+    from rosettastone.server.models import MigrationRecord, TestCaseRecord  # noqa: F811
+
+    with Session(engine) as s:
+        record = MigrationRecord(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+            recommendation="GO",
+            per_type_scores_json=_json.dumps(
+                {
+                    "json": {
+                        "win_rate": 0.95,
+                        "mean": 0.93,
+                        "median": 0.94,
+                        "p10": 0.88,
+                        "p50": 0.94,
+                        "p90": 0.98,
+                        "min_score": 0.85,
+                        "max_score": 1.0,
+                        "sample_count": 10,
+                        "confidence_interval": [0.88, 0.99],
+                    }
+                }
+            ),
+        )
+        s.add(record)
+        s.commit()
+        s.refresh(record)
+        migration_id = record.id
+        # Add a validation test case
+        tc = TestCaseRecord(
+            migration_id=migration_id,
+            phase="validation",
+            output_type="json",
+            composite_score=0.90,
+            is_win=True,
+            scores_json=_json.dumps({"bertscore": 0.91, "exact_match": 0.85}),
+            details_json=_json.dumps({}),
+        )
+        s.add(tc)
+        s.commit()
+
+    resp = client.get(f"/api/v1/migrations/{migration_id}/diagnostics")
+    assert resp.status_code == 200
+    data = resp.json()
+    for key in (
+        "migration_id",
+        "recommendation",
+        "per_type",
+        "metric_win_rates",
+        "border_cases",
+        "regression_summary",
+        "safety",
+    ):
+        assert key in data
+
+
+def test_diagnostics_border_cases_within_range(client, engine):
+    """Test cases within +/-5% of threshold appear in border_cases."""
+    import json as _json
+
+    from sqlmodel import Session
+
+    from rosettastone.server.models import MigrationRecord, TestCaseRecord  # noqa: F811
+
+    with Session(engine) as s:
+        record = MigrationRecord(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+            recommendation="GO",
+        )
+        s.add(record)
+        s.commit()
+        s.refresh(record)
+        migration_id = record.id
+        # json threshold = 0.95; score 0.94 is within -0.01 (within ±0.05)
+        tc = TestCaseRecord(
+            migration_id=migration_id,
+            phase="validation",
+            output_type="json",
+            composite_score=0.94,
+            is_win=False,
+            scores_json=_json.dumps({"bertscore": 0.94}),
+            details_json=_json.dumps({}),
+        )
+        s.add(tc)
+        s.commit()
+
+    resp = client.get(f"/api/v1/migrations/{migration_id}/diagnostics")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["border_cases"]) >= 1
+    bc = data["border_cases"][0]
+    assert bc["output_type"] == "json"
+    assert abs(bc["delta_to_threshold"]) <= 0.05
+
+
+def test_diagnostics_no_prompt_text_in_response(client, engine):
+    """Response JSON must not contain keys named prompt_text, response_text, or new_response_text."""
+    import json as _json
+
+    from sqlmodel import Session
+
+    from rosettastone.server.models import MigrationRecord, TestCaseRecord  # noqa: F811
+
+    with Session(engine) as s:
+        record = MigrationRecord(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+            recommendation="GO",
+        )
+        s.add(record)
+        s.commit()
+        s.refresh(record)
+        migration_id = record.id
+        tc = TestCaseRecord(
+            migration_id=migration_id,
+            phase="validation",
+            output_type="short_text",
+            composite_score=0.82,
+            is_win=True,
+            scores_json=_json.dumps({"bertscore": 0.82}),
+            details_json=_json.dumps({}),
+            prompt_text="this is sensitive PII text",
+            response_text="source response text",
+            new_response_text="new response text",
+        )
+        s.add(tc)
+        s.commit()
+
+    resp = client.get(f"/api/v1/migrations/{migration_id}/diagnostics")
+    assert resp.status_code == 200
+    resp_str = resp.text
+    assert "prompt_text" not in resp_str
+    assert "response_text" not in resp_str
+    assert "new_response_text" not in resp_str
+    assert "this is sensitive PII text" not in resp_str
+
+
+def test_diagnostics_pending_migration_returns_422(client, engine):
+    """Pending migration returns 422."""
+    from sqlmodel import Session
+
+    from rosettastone.server.models import MigrationRecord  # noqa: F811
+
+    with Session(engine) as s:
+        record = MigrationRecord(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="pending",
+        )
+        s.add(record)
+        s.commit()
+        s.refresh(record)
+        migration_id = record.id
+
+    resp = client.get(f"/api/v1/migrations/{migration_id}/diagnostics")
+    assert resp.status_code == 422
+
+
+def test_diagnostics_regression_counts(client, engine):
+    """Controlled baseline+validation TC pairs produce expected regression counts."""
+    import json as _json
+
+    from sqlmodel import Session
+
+    from rosettastone.server.models import MigrationRecord, TestCaseRecord  # noqa: F811
+
+    with Session(engine) as s:
+        record = MigrationRecord(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+            recommendation="GO",
+        )
+        s.add(record)
+        s.commit()
+        s.refresh(record)
+        migration_id = record.id
+
+        # short_text threshold = 0.80
+        # Pair 1: improved (delta = +0.1 >= 0.05)
+        s.add(
+            TestCaseRecord(
+                migration_id=migration_id,
+                phase="baseline",
+                output_type="short_text",
+                composite_score=0.70,
+                is_win=False,
+                scores_json=_json.dumps({"bertscore": 0.70}),
+                details_json=_json.dumps({}),
+            )
+        )
+        s.add(
+            TestCaseRecord(
+                migration_id=migration_id,
+                phase="validation",
+                output_type="short_text",
+                composite_score=0.80,
+                is_win=True,
+                scores_json=_json.dumps({"bertscore": 0.80}),
+                details_json=_json.dumps({}),
+            )
+        )
+        # Pair 2: stable (delta = 0.0, within -0.05..0.05)
+        s.add(
+            TestCaseRecord(
+                migration_id=migration_id,
+                phase="baseline",
+                output_type="short_text",
+                composite_score=0.85,
+                is_win=True,
+                scores_json=_json.dumps({"bertscore": 0.85}),
+                details_json=_json.dumps({}),
+            )
+        )
+        s.add(
+            TestCaseRecord(
+                migration_id=migration_id,
+                phase="validation",
+                output_type="short_text",
+                composite_score=0.85,
+                is_win=True,
+                scores_json=_json.dumps({"bertscore": 0.85}),
+                details_json=_json.dumps({}),
+            )
+        )
+        # Pair 3: regressed (delta = -0.10 < -0.05, but val=0.82 >= threshold=0.80)
+        s.add(
+            TestCaseRecord(
+                migration_id=migration_id,
+                phase="baseline",
+                output_type="short_text",
+                composite_score=0.92,
+                is_win=True,
+                scores_json=_json.dumps({"bertscore": 0.92}),
+                details_json=_json.dumps({}),
+            )
+        )
+        s.add(
+            TestCaseRecord(
+                migration_id=migration_id,
+                phase="validation",
+                output_type="short_text",
+                composite_score=0.82,
+                is_win=True,
+                scores_json=_json.dumps({"bertscore": 0.82}),
+                details_json=_json.dumps({}),
+            )
+        )
+        s.commit()
+
+    resp = client.get(f"/api/v1/migrations/{migration_id}/diagnostics")
+    assert resp.status_code == 200
+    data = resp.json()
+    rs = data["regression_summary"]
+    assert rs["improved_count"] == 1
+    assert rs["stable_count"] == 1
+    assert rs["regressed_count"] == 1
+    assert rs["at_risk_count"] == 0
