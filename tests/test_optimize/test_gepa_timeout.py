@@ -194,7 +194,7 @@ class TestTimeoutWithIntermediate:
             captured_metric.append(kwargs.get("metric"))
             mock_gepa = MagicMock()
 
-            def fake_compile(program, trainset):
+            def fake_compile(program, trainset, valset=None):
                 # Call the capturing metric N times to populate best_intermediate
                 metric = captured_metric[0]
                 for _ in range(len(intermediates)):
@@ -406,7 +406,7 @@ class TestTimeoutWithImmediateCallback:
             captured_metric.append(kwargs.get("metric"))
             mock_gepa = MagicMock()
 
-            def fake_compile(program, trainset):
+            def fake_compile(program, trainset, valset=None):
                 # Fire metric once immediately to populate best_intermediate
                 metric = captured_metric[0]
                 gold = MagicMock()

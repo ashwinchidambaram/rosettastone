@@ -357,6 +357,69 @@ The `enterprise_rag` dataset includes a synthetic knowledge base in `data/meridi
 
 ---
 
+## Benchmark Results — GPT-4o & Haiku → Qwen3.5-27B
+
+> **Setup:** All runs use a locally-hosted Qwen/Qwen3.5-27B via vLLM (`openai/`-compatible endpoint), GEPA `--auto light` with a 90-minute cap, `--num-threads 2`. Each dataset was run twice — once with Qwen's chain-of-thought reasoning enabled (thinking ON) and once disabled (thinking OFF) — to measure whether CoT reasoning improves GEPA optimization quality or just increases latency.
+
+### GPT-4o → Qwen3.5-27B
+
+| Dataset | Baseline (ON) | Optimized (ON) | Δ (ON) | Baseline (OFF) | Optimized (OFF) | Δ (OFF) | Recommendation |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `fintech_extraction` | — | — | — | — | — | — | — |
+| `sql_generation` | — | — | — | — | — | — | — |
+| `support_classification` | — | — | — | — | — | — | — |
+| `ecommerce_products` | — | — | — | — | — | — | — |
+| `enterprise_rag` | — | — | — | — | — | — | — |
+
+### Claude Haiku → Qwen3.5-27B
+
+| Dataset | Baseline (ON) | Optimized (ON) | Δ (ON) | Baseline (OFF) | Optimized (OFF) | Δ (OFF) | Recommendation |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `fintech_extraction` | — | — | — | — | — | — | — |
+| `sql_generation` | — | — | — | — | — | — | — |
+| `support_classification` | — | — | — | — | — | — | — |
+| `ecommerce_products` | — | — | — | — | — | — | — |
+| `enterprise_rag` | — | — | — | — | — | — | — |
+
+### Prompt Evolution — Migration Trajectory
+
+> How performance changes at each stage of the migration pipeline: **source model** (ground truth, 100%) → **target model + original prompt** (zero-shot transfer, no optimization) → **target model + optimized prompt** (after GEPA). "Net Lift" = optimized score − baseline (original prompt) score.
+
+**GPT-4o → Qwen3.5-27B**
+
+| Dataset | GPT-4o (source, ref) | Qwen + Original Prompt | Qwen + Optimized Prompt | Net Lift |
+|:---|:---:|:---:|:---:|:---:|
+| `fintech_extraction` | 100% | — | — | — |
+| `sql_generation` | 100% | — | — | — |
+| `support_classification` | 100% | — | — | — |
+| `ecommerce_products` | 100% | — | — | — |
+| `enterprise_rag` | 100% | — | — | — |
+
+**Claude Haiku → Qwen3.5-27B**
+
+| Dataset | Haiku (source, ref) | Qwen + Original Prompt | Qwen + Optimized Prompt | Net Lift |
+|:---|:---:|:---:|:---:|:---:|
+| `fintech_extraction` | 100% | — | — | — |
+| `sql_generation` | 100% | — | — | — |
+| `support_classification` | 100% | — | — | — |
+| `ecommerce_products` | 100% | — | — | — |
+| `enterprise_rag` | 100% | — | — | — |
+
+> *Best result across thinking ON/OFF shown per dataset. Source model score is always 100% — the JSONL responses are from the source model and serve as ground truth.*
+
+---
+
+### Thinking ON vs OFF — Findings
+
+> *Results pending. Will be filled in as runs complete.*
+
+**Key questions this benchmark addresses:**
+- Does Qwen3.5's chain-of-thought mode improve GEPA's optimization signal, or does the extra reasoning just add noise and latency?
+- Is the effect task-type dependent — does CoT help more for complex extraction (JSON) vs. simpler classification tasks?
+- Which source model (GPT-4o vs Haiku) transfers more cleanly to a reasoning-first target like Qwen3.5?
+
+---
+
 ## Batch Runner
 
 Migrate multiple models at once from a YAML manifest:

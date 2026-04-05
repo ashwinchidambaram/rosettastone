@@ -296,7 +296,7 @@ class TestGEPAOptimizerOptimize:
 
         captured_trainset: list = []
 
-        def capture_compile(program, trainset):
+        def capture_compile(program, trainset, valset=None):
             captured_trainset.extend(trainset)
             return mock_compiled
 
@@ -332,7 +332,7 @@ class TestGEPAOptimizerOptimize:
 
         captured_trainset: list = []
 
-        def capture_compile(program, trainset):
+        def capture_compile(program, trainset, valset=None):
             captured_trainset.extend(trainset)
             return mock_compiled
 

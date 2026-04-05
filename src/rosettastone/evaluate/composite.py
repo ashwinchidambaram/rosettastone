@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
@@ -70,47 +71,62 @@ class CompositeEvaluator:
         test_set: list[PromptPair],
         optimized_prompt: str | None = None,
     ) -> list[EvalResult]:
-        # Phase 1: collect LLM completions for all pairs
-        completions: list[tuple[PromptPair, str] | None] = []
+        # Phase 1: collect LLM completions for all pairs in parallel
+        completions: list[tuple[PromptPair, str] | None] = [None] * len(test_set)
         skipped_count = 0
+        total_eval_cost = 0.0
 
-        for i, pair in enumerate(test_set):
-            # Build messages from prompt
-            if isinstance(pair.prompt, str):
-                messages: list[dict[str, str]] = [{"role": "user", "content": pair.prompt}]
+        # Build per-pair message lists before dispatching to threads
+        _tasks: list[tuple[int, PromptPair, list[dict[str, str]]]] = []
+        for _i, _pair in enumerate(test_set):
+            if isinstance(_pair.prompt, str):
+                _msgs: list[dict[str, str]] = [{"role": "user", "content": _pair.prompt}]
             else:
-                messages = pair.prompt  # type: ignore[assignment,unused-ignore]
-
+                _msgs = list(_pair.prompt)  # type: ignore[arg-type,unused-ignore]
             if optimized_prompt:
-                messages = [{"role": "system", "content": optimized_prompt}] + messages
+                _msgs = [{"role": "system", "content": optimized_prompt}] + _msgs
+            _tasks.append((_i, _pair, _msgs))
 
+        def _call_one(
+            args: tuple[int, PromptPair, list[dict[str, str]]],
+        ) -> tuple[int, tuple[PromptPair, str] | None, float]:
+            idx, pair, msgs = args
             try:
                 extra_kwargs: dict[str, object] = (
                     dict(getattr(self.config, "lm_extra_kwargs", None) or {})
                 )
                 response = litellm.completion(
                     model=self.config.target_model,
-                    messages=messages,
+                    messages=msgs,
                     **extra_kwargs,
                 )
                 cost = getattr(response, "_hidden_params", {}).get("response_cost", 0.0) or 0.0
-                if self._ctx is not None:
-                    self._ctx.add_cost("evaluation", cost)
                 if not response.choices:
-                    logger.warning("Pair %d: empty choices in response, skipping", i)
-                    skipped_count += 1
-                    completions.append(None)
-                    continue
+                    logger.warning("Pair %d: empty choices in response, skipping", idx)
+                    return idx, None, cost
                 new_response = response.choices[0].message.content or ""
-                completions.append((pair, new_response))
+                return idx, (pair, new_response), cost
             except Exception as e:
                 logger.warning(
                     "Pair %d: litellm.completion failed (%s), skipping",
-                    i,
-                    type(e).__name__,  # log only the exception type, not the message
+                    idx,
+                    type(e).__name__,
                 )
-                skipped_count += 1
-                completions.append(None)
+                return idx, None, 0.0
+
+        try:
+            _num_workers = int(self.config.num_threads)
+        except (TypeError, ValueError, AttributeError):
+            _num_workers = 4
+        with concurrent.futures.ThreadPoolExecutor(max_workers=_num_workers) as executor:
+            for _idx, _result, _cost in executor.map(_call_one, _tasks):
+                completions[_idx] = _result
+                total_eval_cost += _cost
+                if _result is None:
+                    skipped_count += 1
+
+        if self._ctx is not None and total_eval_cost > 0:
+            self._ctx.add_cost("evaluation", total_eval_cost)
 
         if skipped_count > 0:
             logger.warning(

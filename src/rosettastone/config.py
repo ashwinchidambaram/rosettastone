@@ -74,7 +74,7 @@ class MigrationConfig(BaseModel):
         ),
     )
     reflection_model: str = "openai/gpt-4o"
-    num_threads: int = 4
+    num_threads: int = 2
 
     # Pre-flight
     dry_run: bool = False

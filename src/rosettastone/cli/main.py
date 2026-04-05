@@ -98,6 +98,15 @@ def migrate(
             "Example: '{\"api_base\": \"http://localhost:8123/v1\", \"api_key\": \"dummy\"}'"
         ),
     ),
+    num_threads: int = typer.Option(
+        2,
+        "--num-threads",
+        help=(
+            "Number of parallel threads for GEPA evaluation. "
+            "Default: 2. Increase on multi-GPU or high-throughput endpoints. "
+            "DSPy's own default is 8."
+        ),
+    ),
     pipeline: Annotated[
         Path | None,
         typer.Option(
@@ -172,6 +181,7 @@ def migrate(
         known_issue_weight=known_issue_weight,
         gepa_timeout_seconds=gepa_timeout_seconds,
         lm_extra_kwargs=parsed_lm_extra_kwargs,
+        num_threads=num_threads,
     )
     migrator = Migrator(config)
     result = migrator.run()

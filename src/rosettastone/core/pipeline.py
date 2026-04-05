@@ -231,13 +231,33 @@ def run_pii_scan(pairs: list[PromptPair], ctx: PipelineContext, config: Migratio
         from rosettastone.safety.pii_scanner import scan_pairs
 
         pii_warnings = scan_pairs(pairs)
+    # Aggregate by pii_type to avoid one warning per pair in reports
+    pii_by_type: dict[str, Any] = {}
     for pw in pii_warnings:
+        if pw.pii_type not in pii_by_type:
+            pii_by_type[pw.pii_type] = {
+                "severity": pw.severity,
+                "total_count": 0,
+                "affected_pairs": set(),
+            }
+        pii_by_type[pw.pii_type]["total_count"] += pw.count
+        pii_by_type[pw.pii_type]["affected_pairs"].add(pw.pair_index)
+
+    for pii_type, data in pii_by_type.items():
+        n_pairs = len(data["affected_pairs"])
         ctx.safety_warnings.append(
             SafetyWarning(
                 warning_type="pii",
-                severity=SafetySeverity(pw.severity),
-                message=f"PII detected: {pw.pii_type} (count: {pw.count})",
-                details={"pair_index": pw.pair_index, "pii_type": pw.pii_type},
+                severity=SafetySeverity(data["severity"]),
+                message=(
+                    f"PII detected: {pii_type} "
+                    f"({data['total_count']} occurrences in {n_pairs} pair(s))"
+                ),
+                details={
+                    "pii_type": pii_type,
+                    "total_count": data["total_count"],
+                    "affected_pairs": n_pairs,
+                },
             )
         )
 
