@@ -38,6 +38,7 @@ def _ray_available() -> bool:
     """Check if the Ray chat endpoint is reachable."""
     try:
         import httpx
+
         resp = httpx.get(
             f"{_RAY_API_BASE}/models",
             timeout=3.0,

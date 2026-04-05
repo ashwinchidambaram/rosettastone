@@ -501,7 +501,9 @@ class TestDeprecationAlerts:
         assert deprecation_alerts[0]["severity"] == "critical"
         assert "retired" in deprecation_alerts[0]["message"].lower()
 
-    def test_soon_to_retire_model_generates_critical_alert(self, client: TestClient, engine) -> None:
+    def test_soon_to_retire_model_generates_critical_alert(
+        self, client: TestClient, engine
+    ) -> None:
         """A migration with source model retiring in <30 days generates a critical alert."""
         with Session(engine) as session:
             # openai/gpt-3.5-turbo-0613 will retire on 2026-03-01 (soon from 2026-04-01)

@@ -85,8 +85,8 @@ class CompositeEvaluator:
                 messages = [{"role": "system", "content": optimized_prompt}] + messages
 
             try:
-                extra_kwargs: dict[str, object] = (
-                    dict(getattr(self.config, "lm_extra_kwargs", None) or {})
+                extra_kwargs: dict[str, object] = dict(
+                    getattr(self.config, "lm_extra_kwargs", None) or {}
                 )
                 response = litellm.completion(
                     model=self.config.target_model,
@@ -260,7 +260,8 @@ class CompositeEvaluator:
             new_response=base.new_response,
             scores=base.scores,
             composite_score=agg_score,
-            is_win=agg_score >= self._get_threshold(
+            is_win=agg_score
+            >= self._get_threshold(
                 base.prompt_pair.output_type or detect_output_type(base.prompt_pair.response)
             ),
             details=base.details,

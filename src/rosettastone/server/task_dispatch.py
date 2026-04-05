@@ -1,4 +1,5 @@
 """Task dispatch abstraction — uses RQ when Redis is available, DB queue otherwise."""
+
 from __future__ import annotations
 
 import logging

@@ -882,9 +882,7 @@ class TestMigrationListFragment:
         assert f"/ui/migrations/{sample_migration.id}" in body
         assert "gpt-4o" in body
 
-    def test_migration_list_fragment_empty_db_shows_no_migrations(
-        self, client: TestClient
-    ) -> None:
+    def test_migration_list_fragment_empty_db_shows_no_migrations(self, client: TestClient) -> None:
         """When DB is empty the fragment falls back to dummy cards (not empty-state, since
         DUMMY_MIGRATIONS is non-empty), so we still get card links."""
         resp = client.get("/ui/fragments/migration-list")
@@ -896,7 +894,9 @@ class TestMigrationListFragment:
 class TestEvalGridFragment:
     """Tests for GET /ui/fragments/eval-grid/{migration_id}."""
 
-    def test_eval_grid_returns_200(self, client: TestClient, sample_migration: MigrationRecord) -> None:
+    def test_eval_grid_returns_200(
+        self, client: TestClient, sample_migration: MigrationRecord
+    ) -> None:
         """Fragment endpoint returns 200."""
         resp = client.get(f"/ui/fragments/eval-grid/{sample_migration.id}")
         assert resp.status_code == 200

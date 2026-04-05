@@ -14,33 +14,25 @@ yaml = pytest.importorskip("yaml")
 
 class TestShadowConfigDownload:
     def test_shadow_config_returns_yaml(self, client, engine, sample_migration):
-        response = client.get(
-            f"/api/v1/migrations/{sample_migration.id}/shadow/config.yaml"
-        )
+        response = client.get(f"/api/v1/migrations/{sample_migration.id}/shadow/config.yaml")
         assert response.status_code == 200
         assert "text/yaml" in response.headers["content-type"]
 
     def test_shadow_config_is_valid_yaml(self, client, engine, sample_migration):
-        response = client.get(
-            f"/api/v1/migrations/{sample_migration.id}/shadow/config.yaml"
-        )
+        response = client.get(f"/api/v1/migrations/{sample_migration.id}/shadow/config.yaml")
         assert response.status_code == 200
         parsed = yaml.safe_load(response.text)
         assert isinstance(parsed, dict)
 
     def test_shadow_config_contains_models(self, client, engine, sample_migration):
-        response = client.get(
-            f"/api/v1/migrations/{sample_migration.id}/shadow/config.yaml"
-        )
+        response = client.get(f"/api/v1/migrations/{sample_migration.id}/shadow/config.yaml")
         assert response.status_code == 200
         parsed = yaml.safe_load(response.text)
         assert parsed["source_model"] == sample_migration.source_model
         assert parsed["target_model"] == sample_migration.target_model
 
     def test_shadow_config_structure(self, client, engine, sample_migration):
-        response = client.get(
-            f"/api/v1/migrations/{sample_migration.id}/shadow/config.yaml"
-        )
+        response = client.get(f"/api/v1/migrations/{sample_migration.id}/shadow/config.yaml")
         assert response.status_code == 200
         parsed = yaml.safe_load(response.text)
         # Required structural keys
@@ -55,9 +47,7 @@ class TestShadowConfigDownload:
         assert "target" in parsed["endpoints"]
 
     def test_shadow_config_content_disposition(self, client, engine, sample_migration):
-        response = client.get(
-            f"/api/v1/migrations/{sample_migration.id}/shadow/config.yaml"
-        )
+        response = client.get(f"/api/v1/migrations/{sample_migration.id}/shadow/config.yaml")
         assert response.status_code == 200
         assert "shadow_config.yaml" in response.headers.get("content-disposition", "")
 
@@ -112,9 +102,7 @@ class TestShadowEvaluate:
 
         jsonl_content = b'{"prompt": "hello", "source_response": "hi", "target_response": "hello there", "source_model": "openai/gpt-4o", "target_model": "anthropic/claude-sonnet-4", "request_id": "r1"}\n'
 
-        with patch(
-            "rosettastone.shadow.evaluator.score_shadow_logs", return_value=fake_results
-        ):
+        with patch("rosettastone.shadow.evaluator.score_shadow_logs", return_value=fake_results):
             response = client.post(
                 f"/api/v1/migrations/{sample_migration.id}/shadow/evaluate",
                 files={"file": ("shadow.jsonl", jsonl_content, "application/octet-stream")},

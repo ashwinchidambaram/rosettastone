@@ -130,11 +130,12 @@ class TestGEPACallbackPersistence:
 
         from rosettastone.server.api.tasks import _make_gepa_callback
 
-        migration_id = sample_migration.id
+        assert sample_migration.id is not None
+        migration_id: int = sample_migration.id
 
         with patch("rosettastone.server.progress.emit_progress", return_value=None):
             cb = _make_gepa_callback(migration_id, engine=engine)
-            cb(iteration=2, total_iterations=10, mean_score=0.81)
+            cb(2, 10, 0.81)
 
         with Session(engine) as s:
             records = s.exec(
@@ -159,11 +160,13 @@ class TestGEPACallbackPersistence:
 
         bad_engine = MagicMock()
 
+        assert sample_migration.id is not None
+        migration_id: int = sample_migration.id
         with patch("rosettastone.server.api.tasks.Session", return_value=bad_session):
             with patch("rosettastone.server.progress.emit_progress", return_value=None):
-                cb = _make_gepa_callback(sample_migration.id, engine=bad_engine)
+                cb = _make_gepa_callback(migration_id, engine=bad_engine)
                 # Should not raise even with a broken DB
-                cb(iteration=1, total_iterations=5, mean_score=0.5)
+                cb(1, 5, 0.5)
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 """Tests for ThresholdCalibrator — no real API calls."""
+
 from __future__ import annotations
 
 import pytest
@@ -204,15 +205,12 @@ class TestThresholdCalibrator:
         y_scores = [p.scores.composite for p in dataset.labeled_pairs()]
         fpr_arr, _tpr_arr, thresh_arr = roc_curve(y_true, y_scores)
 
-        candidates = [
-            float(t) for f, t in zip(fpr_arr[1:], thresh_arr) if float(f) <= target_fpr
-        ]
+        candidates = [float(t) for f, t in zip(fpr_arr[1:], thresh_arr) if float(f) <= target_fpr]
         assert candidates, "No thresholds satisfy FPR target in test data"
         # The calibrated threshold should be the LOWEST among candidates
         # (last match when iterating descending thresholds = highest threshold within FPR budget
         #  is actually the minimum numeric value from the candidates list since thresholds
         #  are descending — the last qualifying entry is the smallest numeric threshold).
         assert calibrated == round(min(candidates), 4), (
-            f"Expected lowest qualifying threshold {round(min(candidates), 4)}, "
-            f"got {calibrated}"
+            f"Expected lowest qualifying threshold {round(min(candidates), 4)}, got {calibrated}"
         )

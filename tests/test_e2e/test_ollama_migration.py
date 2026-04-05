@@ -57,21 +57,77 @@ def ollama_sample_data(tmp_path_factory) -> Path:
     data_file = data_dir / "sample.jsonl"
 
     pairs = [
-        {"prompt": "What is the capital of France?", "response": "Paris", "source_model": _SOURCE_MODEL},
+        {
+            "prompt": "What is the capital of France?",
+            "response": "Paris",
+            "source_model": _SOURCE_MODEL,
+        },
         {"prompt": "What is 15 multiplied by 7?", "response": "105", "source_model": _SOURCE_MODEL},
-        {"prompt": "Name three primary colors.", "response": "Red, blue, and yellow.", "source_model": _SOURCE_MODEL},
-        {"prompt": "What does HTTP stand for?", "response": "HyperText Transfer Protocol", "source_model": _SOURCE_MODEL},
-        {"prompt": "What is the approximate speed of light?", "response": "299,792,458 meters per second", "source_model": _SOURCE_MODEL},
-        {"prompt": 'Return JSON: {"status": "ok", "code": 200}', "response": '{"status": "ok", "code": 200}', "source_model": _SOURCE_MODEL},
-        {"prompt": 'Return JSON with name field: {"name": "Alice"}', "response": '{"name": "Alice"}', "source_model": _SOURCE_MODEL},
-        {"prompt": 'Return JSON: {"items": ["a", "b", "c"]}', "response": '{"items": ["a", "b", "c"]}', "source_model": _SOURCE_MODEL},
-        {"prompt": 'Return JSON: {"error": null, "success": true}', "response": '{"error": null, "success": true}', "source_model": _SOURCE_MODEL},
-        {"prompt": 'Return JSON: {"count": 42, "label": "test"}', "response": '{"count": 42, "label": "test"}', "source_model": _SOURCE_MODEL},
-        {"prompt": "Is Python an interpreted language? Answer yes or no.", "response": "Yes", "source_model": _SOURCE_MODEL},
-        {"prompt": "What is the largest planet in our solar system?", "response": "Jupiter", "source_model": _SOURCE_MODEL},
-        {"prompt": "What programming language was created by Guido van Rossum?", "response": "Python", "source_model": _SOURCE_MODEL},
-        {"prompt": "What does CPU stand for?", "response": "Central Processing Unit", "source_model": _SOURCE_MODEL},
-        {"prompt": "Is water a compound or an element?", "response": "Compound", "source_model": _SOURCE_MODEL},
+        {
+            "prompt": "Name three primary colors.",
+            "response": "Red, blue, and yellow.",
+            "source_model": _SOURCE_MODEL,
+        },
+        {
+            "prompt": "What does HTTP stand for?",
+            "response": "HyperText Transfer Protocol",
+            "source_model": _SOURCE_MODEL,
+        },
+        {
+            "prompt": "What is the approximate speed of light?",
+            "response": "299,792,458 meters per second",
+            "source_model": _SOURCE_MODEL,
+        },
+        {
+            "prompt": 'Return JSON: {"status": "ok", "code": 200}',
+            "response": '{"status": "ok", "code": 200}',
+            "source_model": _SOURCE_MODEL,
+        },
+        {
+            "prompt": 'Return JSON with name field: {"name": "Alice"}',
+            "response": '{"name": "Alice"}',
+            "source_model": _SOURCE_MODEL,
+        },
+        {
+            "prompt": 'Return JSON: {"items": ["a", "b", "c"]}',
+            "response": '{"items": ["a", "b", "c"]}',
+            "source_model": _SOURCE_MODEL,
+        },
+        {
+            "prompt": 'Return JSON: {"error": null, "success": true}',
+            "response": '{"error": null, "success": true}',
+            "source_model": _SOURCE_MODEL,
+        },
+        {
+            "prompt": 'Return JSON: {"count": 42, "label": "test"}',
+            "response": '{"count": 42, "label": "test"}',
+            "source_model": _SOURCE_MODEL,
+        },
+        {
+            "prompt": "Is Python an interpreted language? Answer yes or no.",
+            "response": "Yes",
+            "source_model": _SOURCE_MODEL,
+        },
+        {
+            "prompt": "What is the largest planet in our solar system?",
+            "response": "Jupiter",
+            "source_model": _SOURCE_MODEL,
+        },
+        {
+            "prompt": "What programming language was created by Guido van Rossum?",
+            "response": "Python",
+            "source_model": _SOURCE_MODEL,
+        },
+        {
+            "prompt": "What does CPU stand for?",
+            "response": "Central Processing Unit",
+            "source_model": _SOURCE_MODEL,
+        },
+        {
+            "prompt": "Is water a compound or an element?",
+            "response": "Compound",
+            "source_model": _SOURCE_MODEL,
+        },
     ]
 
     with data_file.open("w") as f:

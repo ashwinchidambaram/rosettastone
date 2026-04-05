@@ -1,4 +1,5 @@
 """Tests for shadow log format serialization."""
+
 from __future__ import annotations
 
 from rosettastone.shadow.log_format import ShadowLogEntry, read_log_entries, write_log_entry

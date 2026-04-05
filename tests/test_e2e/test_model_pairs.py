@@ -53,15 +53,33 @@ skip_if_no_apis = pytest.mark.skipif(
 
 CANONICAL_PAIRS = [
     # JSON output
-    {"prompt": "Return JSON: {\"status\": \"ok\", \"code\": 200}", "response": "{\"status\": \"ok\", \"code\": 200}"},
-    {"prompt": "Return JSON: {\"items\": [1, 2, 3], \"total\": 3}", "response": "{\"items\": [1, 2, 3], \"total\": 3}"},
-    {"prompt": "Return JSON: {\"name\": \"Alice\", \"age\": 30}", "response": "{\"name\": \"Alice\", \"age\": 30}"},
-    {"prompt": "Return JSON: {\"error\": null, \"success\": true}", "response": "{\"error\": null, \"success\": true}"},
-    {"prompt": "Return JSON: {\"count\": 0, \"results\": []}", "response": "{\"count\": 0, \"results\": []}"},
+    {
+        "prompt": 'Return JSON: {"status": "ok", "code": 200}',
+        "response": '{"status": "ok", "code": 200}',
+    },
+    {
+        "prompt": 'Return JSON: {"items": [1, 2, 3], "total": 3}',
+        "response": '{"items": [1, 2, 3], "total": 3}',
+    },
+    {
+        "prompt": 'Return JSON: {"name": "Alice", "age": 30}',
+        "response": '{"name": "Alice", "age": 30}',
+    },
+    {
+        "prompt": 'Return JSON: {"error": null, "success": true}',
+        "response": '{"error": null, "success": true}',
+    },
+    {
+        "prompt": 'Return JSON: {"count": 0, "results": []}',
+        "response": '{"count": 0, "results": []}',
+    },
     # Text/QA
     {"prompt": "What is the capital of France?", "response": "Paris"},
     {"prompt": "What does HTTP stand for?", "response": "HyperText Transfer Protocol"},
-    {"prompt": "Name the first three elements on the periodic table.", "response": "Hydrogen, Helium, and Lithium"},
+    {
+        "prompt": "Name the first three elements on the periodic table.",
+        "response": "Hydrogen, Helium, and Lithium",
+    },
     {"prompt": "What programming language was created by Guido van Rossum?", "response": "Python"},
     {"prompt": "What is the largest planet in our solar system?", "response": "Jupiter"},
     # Classification/boolean
@@ -72,7 +90,10 @@ CANONICAL_PAIRS = [
     {"prompt": "Does Python support multiple inheritance? Answer yes or no.", "response": "Yes"},
     # Reasoning
     {"prompt": "What is 15 multiplied by 8?", "response": "120"},
-    {"prompt": "If a train travels 60 mph for 2 hours, how far does it go?", "response": "120 miles"},
+    {
+        "prompt": "If a train travels 60 mph for 2 hours, how far does it go?",
+        "response": "120 miles",
+    },
     {"prompt": "What is the square root of 144?", "response": "12"},
     {"prompt": "Convert 100 Celsius to Fahrenheit.", "response": "212 degrees Fahrenheit"},
     {"prompt": "How many days are in a leap year?", "response": "366"},

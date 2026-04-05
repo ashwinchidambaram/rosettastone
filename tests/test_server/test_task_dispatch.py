@@ -1,4 +1,5 @@
 """Tests for TaskDispatcher — RQ vs DB queue fallback."""
+
 from __future__ import annotations
 
 import sys

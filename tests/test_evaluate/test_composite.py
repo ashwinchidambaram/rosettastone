@@ -360,9 +360,7 @@ class TestCompositeEvaluatorEvaluate:
         import logging
         import unittest
 
-        pairs = [
-            make_pair(f"Q{i}", "positive", OutputType.CLASSIFICATION) for i in range(5)
-        ]
+        pairs = [make_pair(f"Q{i}", "positive", OutputType.CLASSIFICATION) for i in range(5)]
 
         call_count = 0
 

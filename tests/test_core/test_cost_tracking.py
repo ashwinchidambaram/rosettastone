@@ -45,9 +45,7 @@ def test_add_cost_starts_at_zero():
 
 def test_add_cost_thread_safety():
     ctx = PipelineContext()
-    threads = [
-        threading.Thread(target=ctx.add_cost, args=("evaluation", 0.01)) for _ in range(10)
-    ]
+    threads = [threading.Thread(target=ctx.add_cost, args=("evaluation", 0.01)) for _ in range(10)]
     for t in threads:
         t.start()
     for t in threads:
@@ -97,9 +95,7 @@ def test_composite_evaluator_captures_cost():
 
     evaluator = CompositeEvaluator(config, ctx=ctx)
     with patch("litellm.completion", return_value=mock_response):
-        with patch.dict(
-            "sys.modules", {"rosettastone.evaluate.bertscore": bertscore_module}
-        ):
+        with patch.dict("sys.modules", {"rosettastone.evaluate.bertscore": bertscore_module}):
             evaluator.evaluate([pair])
 
     assert ctx.costs.get("evaluation", 0.0) == pytest.approx(0.05)
@@ -136,9 +132,7 @@ def test_composite_evaluator_captures_cost_no_hidden_params():
 
     evaluator = CompositeEvaluator(config, ctx=ctx)
     with patch("litellm.completion", return_value=mock_response):
-        with patch.dict(
-            "sys.modules", {"rosettastone.evaluate.bertscore": bertscore_module}
-        ):
+        with patch.dict("sys.modules", {"rosettastone.evaluate.bertscore": bertscore_module}):
             evaluator.evaluate([pair])
 
     # Should store 0.0 and not raise
@@ -172,7 +166,10 @@ def test_build_result_cost_breakdown():
 
     assert isinstance(result, MigrationResult)
     assert result.cost_usd == pytest.approx(0.30)
-    assert result.cost_breakdown == {"evaluation": pytest.approx(0.10), "optimization": pytest.approx(0.20)}
+    assert result.cost_breakdown == {
+        "evaluation": pytest.approx(0.10),
+        "optimization": pytest.approx(0.20),
+    }
 
 
 def test_build_result_no_ctx_cost_breakdown_empty():

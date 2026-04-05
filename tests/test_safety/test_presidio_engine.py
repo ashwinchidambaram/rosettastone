@@ -558,7 +558,9 @@ class TestAnonymizePairsPreservesListOfDicts:
         fields must be replaced.
         """
         mock_analyzer = MagicMock()
-        mock_analyzer.analyze.return_value = [_make_analyzer_result("PHONE_NUMBER", start=10, end=18)]
+        mock_analyzer.analyze.return_value = [
+            _make_analyzer_result("PHONE_NUMBER", start=10, end=18)
+        ]
 
         mock_anonymizer = MagicMock()
         mock_anonymizer.anonymize.return_value = self._make_anonymizer_result(
