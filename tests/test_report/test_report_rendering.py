@@ -8,31 +8,41 @@ from rosettastone.report.markdown import generate_markdown_report
 
 def _base_result(**kwargs) -> MigrationResult:
     """Return a MigrationResult with sensible defaults."""
-    defaults = dict(
-        config={"source_model": "openai/gpt-4o", "target_model": "anthropic/claude-sonnet-4"},
-        optimized_prompt="You are a helpful assistant.",
-        baseline_results=[],
-        validation_results=[
-            EvalResult(
-                prompt_pair=PromptPair(
-                    prompt="test", response="expected", source_model="openai/gpt-4o"
+    return MigrationResult(
+        config=kwargs.get(
+            "config",
+            {"source_model": "openai/gpt-4o", "target_model": "anthropic/claude-sonnet-4"},
+        ),
+        optimized_prompt=kwargs.get("optimized_prompt", "You are a helpful assistant."),
+        baseline_results=kwargs.get("baseline_results", []),
+        validation_results=kwargs.get(
+            "validation_results",
+            [
+                EvalResult(
+                    prompt_pair=PromptPair(
+                        prompt="test", response="expected", source_model="openai/gpt-4o"
+                    ),
+                    new_response="actual",
+                    scores={"bertscore_f1": 0.85},
+                    composite_score=0.85,
+                    is_win=True,
+                    details={"output_type": "short_text"},
                 ),
-                new_response="actual",
-                scores={"bertscore_f1": 0.85},
-                composite_score=0.85,
-                is_win=True,
-                details={"output_type": "short_text"},
-            ),
-        ],
-        confidence_score=1.0,
-        baseline_score=0.7,
-        improvement=0.3,
-        cost_usd=5.0,
-        duration_seconds=60.0,
-        warnings=[],
+            ],
+        ),
+        confidence_score=float(kwargs.get("confidence_score", 1.0)),
+        baseline_score=float(kwargs.get("baseline_score", 0.7)),
+        improvement=float(kwargs.get("improvement", 0.3)),
+        cost_usd=float(kwargs.get("cost_usd", 5.0)),
+        duration_seconds=float(kwargs.get("duration_seconds", 60.0)),
+        warnings=kwargs.get("warnings", []),
+        recommendation=kwargs.get("recommendation"),
+        recommendation_reasoning=kwargs.get("recommendation_reasoning"),
+        per_type_scores=kwargs.get("per_type_scores", {}),
+        stage_timing=kwargs.get("stage_timing", {}),
+        eval_runs=int(kwargs.get("eval_runs", 1)),
+        non_deterministic_count=int(kwargs.get("non_deterministic_count", 0)),
     )
-    defaults.update(kwargs)
-    return MigrationResult(**defaults)
 
 
 # ---------------------------------------------------------------------------

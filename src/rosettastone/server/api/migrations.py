@@ -509,14 +509,14 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
 
     # Phase A observability: stage timing and eval reliability
     _raw_config = json.loads(record.config_json) if record.config_json else {}
-    _stage_timing_raw = _raw_config.get("_stage_timing", {})
+    _stage_timing_raw = _raw_config.pop("_stage_timing", {})
     result["stage_timing"] = (
         {k: float(v) for k, v in _stage_timing_raw.items()}
         if isinstance(_stage_timing_raw, dict)
         else {}
     )
-    result["non_deterministic_count"] = int(_raw_config.get("_non_deterministic_count", 0) or 0)
-    result["eval_runs"] = int(_raw_config.get("_eval_runs", 1) or 1)
+    result["non_deterministic_count"] = int(_raw_config.pop("_non_deterministic_count", 0) or 0)
+    result["eval_runs"] = int(_raw_config.pop("_eval_runs", 1) or 1)
 
     return result
 
