@@ -176,6 +176,7 @@ def optimize_prompt(
     val: list[PromptPair],
     config: MigrationConfig,
     on_iteration: Callable[[int, int, float], None] | None = None,
+    iteration_history_out: list[dict] | None = None,
 ) -> str:
     from rosettastone.optimize.base import Optimizer
 
@@ -189,7 +190,10 @@ def optimize_prompt(
         from rosettastone.optimize.gepa import GEPAOptimizer
 
         optimizer = GEPAOptimizer()
-        return optimizer.optimize(train, val, config, on_iteration=on_iteration)
+        return optimizer.optimize(
+            train, val, config, on_iteration=on_iteration,
+            iteration_history_out=iteration_history_out,
+        )
 
 
 def evaluate_baseline(

@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import threading
 from collections.abc import Callable
+from datetime import UTC
+from datetime import datetime as _dt
 from typing import TYPE_CHECKING, Any
 
 import dspy
@@ -34,6 +36,7 @@ class IterationTracker:
         self._iteration = 0
         self._scores: list[float] = []
         self._callback = callback  # (iteration, total_iterations, running_mean_score) -> None
+        self._iteration_history: list[dict] = []
 
     def wrap(self, metric_fn: Any) -> Any:
         """Wrap a DSPy metric function to track iteration progress.
@@ -64,11 +67,21 @@ class IterationTracker:
                     tracker._iteration += 1
                     mean = sum(tracker._scores) / len(tracker._scores)
                     fire_callback = (tracker._iteration, tracker._total_iterations, mean)
+                    tracker._iteration_history.append({
+                        "iteration_num": tracker._iteration,
+                        "mean_score": round(mean, 4),
+                        "timestamp_iso": _dt.now(UTC).isoformat(),
+                    })
             if fire_callback is not None:
                 tracker._callback(*fire_callback)
             return result
 
         return wrapped
+
+    def get_history(self) -> list[dict]:
+        """Return a shallow copy of the iteration history under lock."""
+        with self._lock:
+            return list(self._iteration_history)
 
 
 def build_migration_metric(

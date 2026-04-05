@@ -288,6 +288,7 @@ class Migrator:
             return _gepa_cost_callback
 
         # Step 3: Optimize — restore optimized prompt from checkpoint if available
+        _iteration_history: list[dict] = []
         if _already_done("optimize"):
             # Try to recover the optimized prompt from checkpoint data
             saved_prompt = resume_data.get("stage_output", {})
@@ -305,7 +306,8 @@ class Migrator:
                 t0 = time.time()
                 try:
                     optimized_prompt = optimize_prompt(
-                        train, val, self.config, self._gepa_iteration_callback
+                        train, val, self.config, self._gepa_iteration_callback,
+                        iteration_history_out=_iteration_history,
                     )
                 except GEPATimeoutWithResult as exc:
                     ctx.warnings.append(exc.message)
@@ -337,7 +339,8 @@ class Migrator:
             t0 = time.time()
             try:
                 optimized_prompt = optimize_prompt(
-                    train, val, self.config, self._gepa_iteration_callback
+                    train, val, self.config, self._gepa_iteration_callback,
+                    iteration_history_out=_iteration_history,
                 )
             except GEPATimeoutWithResult as exc:
                 ctx.warnings.append(exc.message)
@@ -421,6 +424,7 @@ class Migrator:
         # Step 5: Report
         duration = time.time() - start
         result = build_result(self.config, optimized_prompt, baseline, validation, duration, ctx)
+        result.optimization_iterations = _iteration_history
         generate_report(result, self.config.output_dir)
         self._emit("report", 1.0, 1.0)
 

@@ -1018,3 +1018,80 @@ def test_migration_detail_has_total_tokens(client, session, engine):
     data = resp.json()
     # The key assertion: total_tokens is stored and accessible on the record
     assert record.total_tokens == 1500
+
+
+def test_get_optimization_trace_empty(client, engine):
+    """Migration with no iteration history returns correct empty shape."""
+    import json as _json
+
+    from sqlmodel import Session as _Session
+
+    from rosettastone.server.models import MigrationRecord as _MR
+
+    with _Session(engine) as s:
+        record = _MR(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+            confidence_score=0.88,
+            baseline_score=0.80,
+            improvement=0.08,
+            cost_usd=0.50,
+            recommendation="GO",
+            optimization_score_history_json="[]",
+        )
+        s.add(record)
+        s.commit()
+        s.refresh(record)
+        migration_id = record.id
+
+    resp = client.get(f"/api/v1/migrations/{migration_id}/optimization-trace")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "iterations" in data
+    assert data["total_iterations"] == 0
+    assert data["iterations"] == []
+    assert data["migration_id"] == migration_id
+
+
+def test_get_optimization_trace_with_data(client, engine):
+    """Migration with iteration history returns the data correctly."""
+    import json as _json
+
+    from sqlmodel import Session as _Session
+
+    from rosettastone.server.models import MigrationRecord as _MR
+
+    history = [
+        {"iteration_num": 1, "mean_score": 0.6123, "timestamp_iso": "2026-04-05T10:00:00+00:00"},
+        {"iteration_num": 2, "mean_score": 0.7456, "timestamp_iso": "2026-04-05T10:01:00+00:00"},
+        {"iteration_num": 3, "mean_score": 0.8012, "timestamp_iso": "2026-04-05T10:02:00+00:00"},
+    ]
+
+    with _Session(engine) as s:
+        record = _MR(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+            confidence_score=0.90,
+            baseline_score=0.80,
+            improvement=0.10,
+            cost_usd=1.00,
+            recommendation="GO",
+            optimized_prompt="Optimized system prompt here.",
+            optimization_score_history_json=_json.dumps(history),
+        )
+        s.add(record)
+        s.commit()
+        s.refresh(record)
+        migration_id = record.id
+
+    resp = client.get(f"/api/v1/migrations/{migration_id}/optimization-trace")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["migration_id"] == migration_id
+    assert data["total_iterations"] == 3
+    assert len(data["iterations"]) == 3
+    assert data["iterations"][0]["iteration_num"] == 1
+    assert data["iterations"][2]["mean_score"] == 0.8012
+    assert data["final_prompt_length"] == len("Optimized system prompt here.")

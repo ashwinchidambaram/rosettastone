@@ -90,3 +90,6 @@ class MigrationResult(BaseModel):
     total_tokens: int = 0
     token_breakdown: dict[str, int] = {}
     stage_timing: dict[str, float] = {}
+
+    # F2: GEPA iteration telemetry
+    optimization_iterations: list[dict[str, Any]] = []

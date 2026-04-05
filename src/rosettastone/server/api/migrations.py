@@ -416,6 +416,11 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
     result["total_tokens"] = record.total_tokens
     result["token_breakdown"] = json.loads(record.token_breakdown_json or "{}")
 
+    # F2: GEPA iteration telemetry presence flag
+    result["has_optimization_trace"] = record.optimization_score_history_json not in (
+        "[]", "", None
+    )
+
     # Checkpoint info
     result["checkpoint_stage"] = record.checkpoint_stage
 
@@ -997,6 +1002,47 @@ async def get_migration_regressions(
         "at_risk_count": at_risk_count,
         "total_analyzed": len(prompt_regressions),
     }
+
+
+@router.get("/api/v1/migrations/{migration_id}/optimization-trace")
+async def get_optimization_trace(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> dict:
+    """Return the GEPA score trajectory for a migration."""
+    record = _get_migration_or_404(migration_id, session)
+    check_resource_owner(record.owner_id, request)
+    history = json.loads(record.optimization_score_history_json or "[]")
+    return {
+        "migration_id": migration_id,
+        "iterations": history,
+        "total_iterations": len(history),
+        "final_prompt_length": len(record.optimized_prompt or ""),
+    }
+
+
+@router.get("/ui/migrations/{migration_id}/optimization-trace-fragment")
+async def optimization_trace_fragment(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """HTMX fragment: GEPA score trajectory chart for the migration detail page."""
+    record = _get_migration_or_404(migration_id, session)
+    history = json.loads(record.optimization_score_history_json or "[]")
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "fragments/optimization_trace.html",
+        {
+            "request": request,
+            "iteration_nums": [h["iteration_num"] for h in history],
+            "scores": [h["mean_score"] for h in history],
+            "total_iterations": len(history),
+            "final_prompt_length": len(record.optimized_prompt or ""),
+        },
+    )
 
 
 @router.get(

@@ -68,6 +68,9 @@ class MigrationRecord(SQLModel, table=True):
     total_tokens: int = Field(default=0)
     token_breakdown_json: str = Field(default="{}")
 
+    # F2: GEPA iteration telemetry
+    optimization_score_history_json: str = Field(default="[]")
+
     test_cases: list["TestCaseRecord"] = Relationship(back_populates="migration")
     warning_records: list["WarningRecord"] = Relationship(back_populates="migration")
 

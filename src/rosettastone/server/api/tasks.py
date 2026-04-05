@@ -268,6 +268,7 @@ def run_migration_background(
             record.recommendation_reasoning = result.recommendation_reasoning
             record.total_tokens = result.total_tokens
             record.token_breakdown_json = json.dumps(result.token_breakdown)
+            record.optimization_score_history_json = json.dumps(result.optimization_iterations)
             # Store latency and cost data
             if latency_data:
                 record.source_latency_p50 = latency_data.get("source_p50")

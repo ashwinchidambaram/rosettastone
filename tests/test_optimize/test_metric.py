@@ -647,3 +647,114 @@ class TestIterationTrackerThreadSafety:
         assert callback_count[0] == n_sweeps, (
             f"Expected {n_sweeps} callbacks for {n_sweeps} sweeps, got {callback_count[0]}"
         )
+
+
+# ---------------------------------------------------------------------------
+# IterationTracker history tests (F2)
+# ---------------------------------------------------------------------------
+
+
+def test_iteration_tracker_captures_history():
+    """Tracker records history entries after each full trainset sweep."""
+    from types import SimpleNamespace
+
+    calls = []
+    tracker = IterationTracker(
+        trainset_size=2,
+        total_iterations=3,
+        callback=lambda i, t, s: calls.append((i, t, s)),
+    )
+
+    def dummy_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
+        return 0.75
+
+    wrapped = tracker.wrap(dummy_metric)
+
+    # Call 6 times = 3 full sweeps (trainset_size=2)
+    ex = SimpleNamespace()
+    pred = SimpleNamespace()
+    for _ in range(6):
+        wrapped(ex, pred)
+
+    history = tracker.get_history()
+    assert len(history) == 3
+    assert history[0]["iteration_num"] == 1
+    assert history[1]["iteration_num"] == 2
+    assert history[2]["iteration_num"] == 3
+    assert all("mean_score" in h for h in history)
+    assert all("timestamp_iso" in h for h in history)
+    # All scores should be 0.75
+    assert all(h["mean_score"] == 0.75 for h in history)
+
+
+def test_iteration_tracker_history_thread_safe():
+    """History remains consistent when multiple threads call the wrapped metric."""
+    tracker = IterationTracker(
+        trainset_size=10,
+        total_iterations=4,
+        callback=lambda i, t, s: None,
+    )
+
+    def dummy_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
+        return 0.5
+
+    wrapped = tracker.wrap(dummy_metric)
+
+    from types import SimpleNamespace
+
+    ex = SimpleNamespace()
+    pred = SimpleNamespace()
+
+    def worker():
+        for _ in range(10):
+            wrapped(ex, pred)
+
+    threads = [threading.Thread(target=worker) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    history = tracker.get_history()
+    # 4 threads * 10 calls = 40 calls, trainset_size=10 → 4 iterations
+    assert len(history) == 4
+    assert all(h["iteration_num"] == i + 1 for i, h in enumerate(history))
+
+
+def test_iteration_tracker_no_callback():
+    """Tracker with trainset_size=0 returns original metric (no-op)."""
+    tracker = IterationTracker(trainset_size=0, total_iterations=0, callback=lambda i, t, s: None)
+
+    def dummy_metric(*args, **kwargs):
+        return 1.0
+
+    wrapped = tracker.wrap(dummy_metric)
+    # With trainset_size=0, wrap returns original metric unchanged
+    assert wrapped is dummy_metric
+
+
+def test_iteration_tracker_get_history_returns_copy():
+    """get_history() returns a copy; mutating it does not affect the tracker's internal list."""
+    tracker = IterationTracker(
+        trainset_size=1,
+        total_iterations=1,
+        callback=lambda i, t, s: None,
+    )
+
+    def dummy_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
+        return 0.6
+
+    wrapped = tracker.wrap(dummy_metric)
+
+    from types import SimpleNamespace
+
+    ex = SimpleNamespace()
+    pred = SimpleNamespace()
+    wrapped(ex, pred)
+
+    history = tracker.get_history()
+    assert len(history) == 1
+    # Mutate the returned copy
+    history.clear()
+    # Internal state must be unchanged
+    assert len(tracker.get_history()) == 1

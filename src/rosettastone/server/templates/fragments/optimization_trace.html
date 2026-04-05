@@ -1,0 +1,35 @@
+{# HTMX fragment — GEPA score trajectory. No prompt/response text. #}
+<div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4">
+  <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">GEPA Score Trajectory</p>
+  {% if iteration_nums %}
+  <div style="position:relative;height:150px;">
+    <canvas id="gepaTraceChart"></canvas>
+  </div>
+  <script nonce="{{ request.state.csp_nonce }}">
+  (function() {
+    var c = document.getElementById('gepaTraceChart').getContext('2d');
+    new Chart(c, {
+      type: 'line',
+      data: {
+        labels: {{ iteration_nums | tojson }},
+        datasets: [{ label: 'Mean Score', data: {{ scores | tojson }},
+          borderColor: 'rgba(212,116,94,0.8)', backgroundColor: 'rgba(212,116,94,0.1)',
+          tension: 0.3, fill: true, pointRadius: 3 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { min: 0, max: 1, ticks: { color: '#a89984' }, grid: { color: 'rgba(168,153,132,0.15)' } },
+          x: { title: { display: true, text: 'Iteration', color: '#a89984' }, ticks: { color: '#a89984' } }
+        }
+      }
+    });
+  })();
+  </script>
+  <p class="text-xs text-on-surface-variant mt-3 font-mono">
+    {{ total_iterations }} iteration{% if total_iterations != 1 %}s{% endif %} &middot; Final prompt: {{ final_prompt_length }} chars
+  </p>
+  {% else %}
+  <p class="text-sm text-on-surface-variant/60 p-2">No iteration data captured (GEPA ran without callback or no training data).</p>
+  {% endif %}
+</div>
