@@ -161,9 +161,8 @@ def test_eval_reliability_section_absent_when_baseline(tmp_path):
     result = _base_result(eval_runs=1, non_deterministic_count=0)
     output_path = generate_markdown_report(result, tmp_path)
     content = output_path.read_text()
-    # The section header should be present (it's always rendered) but the
-    # body content block should NOT be, since both conditions are false.
-    # The template wraps the body in {% if eval_runs > 1 or non_deterministic_count > 0 %}.
-    # We check that the count line doesn't appear.
+    # The entire section (header + body) should be absent because the guard
+    # {% if eval_runs > 1 or non_deterministic_count > 0 %} wraps both.
+    assert "## Evaluation Reliability" not in content
     assert "Evaluation runs:" not in content
     assert "Non-deterministic pairs:" not in content

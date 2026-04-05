@@ -207,9 +207,9 @@ No issues found.
 
 {% endif %}
 
+{% if eval_runs > 1 or non_deterministic_count > 0 %}
 ## Evaluation Reliability
 
-{% if eval_runs > 1 or non_deterministic_count > 0 %}
 Evaluation runs: {{ eval_runs }} | Non-deterministic pairs: {{ non_deterministic_count }} / {{ baseline_results | length + validation_results | length }}
 
 ---
