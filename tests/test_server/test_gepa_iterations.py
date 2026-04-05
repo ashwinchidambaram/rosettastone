@@ -207,10 +207,9 @@ class TestOptimizerHistoryEndpoint:
         assert resp.json() == []
 
     def test_returns_empty_list_for_nonexistent_migration(self, client: TestClient):
-        """Endpoint returns [] for a migration ID that has no records."""
+        """Endpoint returns 404 for a migration ID that does not exist."""
         resp = client.get("/api/v1/migrations/99999/optimizer-history")
-        assert resp.status_code == 200
-        assert resp.json() == []
+        assert resp.status_code == 404
 
     def test_response_schema_fields(
         self, client: TestClient, engine, sample_migration: MigrationRecord

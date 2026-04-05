@@ -839,10 +839,11 @@ async def get_optimizer_history(
     session: Session = Depends(get_session),
 ) -> list[GEPAIterationOut]:
     """Get GEPA optimizer iteration history for a migration, sorted by iteration asc."""
+    _get_migration_or_404(migration_id, session)
     records = session.exec(
         select(GEPAIterationRecord)
         .where(GEPAIterationRecord.migration_id == migration_id)
-        .order_by(GEPAIterationRecord.iteration)
+        .order_by(GEPAIterationRecord.iteration)  # type: ignore[arg-type]
     ).all()
     return [GEPAIterationOut(**r.model_dump()) for r in records]
 
@@ -1885,10 +1886,11 @@ async def optimizer_history_fragment(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """HTMX fragment: optimizer iteration history for a completed migration."""
+    _get_migration_or_404(migration_id, session)
     records = session.exec(
         select(GEPAIterationRecord)
         .where(GEPAIterationRecord.migration_id == migration_id)
-        .order_by(GEPAIterationRecord.iteration)
+        .order_by(GEPAIterationRecord.iteration)  # type: ignore[arg-type]
     ).all()
     return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,

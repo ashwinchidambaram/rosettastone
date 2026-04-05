@@ -160,8 +160,13 @@ def _make_gepa_callback(migration_id: int, engine: Any = None) -> Callable[[int,
                     )
                 )
                 _s.commit()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Failed to persist GEPA iteration %d for migration %d: %s",
+                iteration,
+                migration_id,
+                exc,
+            )
 
     return on_iteration
 
