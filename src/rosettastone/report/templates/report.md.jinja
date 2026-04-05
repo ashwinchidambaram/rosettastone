@@ -217,6 +217,20 @@ Evaluation runs: {{ eval_runs }} | Non-deterministic pairs: {{ non_deterministic
 ---
 {% endif %}
 
+{% if skipped_count > 0 %}
+## Skipped Pairs
+
+{{ skipped_count }} pairs could not be evaluated:
+
+| Reason | Count |
+|--------|-------|
+{% for reason, count in failure_reason_counts.items() -%}
+| {{ reason | replace('_', ' ') }} | {{ count }} |
+{% endfor %}
+
+---
+{% endif %}
+
 ## Optimized Prompt
 
 ```

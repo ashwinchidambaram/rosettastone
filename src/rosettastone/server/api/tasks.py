@@ -342,6 +342,7 @@ def run_migration_background(
                         response_length=len(eval_result.prompt_pair.response),
                         new_response_length=len(eval_result.new_response),
                         evaluators_used=", ".join(eval_result.scores.keys()),
+                        failure_reason=eval_result.failure_reason,
                     )
 
                     if store_content:

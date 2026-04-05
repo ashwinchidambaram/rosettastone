@@ -34,6 +34,7 @@ class TestCaseSummary(BaseModel):
     new_token_count: int | None
     evaluators_used: str | None
     fallback_triggered: bool
+    failure_reason: str | None = None
 
 
 class TestCaseDetail(BaseModel):
@@ -50,6 +51,7 @@ class TestCaseDetail(BaseModel):
     new_token_count: int | None
     evaluators_used: str | None
     fallback_triggered: bool
+    failure_reason: str | None = None
     diff: DiffData | None = None
 
 

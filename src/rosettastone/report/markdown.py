@@ -75,6 +75,15 @@ def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
         result.baseline_results, result.validation_results, n=3
     )
 
+    # F6: Aggregate failure reasons across both result sets
+    all_results = list(result.baseline_results) + list(result.validation_results)
+    skipped_results = [r for r in all_results if getattr(r, "failure_reason", None) is not None]
+    skipped_count = len(skipped_results)
+    failure_reason_counts: dict[str, int] = {}
+    for r in skipped_results:
+        reason = r.failure_reason or "unknown"
+        failure_reason_counts[reason] = failure_reason_counts.get(reason, 0) + 1
+
     report_content = template.render(
         config=result.config,
         optimized_prompt=result.optimized_prompt,
@@ -106,6 +115,9 @@ def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
         stage_timing=getattr(result, "stage_timing", {}),
         # Prompt evolution / sample comparisons
         sample_comparisons=sample_comparisons,
+        # F6: failure reason taxonomy
+        skipped_count=skipped_count,
+        failure_reason_counts=failure_reason_counts,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

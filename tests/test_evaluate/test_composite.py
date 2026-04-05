@@ -353,9 +353,9 @@ class TestCompositeEvaluatorEvaluate:
         evaluator.evaluate(pairs)
         assert progress_calls == [(1, 2), (2, 2)]
 
-    def test_evaluate_logs_warning_on_skipped_pairs(self) -> None:
-        """When litellm.completion raises for some pairs, skipped pairs are excluded from
-        results and a warning is logged.
+    def test_logs_warning_on_skipped_pairs(self) -> None:
+        """When litellm.completion raises for some pairs, all pairs are included in
+        results — skipped ones with failure_reason set — and a warning is logged.
         """
         import logging
         import unittest
@@ -378,11 +378,75 @@ class TestCompositeEvaluatorEvaluate:
             with tc.assertLogs("rosettastone.evaluate.composite", level=logging.WARNING) as log_ctx:
                 results = self.evaluator.evaluate(pairs)
 
-        # Only 2 successful completions should produce results
-        assert len(results) == 2, f"Expected 2 results (non-skipped), got {len(results)}"
+        # All 5 pairs return EvalResults: 3 skipped (failure_reason set) + 2 successful
+        assert len(results) == 5, f"Expected 5 results (all pairs), got {len(results)}"
+
+        skipped = [r for r in results if r.failure_reason is not None]
+        successful = [r for r in results if r.failure_reason is None]
+        assert len(skipped) == 3, f"Expected 3 skipped, got {len(skipped)}"
+        assert len(successful) == 2, f"Expected 2 successful, got {len(successful)}"
 
         # A warning about skipped pairs must have been logged
         warning_messages = "\n".join(log_ctx.output)
         assert "skipped" in warning_messages.lower() or "Skipped" in warning_messages, (
             f"Expected a 'skipped' warning in logs, got: {warning_messages}"
         )
+
+    @patch("rosettastone.evaluate.composite.litellm.completion")
+    def test_failure_reason_none_on_success(self, mock_completion: MagicMock) -> None:
+        """EvalResult.failure_reason is None when scoring succeeds."""
+        mock_completion.return_value = make_litellm_response("positive")
+        pair = make_pair(
+            prompt="Classify sentiment",
+            response="positive",
+            output_type=OutputType.CLASSIFICATION,
+        )
+        results = self.evaluator.evaluate([pair])
+        assert len(results) == 1
+        assert results[0].failure_reason is None
+
+    def test_failure_reason_api_error_on_exception(self) -> None:
+        """EvalResult.failure_reason is 'api_error' when litellm raises a generic exception."""
+        pair = make_pair("Q1", "positive", OutputType.CLASSIFICATION)
+
+        def side_effect(*args, **kwargs):
+            raise ConnectionError("Connection refused")
+
+        with patch("rosettastone.evaluate.composite.litellm.completion", side_effect=side_effect):
+            results = self.evaluator.evaluate([pair])
+
+        assert len(results) == 1
+        assert results[0].failure_reason == "api_error"
+        assert results[0].composite_score == 0.0
+        assert results[0].is_win is False
+
+    def test_failure_reason_timeout_on_timeout_exception(self) -> None:
+        """EvalResult.failure_reason is 'timeout' when a timeout exception is raised."""
+        pair = make_pair("Q1", "positive", OutputType.CLASSIFICATION)
+
+        class FakeTimeoutError(Exception):
+            pass
+
+        def side_effect(*args, **kwargs):
+            raise FakeTimeoutError("Request timed out")
+
+        with patch("rosettastone.evaluate.composite.litellm.completion", side_effect=side_effect):
+            results = self.evaluator.evaluate([pair])
+
+        assert len(results) == 1
+        assert results[0].failure_reason == "timeout"
+
+    @patch("rosettastone.evaluate.composite.litellm.completion")
+    def test_failure_reason_json_gate(self, mock_completion: MagicMock) -> None:
+        """EvalResult.failure_reason is 'json_gate_failed' when JSON validity gate fires."""
+        # Return invalid JSON so json_valid == 0
+        mock_completion.return_value = make_litellm_response("not valid json at all")
+        pair = make_pair(
+            prompt="Give me JSON",
+            response='{"key": "value"}',
+            output_type=OutputType.JSON,
+        )
+        results = self.evaluator.evaluate([pair])
+        assert len(results) == 1
+        assert results[0].failure_reason == "json_gate_failed"
+        assert results[0].composite_score == 0.0

@@ -449,6 +449,27 @@ function showPersonaView(view) {
         </section>
         {% endif %}
 
+        <!-- Skipped Pairs Subsection (F6) -->
+        {% if migration.skipped_count > 0 %}
+        <section class="bg-surface-container-low rounded-xl overflow-hidden">
+            <div class="px-6 py-5 bg-surface-container-high border-b border-outline-variant/10 flex justify-between items-center">
+                <h3 class="font-bold text-sm uppercase tracking-wider text-on-surface/70">Skipped Pairs</h3>
+                <span class="px-2 py-0.5 bg-red-500/10 text-red-400 text-[10px] font-bold rounded-full">{{ migration.skipped_count }} SKIPPED</span>
+            </div>
+            <div class="p-6 space-y-2">
+                {% for reason, count in migration.skipped_pairs_by_reason.items() %}
+                <div class="flex items-center justify-between text-xs">
+                    <a class="font-mono text-red-400 hover:text-red-300 underline underline-offset-2 transition-colors"
+                       hx-get="/ui/migrations/{{ migration.id }}/test-cases-table?failure_reason={{ reason }}"
+                       hx-target="#test-cases-grid"
+                       hx-swap="innerHTML">{{ reason | replace('_', ' ') }}</a>
+                    <span class="font-mono text-on-surface-variant">{{ count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
         <!-- Configuration Section -->
         <section>
             <button class="w-full flex items-center justify-between p-4 bg-surface-container-low hover:bg-surface-container-high rounded-xl transition-all group"
@@ -768,6 +789,27 @@ function showPersonaView(view) {
 </div>
 {% endif %}
 
+<!-- Skipped Pairs (F6) — layout 2 -->
+{% if migration.skipped_count > 0 %}
+<div class="mt-8">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="headline-sm font-bold text-[#E8DCC4]">Skipped Pairs</h3>
+        <span class="text-xs font-mono text-red-400">{{ migration.skipped_count }} skipped</span>
+    </div>
+    <div class="space-y-2">
+        {% for reason, count in migration.skipped_pairs_by_reason.items() %}
+        <div class="flex items-center justify-between bg-surface-container-lowest p-3 rounded-lg text-xs">
+            <a class="font-mono text-red-400 hover:text-red-300 underline underline-offset-2 transition-colors"
+               hx-get="/ui/migrations/{{ migration.id }}/test-cases-table?failure_reason={{ reason }}"
+               hx-target="#test-cases-grid"
+               hx-swap="innerHTML">{{ reason | replace('_', ' ') }}</a>
+            <span class="font-mono text-on-surface-variant">{{ count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 {% else %}
 {# ─── NEEDS REVIEW / DEFAULT LAYOUT (warning/gold) ─── #}
 
@@ -978,6 +1020,27 @@ function showPersonaView(view) {
                 {% endfor %}
             </div>
             {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Skipped Pairs (F6) — layout 3 -->
+{% if migration.skipped_count > 0 %}
+<div class="mt-8">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="headline-sm font-bold text-[#E8DCC4]">Skipped Pairs</h3>
+        <span class="text-xs font-mono text-red-400">{{ migration.skipped_count }} skipped</span>
+    </div>
+    <div class="space-y-2">
+        {% for reason, count in migration.skipped_pairs_by_reason.items() %}
+        <div class="flex items-center justify-between bg-surface-container-lowest p-3 rounded-lg text-xs">
+            <a class="font-mono text-red-400 hover:text-red-300 underline underline-offset-2 transition-colors"
+               hx-get="/ui/migrations/{{ migration.id }}/test-cases-table?failure_reason={{ reason }}"
+               hx-target="#test-cases-grid"
+               hx-swap="innerHTML">{{ reason | replace('_', ' ') }}</a>
+            <span class="font-mono text-on-surface-variant">{{ count }}</span>
         </div>
         {% endfor %}
     </div>

@@ -568,6 +568,19 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
     result["non_deterministic_count"] = int(_raw_config.pop("_non_deterministic_count", 0) or 0)
     result["eval_runs"] = int(_raw_config.pop("_eval_runs", 1) or 1)
 
+    # F6: Skipped pairs grouped by failure reason (for "Needs Attention" panel)
+    skipped_stmt = select(TestCaseRecord).where(
+        TestCaseRecord.migration_id == record.id,
+        TestCaseRecord.failure_reason != None,  # noqa: E711
+    )
+    skipped_tcs = list(session.exec(skipped_stmt).all())
+    skipped_by_reason: dict[str, int] = {}
+    for _stc in skipped_tcs:
+        reason = _stc.failure_reason or "unknown"
+        skipped_by_reason[reason] = skipped_by_reason.get(reason, 0) + 1
+    result["skipped_pairs_by_reason"] = skipped_by_reason
+    result["skipped_count"] = len(skipped_tcs)
+
     return result
 
 
@@ -630,6 +643,7 @@ def _test_case_to_summary(tc: TestCaseRecord) -> TestCaseSummary:
         new_token_count=tc.new_token_count,
         evaluators_used=tc.evaluators_used,
         fallback_triggered=tc.fallback_triggered,
+        failure_reason=tc.failure_reason,
     )
 
 
@@ -660,6 +674,7 @@ def _test_case_to_detail(tc: TestCaseRecord) -> TestCaseDetail:
         new_token_count=tc.new_token_count,
         evaluators_used=tc.evaluators_used,
         fallback_triggered=tc.fallback_triggered,
+        failure_reason=tc.failure_reason,
         diff=diff,
     )
 
@@ -942,6 +957,7 @@ async def list_test_cases(
     limit: int = Query(20, ge=1, le=100),
     phase: str | None = Query(None),
     output_type: str | None = Query(None),
+    failure_reason: str | None = Query(None),
     session: Session = Depends(get_session),
 ) -> PaginatedResponse[TestCaseSummary]:
     """List test cases for a migration with optional filters."""
@@ -953,6 +969,8 @@ async def list_test_cases(
         conditions.append(TestCaseRecord.phase == phase)
     if output_type:
         conditions.append(TestCaseRecord.output_type == output_type)
+    if failure_reason:
+        conditions.append(TestCaseRecord.failure_reason == failure_reason)
 
     count_stmt = select(func.count()).select_from(TestCaseRecord).where(*conditions)
     total = session.exec(count_stmt).one()
@@ -1722,6 +1740,7 @@ async def test_case_fragment(
             "target_response": db_tc.new_response_text,
             "evaluators_used": db_tc.evaluators_used,
             "fallback_triggered": db_tc.fallback_triggered,
+            "failure_reason": db_tc.failure_reason,
         }
     else:
         tc = DUMMY_TEST_CASES.get(
@@ -1740,10 +1759,11 @@ async def test_case_fragment(
 async def test_cases_table_fragment(
     migration_id: int,
     request: Request,
-    outcome: str = Query("all"),  # "win" | "loss" | "all"
+    outcome: str = Query("all"),  # "win" | "loss" | "skipped" | "all"
     search: str = Query(""),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    failure_reason: str = Query(""),
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """HTMX partial for filterable test case grid."""
@@ -1754,6 +1774,10 @@ async def test_cases_table_fragment(
         conditions.append(TestCaseRecord.is_win == True)  # noqa: E712
     elif outcome == "loss":
         conditions.append(TestCaseRecord.is_win == False)  # noqa: E712
+    elif outcome == "skipped":
+        conditions.append(TestCaseRecord.failure_reason != None)  # noqa: E711
+    if failure_reason:
+        conditions.append(TestCaseRecord.failure_reason == failure_reason)
     if search:
         conditions.append(TestCaseRecord.prompt_text.contains(search))  # type: ignore[union-attr]
 
@@ -1781,6 +1805,7 @@ async def test_cases_table_fragment(
                 "output_type": tc.output_type.replace("_", " ").title(),
                 "composite_score": round(tc.composite_score, 2),
                 "is_win": tc.is_win,
+                "failure_reason": tc.failure_reason,
             }
         )
 
@@ -1792,6 +1817,7 @@ async def test_cases_table_fragment(
             "test_cases": tc_list,
             "outcome": outcome,
             "search": search,
+            "failure_reason": failure_reason,
             "page": page,
             "page_size": page_size,
             "total": total,

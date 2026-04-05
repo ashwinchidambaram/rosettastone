@@ -95,6 +95,10 @@ class TestCaseRecord(SQLModel, table=True):
     response_text: str | None = None
     new_response_text: str | None = None
 
+    # F6: Failure reason taxonomy (categorical only, no PII)
+    # Values: api_error / timeout / rate_limit / no_response / json_gate_failed
+    failure_reason: str | None = None
+
     migration: Optional["MigrationRecord"] = Relationship(back_populates="test_cases")
 
 

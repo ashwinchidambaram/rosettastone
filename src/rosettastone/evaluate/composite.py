@@ -71,7 +71,9 @@ class CompositeEvaluator:
         optimized_prompt: str | None = None,
     ) -> list[EvalResult]:
         # Phase 1: collect LLM completions for all pairs
-        completions: list[tuple[PromptPair, str] | None] = []
+        # Each entry is either (PromptPair, response_str) on success
+        # or (failure_reason_str, PromptPair) on failure.
+        completions: list[tuple[PromptPair, str] | tuple[str, PromptPair]] = []
         skipped_count = 0
 
         for i, pair in enumerate(test_set):
@@ -99,18 +101,30 @@ class CompositeEvaluator:
                 if not response.choices:
                     logger.warning("Pair %d: empty choices in response, skipping", i)
                     skipped_count += 1
-                    completions.append(None)
+                    completions.append(("no_response", pair))
                     continue
                 new_response = response.choices[0].message.content or ""
+                if not new_response:
+                    logger.warning("Pair %d: null/empty content in response, skipping", i)
+                    skipped_count += 1
+                    completions.append(("no_response", pair))
+                    continue
                 completions.append((pair, new_response))
             except Exception as e:
+                exc_type = type(e).__name__.lower()
+                if "timeout" in exc_type or "timeout" in str(type(e).__module__).lower():
+                    failure_cat = "timeout"
+                elif "ratelimit" in exc_type or "rate_limit" in exc_type or "quota" in exc_type:
+                    failure_cat = "rate_limit"
+                else:
+                    failure_cat = "api_error"
                 logger.warning(
                     "Pair %d: litellm.completion failed (%s), skipping",
                     i,
                     type(e).__name__,  # log only the exception type, not the message
                 )
                 skipped_count += 1
-                completions.append(None)
+                completions.append((failure_cat, pair))
 
         if skipped_count > 0:
             logger.warning(
@@ -131,7 +145,8 @@ class CompositeEvaluator:
         free_text_pairs: list[tuple[str, str]] = []  # (actual, expected)
 
         for idx, entry in enumerate(completions):
-            if entry is None:
+            # Skip failure entries (tuple[str, PromptPair] with a failure reason string)
+            if isinstance(entry[0], str) and not isinstance(entry[1], str):
                 continue
             pair, new_response = entry
             output_type = pair.output_type or detect_output_type(pair.response)
@@ -153,7 +168,28 @@ class CompositeEvaluator:
         results: list[EvalResult] = []
 
         for idx, entry in enumerate(completions):
-            if entry is None:
+            # Failure entry: (failure_reason: str, pair: PromptPair)
+            if isinstance(entry[0], str) and not isinstance(entry[1], str):
+                failure_reason, pair = entry
+                output_type = pair.output_type or detect_output_type(pair.response)
+                results.append(
+                    EvalResult(
+                        prompt_pair=pair,
+                        new_response="",
+                        scores={},
+                        composite_score=0.0,
+                        is_win=False,
+                        details={
+                            "output_type": output_type.value,
+                            "evaluators_used": [],
+                            "threshold": self._get_threshold(output_type),
+                            "skipped": True,
+                        },
+                        failure_reason=failure_reason,
+                    )
+                )
+                if self.on_progress:
+                    self.on_progress(idx + 1, len(test_set))
                 continue
             pair, new_response = entry
             output_type = pair.output_type or detect_output_type(pair.response)
@@ -168,6 +204,11 @@ class CompositeEvaluator:
             composite = self._composite_score(scores, output_type)
             threshold = self._get_threshold(output_type)
 
+            # F6: detect JSON gate failure (json_valid == 0 forces composite to 0)
+            failure_reason: str | None = None
+            if output_type == OutputType.JSON and scores.get("json_valid", 1.0) == 0.0:
+                failure_reason = "json_gate_failed"
+
             results.append(
                 EvalResult(
                     prompt_pair=pair,
@@ -180,6 +221,7 @@ class CompositeEvaluator:
                         "evaluators_used": list(scores.keys()),
                         "threshold": threshold,
                     },
+                    failure_reason=failure_reason,
                 )
             )
 
