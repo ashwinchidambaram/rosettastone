@@ -126,6 +126,14 @@ class Migrator:
         )
         from rosettastone.core.types import MigrationResult
 
+        def _record_stage(stage_name: str, elapsed: float) -> None:
+            try:
+                from rosettastone.server.metrics import record_stage_duration
+
+                record_stage_duration(stage_name, elapsed, "success")
+            except Exception:
+                pass
+
         if self.config.dry_run:
             if self.config.skip_preflight:
                 return MigrationResult(
@@ -207,6 +215,7 @@ class Migrator:
         t0 = time.time()
         train, val, test = load_and_split_data(self.config, ctx)
         ctx.timing["ingest"] = time.time() - t0
+        _record_stage("ingest", ctx.timing["ingest"])
         if not _already_done("ingest"):
             self._checkpoint("ingest", {"pair_count": len(train) + len(val) + len(test)})
         self._emit("data_load", 1.0, 0.25)
@@ -215,6 +224,7 @@ class Migrator:
         t0 = time.time()
         run_pii_scan(train + val + test, ctx, self.config)
         ctx.timing["pii_scan"] = time.time() - t0
+        _record_stage("pii_scan", ctx.timing["pii_scan"])
         self._emit("pii_scan", 1.0, 0.37)
 
         # Step 2: Baseline — restore from checkpoint or run
@@ -233,6 +243,7 @@ class Migrator:
             t0 = time.time()
             baseline = evaluate_baseline(test, self.config, ctx=ctx)
             ctx.timing["baseline_eval"] = time.time() - t0
+            _record_stage("baseline_eval", ctx.timing["baseline_eval"])
             if not _already_done("baseline_eval"):
                 baseline_score = sum(1 for r in baseline if r.is_win) / max(len(baseline), 1)
                 self._checkpoint(
@@ -303,6 +314,7 @@ class Migrator:
                         pass
                     ctx.add_cost("optimization", _gepa_cost[0])
                 ctx.timing["optimize"] = time.time() - t0
+                _record_stage("optimize", ctx.timing["optimize"])
             else:
                 ctx.timing["optimize"] = 0.0
         else:
@@ -332,6 +344,7 @@ class Migrator:
                     pass
                 ctx.add_cost("optimization", _gepa_cost2[0])
             ctx.timing["optimize"] = time.time() - t0
+            _record_stage("optimize", ctx.timing["optimize"])
             self._checkpoint("optimize", {"optimized_prompt": optimized_prompt})
         self._emit("optimize", 1.0, 0.75)
 
@@ -341,6 +354,7 @@ class Migrator:
         self._emit("pii_scan_text", 1.0, 0.80)
         run_prompt_audit(optimized_prompt, train, ctx, self.config)
         ctx.timing["prompt_safety"] = time.time() - t0
+        _record_stage("prompt_safety", ctx.timing["prompt_safety"])
         self._emit("prompt_audit", 1.0, 0.85)
 
         # Step 4: Validate — restore from checkpoint or run
@@ -361,6 +375,7 @@ class Migrator:
             t0 = time.time()
             validation = evaluate_optimized(test, optimized_prompt, self.config, ctx=ctx)
             ctx.timing["validation_eval"] = time.time() - t0
+            _record_stage("validation_eval", ctx.timing["validation_eval"])
             if not _already_done("validation_eval"):
                 val_score = sum(1 for r in validation if r.is_win) / max(len(validation), 1)
                 self._checkpoint(
@@ -387,6 +402,7 @@ class Migrator:
         rec, reasoning, per_type = make_recommendation(validation, ctx, self.config)
         ctx.recommendation = (rec, reasoning, per_type)
         ctx.timing["recommendation"] = time.time() - t0
+        _record_stage("recommendation", ctx.timing["recommendation"])
         self._emit("recommendation", 1.0, 0.98)
 
         # Step 5: Report

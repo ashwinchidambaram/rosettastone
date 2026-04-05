@@ -100,3 +100,34 @@ def test_rate_limit_different_users_have_independent_limits(monkeypatch):
     # Request 2: next request should also be blocked
     is_limited_2, _ = check_rate_limit(request_2, "test")
     assert is_limited_2
+
+
+def test_rate_limit_hit_metric_called_on_rejection(monkeypatch):
+    """record_rate_limit_hit is called when a request is rate-limited."""
+    import rosettastone.server.metrics as metrics_module
+    from rosettastone.server.rate_limit import check_rate_limit, reset_for_testing
+
+    reset_for_testing()
+
+    calls: list = []
+    monkeypatch.setattr(metrics_module, "record_rate_limit_hit", lambda e, k: calls.append((e, k)))
+    monkeypatch.setenv("ROSETTASTONE_RATE_LIMIT", "1")
+    monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "")
+
+    from types import SimpleNamespace
+
+    req = SimpleNamespace(
+        state=SimpleNamespace(user=None),
+        client=SimpleNamespace(host="10.0.0.1"),
+    )
+
+    # First call — allowed, no metric
+    limited, _ = check_rate_limit(req, endpoint="submit")
+    assert not limited
+    assert calls == []
+
+    # Second call — blocked, metric recorded
+    limited, _ = check_rate_limit(req, endpoint="submit")
+    assert limited
+    assert len(calls) == 1
+    assert calls[0][0] == "submit"

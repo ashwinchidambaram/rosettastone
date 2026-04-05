@@ -67,6 +67,12 @@ def check_rate_limit(request, endpoint: str = "submit") -> tuple[bool, int]:
             # Calculate retry-after: when the oldest entry expires
             oldest = min(_windows[key])
             retry_after = int(oldest + window - now) + 1
+            try:
+                import rosettastone.server.metrics as _metrics
+
+                _metrics.record_rate_limit_hit(endpoint, key[0])
+            except Exception:
+                pass
             return True, retry_after
 
         # Record this attempt

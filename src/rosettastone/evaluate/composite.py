@@ -284,35 +284,75 @@ class CompositeEvaluator:
         prompt: str | list[dict[str, Any]] | None = None,
         bertscore_f1: float | None = None,
     ) -> dict[str, float]:
+        import time as _time
+
         scores: dict[str, float] = {}
         prompt_str = prompt if isinstance(prompt, str) else None
 
         if output_type == OutputType.JSON:
+            _t = _time.time()
             scores.update(JSONEvaluator(config=self.config).score(expected, actual))
+            try:
+                from rosettastone.server.metrics import record_evaluator_duration
 
-            # JSON structural evaluator (Phase 2 addition — lazy import)
+                record_evaluator_duration("json_validator", output_type.value, _time.time() - _t)
+            except Exception:
+                pass
+
             try:
                 from rosettastone.evaluate.json_structural import JSONStructuralEvaluator
 
+                _t = _time.time()
                 scores.update(JSONStructuralEvaluator(config=self.config).score(expected, actual))
+                try:
+                    from rosettastone.server.metrics import record_evaluator_duration
+
+                    record_evaluator_duration(
+                        "json_structural", output_type.value, _time.time() - _t
+                    )
+                except Exception:
+                    pass
             except ImportError:
                 pass
 
         elif output_type == OutputType.CLASSIFICATION:
+            _t = _time.time()
             scores.update(ExactMatchEvaluator(config=self.config).score(expected, actual))
+            try:
+                from rosettastone.server.metrics import record_evaluator_duration
+
+                record_evaluator_duration("exact_match", output_type.value, _time.time() - _t)
+            except Exception:
+                pass
         else:
             # Free text — use pre-computed BERTScore if available, else fall back
+            _t = _time.time()
             scores.update(self._score_semantic(expected, actual, bertscore_f1=bertscore_f1))
+            try:
+                from rosettastone.server.metrics import record_evaluator_duration
+
+                record_evaluator_duration("bertscore", output_type.value, _time.time() - _t)
+            except Exception:
+                pass
 
         # LLM judge for long text (and optionally all types) — Phase 2
         if output_type == OutputType.LONG_TEXT and not getattr(self.config, "local_only", False):
             try:
                 from rosettastone.evaluate.llm_judge import LLMJudgeEvaluator
 
+                _t = _time.time()
                 judge_scores = LLMJudgeEvaluator(config=self.config, ctx=self._ctx).score(
                     expected, actual, prompt=prompt_str
                 )
                 scores.update(judge_scores)
+                try:
+                    from rosettastone.server.metrics import record_evaluator_duration
+
+                    record_evaluator_duration(
+                        "llm_judge", output_type.value, _time.time() - _t
+                    )
+                except Exception:
+                    pass
             except ImportError:
                 pass
 

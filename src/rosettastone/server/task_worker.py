@@ -136,6 +136,17 @@ class TaskWorker:
             task.worker_id = self._worker_id
             sess.add(task)
             sess.commit()
+            # Record queue wait time metric
+            try:
+                from datetime import UTC as _UTC
+                from datetime import datetime as _dt
+
+                _wait = (_dt.now(_UTC) - task.created_at).total_seconds()
+                from rosettastone.server.metrics import record_task_queue_wait
+
+                record_task_queue_wait(max(0.0, _wait))
+            except Exception:
+                pass
             # Capture scalar values before session closes
             return SimpleNamespace(
                 id=task.id,
