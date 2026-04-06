@@ -7,12 +7,23 @@
 - Scope: service and plugin boundaries, path to production
 
 ## Current Status
-- Current phase: Phase 2 complete, entering Phase 3 (subagent spawn)
-- Last action: 2026-04-06T02:10 Phase 2 service inventory and subagent split written
-- Next action: Spawn 8 subagents for per-area test plans
+- Current phase: Phase 4/5 — all subagents delivered, entering consolidation
+- Last action: 2026-04-06T02:27 All 8 subagent reports committed
+- Next action: Write consolidation deliverables (README update, synthetic-data-strategy, path-to-production, summary)
 
 ## Phase Log
 (newest at top)
+
+### 2026-04-06 02:27 — Phase 4 — All 8 Subagent Reports Delivered
+- All 8 reports committed to branch
+- CRITICAL findings across areas: JWT default secret, IDOR gaps, schema parity false-confidence test, PII evasion testing gap, A/B batch partial failure, fallback chain silent degradation, Redis mixed-format gap, DSPy version coupling, Wilson CI single test case
+- Entering Phase 5 consolidation
+
+### 2026-04-06 02:15 — Phase 3 — All 8 Subagents Spawned
+- All subagents launched in parallel (resumed from prior session)
+- Areas: ingest-adapters, optimization-engines, evaluation-strategies, server-http-security, database-persistence, background-orchestration, report-generation-cli, safety-observability-decision
+- Each subagent has full task template with 9-section report format
+- Awaiting reports
 
 ### 2026-04-06 02:10 — Phase 2 — Service Inventory & Subagent Split Complete
 - Identified 8 testing areas across all service/plugin boundaries
@@ -61,14 +72,14 @@
 
 | Area | State | Report | Last Update |
 |---|---|---|---|
-| ingest-adapters | queued | docs/.../ingest-adapters.md | 02:10 |
-| optimization-engines | queued | docs/.../optimization-engines.md | 02:10 |
-| evaluation-strategies | queued | docs/.../evaluation-strategies.md | 02:10 |
-| server-http-security | queued | docs/.../server-http-security.md | 02:10 |
-| database-persistence | queued | docs/.../database-persistence.md | 02:10 |
-| background-orchestration | queued | docs/.../background-orchestration.md | 02:10 |
-| report-generation-cli | queued | docs/.../report-generation-cli.md | 02:10 |
-| safety-observability-decision | queued | docs/.../safety-observability-decision.md | 02:10 |
+| ingest-adapters | done | docs/.../ingest-adapters.md | 02:20 |
+| optimization-engines | done | docs/.../optimization-engines.md | 02:19 |
+| evaluation-strategies | done | docs/.../evaluation-strategies.md | 02:20 |
+| server-http-security | done | docs/.../server-http-security.md | 02:25 |
+| database-persistence | done | docs/.../database-persistence.md | 02:20 |
+| background-orchestration | done | docs/.../background-orchestration.md | 02:20 |
+| report-generation-cli | done | docs/.../report-generation-cli.md | 02:22 |
+| safety-observability-decision | done | docs/.../safety-observability-decision.md | 02:27 |
 
 ## Decisions Log
 (non-obvious calls with reasoning)
