@@ -295,3 +295,36 @@ def test_sample_improvements_shows_dash_when_no_scores(tmp_path):
 
     assert "Top Metric" in content
     assert "—" in content
+
+
+# ---------------------------------------------------------------------------
+# Feature 6: Skipped Pairs section
+# ---------------------------------------------------------------------------
+
+
+def test_skipped_pairs_section_renders_when_skipped_count_gt_0(tmp_path):
+    """## Skipped Pairs section appears when validation results have failure_reason set."""
+    skipped = EvalResult(
+        prompt_pair=PromptPair(prompt="test", response="expected", source_model="openai/gpt-4o"),
+        new_response="",
+        scores={},
+        composite_score=0.0,
+        is_win=False,
+        details={"output_type": "json"},
+        failure_reason="api_error",
+    )
+    result = _base_result(validation_results=[skipped])
+    output_path = generate_markdown_report(result, tmp_path)
+    content = output_path.read_text()
+
+    assert "## Skipped Pairs" in content
+    assert "api error" in content  # template renders api_error → "api error" via replace('_', ' ')
+
+
+def test_skipped_pairs_section_absent_when_no_skipped(tmp_path):
+    """## Skipped Pairs section is absent when all pairs evaluated successfully."""
+    result = _base_result()
+    output_path = generate_markdown_report(result, tmp_path)
+    content = output_path.read_text()
+
+    assert "## Skipped Pairs" not in content
