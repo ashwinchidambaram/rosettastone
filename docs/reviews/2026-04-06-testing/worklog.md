@@ -7,12 +7,18 @@
 - Scope: service and plugin boundaries, path to production
 
 ## Current Status
-- Current phase: Phase 1 complete, entering Phase 2
-- Last action: 2026-04-06T02:06 Phase 1 context ingestion complete
-- Next action: Build service inventory, propose subagent split
+- Current phase: Phase 2 complete, entering Phase 3 (subagent spawn)
+- Last action: 2026-04-06T02:10 Phase 2 service inventory and subagent split written
+- Next action: Spawn 8 subagents for per-area test plans
 
 ## Phase Log
 (newest at top)
+
+### 2026-04-06 02:10 — Phase 2 — Service Inventory & Subagent Split Complete
+- Identified 8 testing areas across all service/plugin boundaries
+- Wrote README.md with per-boundary inventory and proposed subagent split
+- Coordination points documented between areas
+- Commit: fb1bd2f
 
 ### 2026-04-06 02:06 — Phase 1 — Context Ingestion Complete
 
@@ -55,7 +61,14 @@
 
 | Area | State | Report | Last Update |
 |---|---|---|---|
-| (none yet) | - | - | - |
+| ingest-adapters | queued | docs/.../ingest-adapters.md | 02:10 |
+| optimization-engines | queued | docs/.../optimization-engines.md | 02:10 |
+| evaluation-strategies | queued | docs/.../evaluation-strategies.md | 02:10 |
+| server-http-security | queued | docs/.../server-http-security.md | 02:10 |
+| database-persistence | queued | docs/.../database-persistence.md | 02:10 |
+| background-orchestration | queued | docs/.../background-orchestration.md | 02:10 |
+| report-generation-cli | queued | docs/.../report-generation-cli.md | 02:10 |
+| safety-observability-decision | queued | docs/.../safety-observability-decision.md | 02:10 |
 
 ## Decisions Log
 (non-obvious calls with reasoning)
