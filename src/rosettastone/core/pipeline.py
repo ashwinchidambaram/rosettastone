@@ -176,6 +176,7 @@ def optimize_prompt(
     val: list[PromptPair],
     config: MigrationConfig,
     on_iteration: Callable[[int, int, float], None] | None = None,
+    iteration_history_out: list[dict] | None = None,
 ) -> str:
     from rosettastone.optimize.base import Optimizer
 
@@ -189,7 +190,10 @@ def optimize_prompt(
         from rosettastone.optimize.gepa import GEPAOptimizer
 
         optimizer = GEPAOptimizer()
-        return optimizer.optimize(train, val, config, on_iteration=on_iteration)
+        return optimizer.optimize(
+            train, val, config, on_iteration=on_iteration,
+            iteration_history_out=iteration_history_out,
+        )
 
 
 def evaluate_baseline(
@@ -391,6 +395,9 @@ def build_result(
 
     total_cost = sum(ctx.costs.values()) if ctx else 0.0
     cost_breakdown = dict(ctx.costs) if ctx else {}
+    total_tokens = sum(ctx.token_counts.values()) if ctx else 0
+    token_breakdown = dict(ctx.token_counts) if ctx else {}
+    stage_timing = dict(ctx.timing) if ctx else {}
 
     # Build config dict and add cluster_summary if available
     config_dict = config.model_dump(mode="json")
@@ -481,6 +488,9 @@ def build_result(
         at_risk_count=at_risk_count,
         non_deterministic_count=non_deterministic_count,
         eval_runs=eval_runs_value,
+        total_tokens=total_tokens,
+        token_breakdown=token_breakdown,
+        stage_timing=stage_timing,
     )
 
 

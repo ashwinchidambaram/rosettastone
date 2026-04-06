@@ -312,8 +312,80 @@ def create_app() -> FastAPI:
     app.include_router(annotations_router)
     app.include_router(approvals_router)
 
+    async def _check_readiness(app: FastAPI) -> dict:
+        """Check all system components and return a readiness dict."""
+        import os as _os
+
+        components: dict = {}
+
+        # Database check
+        try:
+            from sqlalchemy import text as _text
+            from sqlmodel import Session as _Session
+
+            from rosettastone.server.database import get_engine as _get_engine
+
+            _engine = _get_engine()
+            with _Session(_engine) as _sess:
+                _sess.exec(_text("SELECT 1"))
+            components["database"] = {"status": "ok"}
+        except Exception as _exc:
+            components["database"] = {"status": "unavailable", "error": str(_exc)[:100]}
+
+        # Task worker check (non-fatal if degraded)
+        try:
+            dispatcher = getattr(app.state, "task_worker", None)
+            if dispatcher is not None:
+                _db_worker = getattr(dispatcher, "_db_worker", None)
+                _alive = _db_worker is not None and _db_worker._thread.is_alive()
+                components["task_worker"] = {"status": "ok" if _alive else "degraded"}
+            else:
+                components["task_worker"] = {"status": "degraded"}
+        except Exception:
+            components["task_worker"] = {"status": "degraded"}
+
+        # Redis check (optional, only if REDIS_URL is configured)
+        _redis_url = _os.environ.get("REDIS_URL", "")
+        if _redis_url:
+            try:
+                import redis as _redis_lib
+
+                _r = _redis_lib.from_url(_redis_url)
+                _r.ping()
+                components["redis"] = {"status": "ok"}
+            except ImportError:
+                components["redis"] = {"status": "skipped"}
+            except Exception:
+                components["redis"] = {"status": "unavailable"}
+
+        # Overall status: unavailable if DB down, degraded if worker/redis issue
+        _db_status = components.get("database", {}).get("status", "unavailable")
+        if _db_status == "unavailable":
+            overall = "unavailable"
+        elif any(v.get("status") not in ("ok", "skipped") for v in components.values()):
+            overall = "degraded"
+        else:
+            overall = "ok"
+
+        return {"status": overall, "components": components}
+
     @app.get("/api/v1/health")
-    async def health() -> dict[str, str]:
+    async def health(request: Request) -> dict:
+        """Basic health check — enriched with component statuses."""
+        return await _check_readiness(request.app)
+
+    @app.get("/api/v1/health/ready")
+    async def health_ready(request: Request) -> Response:
+        """Readiness probe — returns 503 when database is unavailable."""
+        from fastapi.responses import JSONResponse as _JSONResponse
+
+        result = await _check_readiness(request.app)
+        status_code = 503 if result["status"] == "unavailable" else 200
+        return _JSONResponse(status_code=status_code, content=result)
+
+    @app.get("/api/v1/health/live")
+    async def health_live() -> dict[str, str]:
+        """Liveness probe — always returns 200 while the process is running."""
         return {"status": "ok"}
 
     @app.get("/metrics")

@@ -44,6 +44,7 @@ class PipelineContext:
     warnings: list[str] = field(default_factory=list)
     safety_warnings: list[SafetyWarning] = field(default_factory=list)
     costs: dict[str, float] = field(default_factory=dict)
+    token_counts: dict[str, int] = field(default_factory=dict)
     timing: dict[str, float] = field(default_factory=dict)
     per_type_stats: dict[OutputType, TypeStats] = field(default_factory=dict)
     recommendation: tuple[str, str, dict[str, object]] | None = None
@@ -57,3 +58,9 @@ class PipelineContext:
         """Thread-safely accumulate cost for a pipeline phase."""
         with self._cost_lock:  # type: ignore[attr-defined]
             self.costs[phase] = self.costs.get(phase, 0.0) + cost
+
+    def add_tokens(self, phase: str, prompt_tokens: int, completion_tokens: int) -> None:
+        """Thread-safely accumulate token usage for a pipeline phase."""
+        with self._cost_lock:  # type: ignore[attr-defined]
+            total = prompt_tokens + completion_tokens
+            self.token_counts[phase] = self.token_counts.get(phase, 0) + total

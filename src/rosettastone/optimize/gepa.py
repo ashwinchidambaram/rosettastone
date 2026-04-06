@@ -40,6 +40,7 @@ class GEPAOptimizer(Optimizer):
         val_set: list[PromptPair],
         config: MigrationConfig,
         on_iteration: Callable[[int, int, float], None] | None = None,
+        iteration_history_out: list[dict] | None = None,
     ) -> str:
         # Configure LMs — merge any provider-specific extra kwargs from config
         extra_kwargs: dict[str, object] = (
@@ -64,26 +65,23 @@ class GEPAOptimizer(Optimizer):
             dspy.Example(prompt=p.prompt, expected_response=p.response).with_inputs("prompt")
             for p in train_set
         ]
-        valset = [
-            dspy.Example(prompt=p.prompt, expected_response=p.response).with_inputs("prompt")
-            for p in val_set
-        ]
-
         # best_intermediate accumulates the most recent extractable instructions after each
         # iteration fires. Using a list so the thread's closure can append to it safely.
         best_intermediate: list[str] = []
 
-        # Wrap metric with iteration tracker if a callback was provided
-        if on_iteration is not None and len(trainset) > 0:
+        # Wrap metric with iteration tracker if a callback or history out-param was provided
+        tracker: IterationTracker | None = None
+        if (on_iteration is not None or iteration_history_out is not None) and len(trainset) > 0:
             # GEPA "light"=25, "medium"=50, "heavy"=100 iterations by default.
             # We derive total_iterations from the auto setting as a best-effort estimate;
             # the tracker fires on every trainset_size calls regardless of the exact count.
             _auto_iterations = {"light": 25, "medium": 50, "heavy": 100}
             total_iterations = _auto_iterations.get(config.gepa_auto, 25)
+            _effective_callback = on_iteration or (lambda i, t, s: None)
             tracker = IterationTracker(
                 trainset_size=len(trainset),
                 total_iterations=total_iterations,
-                callback=on_iteration,
+                callback=_effective_callback,
             )
             base_metric = tracker.wrap(metric)
         else:
@@ -124,7 +122,7 @@ class GEPAOptimizer(Optimizer):
         def _run_gepa() -> dspy.Module:
             with dspy.context(lm=target_lm):
                 optimizer = dspy.GEPA(**gepa_kwargs)
-                return optimizer.compile(program, trainset=trainset, valset=valset)
+                return optimizer.compile(program, trainset=trainset)
 
         if timeout is not None:
             # Safety-net path: wrap in executor with hard timeout.
@@ -167,4 +165,7 @@ class GEPAOptimizer(Optimizer):
             # GEPA terminates naturally when it exhausts its max_metric_calls budget.
             compiled = _run_gepa()
 
-        return extract_optimized_instructions(compiled)
+        result_instructions = extract_optimized_instructions(compiled)
+        if iteration_history_out is not None and tracker is not None:
+            iteration_history_out.extend(tracker.get_history())
+        return result_instructions

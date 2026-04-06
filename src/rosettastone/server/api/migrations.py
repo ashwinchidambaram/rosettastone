@@ -25,6 +25,7 @@ from rosettastone.server.rbac import (
 )
 from rosettastone.server.schemas import (
     MigrationDetail,
+    MigrationDiagnostics,
     MigrationSummary,
     PaginatedResponse,
     TestCaseDetail,
@@ -36,6 +37,10 @@ from rosettastone.server.schemas import (
 router = APIRouter()
 
 _SENSITIVE_CONFIG_KEYS = frozenset({"lm_extra_kwargs"})
+# Generic fallback threshold used when computing per-metric above-threshold counts in diagnostics.
+# Individual metric scales vary (0-1 for BERTScore/embedding, binary for exact_match), so this
+# represents a reasonable midpoint rather than being sourced from DEFAULT_THRESHOLDS.
+_DIAGNOSTIC_METRIC_THRESHOLD = 0.7
 
 
 # ---------------------------------------------------------------------------
@@ -411,6 +416,17 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
     result["target_latency_p95"] = record.target_latency_p95
     result["projected_source_cost_per_call"] = record.projected_source_cost_per_call
     result["projected_target_cost_per_call"] = record.projected_target_cost_per_call
+
+    # Token tracking
+    result["total_tokens"] = record.total_tokens
+    result["token_breakdown"] = json.loads(record.token_breakdown_json or "{}")
+
+    # F2: GEPA iteration telemetry presence flag
+    result["has_optimization_trace"] = record.optimization_score_history_json not in (
+        "[]",
+        "",
+        None,
+    )
 
     # Checkpoint info
     result["checkpoint_stage"] = record.checkpoint_stage
@@ -960,9 +976,7 @@ async def get_migration_regressions(
         base_scores = json.loads(base_tc.scores_json) if base_tc.scores_json else {}
         val_scores = json.loads(val_tc.scores_json) if val_tc.scores_json else {}
         metric_deltas: dict[str, float] = {
-            m: val_scores[m] - base_scores[m]
-            for m in base_scores
-            if m in val_scores
+            m: val_scores[m] - base_scores[m] for m in base_scores if m in val_scores
         }
 
         prompt_regressions.append(
@@ -993,6 +1007,280 @@ async def get_migration_regressions(
         "at_risk_count": at_risk_count,
         "total_analyzed": len(prompt_regressions),
     }
+
+
+@router.get("/api/v1/migrations/{migration_id}/optimization-trace")
+async def get_optimization_trace(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> dict:
+    """Return the GEPA score trajectory for a migration."""
+    record = _get_migration_or_404(migration_id, session)
+    check_resource_owner(record.owner_id, request)
+    history = json.loads(record.optimization_score_history_json or "[]")
+    return {
+        "migration_id": migration_id,
+        "iterations": history,
+        "total_iterations": len(history),
+        "final_prompt_length": len(record.optimized_prompt or ""),
+    }
+
+
+@router.get("/ui/migrations/{migration_id}/optimization-trace-fragment")
+async def optimization_trace_fragment(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """HTMX fragment: GEPA score trajectory chart for the migration detail page."""
+    record = _get_migration_or_404(migration_id, session)
+    history = json.loads(record.optimization_score_history_json or "[]")
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "fragments/optimization_trace.html",
+        {
+            "request": request,
+            "iteration_nums": [h["iteration_num"] for h in history],
+            "scores": [h["mean_score"] for h in history],
+            "total_iterations": len(history),
+            "final_prompt_length": len(record.optimized_prompt or ""),
+        },
+    )
+
+
+def _build_diagnostics(record: MigrationRecord, session: Session) -> MigrationDiagnostics:
+    """Build comprehensive migration diagnostics. NEVER accesses prompt/response text columns."""
+    from rosettastone.decision.recommendation import DEFAULT_THRESHOLDS
+    from rosettastone.server.schemas import (
+        BorderCase,
+        MetricWinRate,
+        RegressionSummary,
+        SafetyDiagnostic,
+        TypeDiagnostic,
+    )
+
+    stored_config = {}
+    if record.config_json:
+        try:
+            stored_config = json.loads(record.config_json)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    stored_win_thresholds: dict[str, float] = stored_config.get("win_thresholds", {})
+    effective_thresholds = {**DEFAULT_THRESHOLDS, **stored_win_thresholds}
+
+    # 1. Per-type breakdown from stored per_type_scores_json
+    per_type_raw: dict[str, Any] = {}
+    if record.per_type_scores_json:
+        try:
+            per_type_raw = json.loads(record.per_type_scores_json)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    per_type_diagnostics: list[TypeDiagnostic] = []
+    for type_name, stats in per_type_raw.items():
+        ci = stats.get("confidence_interval", [0.0, 1.0])
+        ci_lower = ci[0] if len(ci) > 0 else 0.0
+        ci_upper = ci[1] if len(ci) > 1 else 1.0
+        threshold = effective_thresholds.get(type_name, 0.80)
+        win_rate = stats.get("win_rate", 0.0)
+        per_type_diagnostics.append(
+            TypeDiagnostic(
+                output_type=type_name,
+                win_rate=win_rate,
+                ci_lower=ci_lower,
+                ci_upper=ci_upper,
+                p10=stats.get("p10", 0.0),
+                p50=stats.get("p50", 0.0),
+                p90=stats.get("p90", 0.0),
+                sample_count=stats.get("sample_count", 0),
+                threshold=threshold,
+                # CI lower bound mirrors the recommendation engine's pass criterion
+                # (uses confidence_interval[0] < threshold for CONDITIONAL).
+                passes=ci_lower >= threshold,
+            )
+        )
+
+    # 2. Metric win rates from validation TestCaseRecords
+    val_tcs = list(
+        session.exec(
+            select(TestCaseRecord)
+            .where(TestCaseRecord.migration_id == record.id)
+            .where(TestCaseRecord.phase == "validation")
+            .order_by(TestCaseRecord.id)
+        ).all()
+    )
+    metric_accumulator: dict[str, list[float]] = {}
+    for tc in val_tcs:
+        try:
+            scores = json.loads(tc.scores_json) if tc.scores_json else {}
+        except (json.JSONDecodeError, TypeError):
+            scores = {}
+        for metric_name, val in scores.items():
+            if isinstance(val, (int, float)):
+                metric_accumulator.setdefault(metric_name, []).append(float(val))
+    metric_win_rates: list[MetricWinRate] = []
+    for metric_name, values in sorted(metric_accumulator.items()):
+        mean_val = sum(values) / len(values) if values else 0.0
+        above = sum(1 for v in values if v >= _DIAGNOSTIC_METRIC_THRESHOLD)
+        metric_win_rates.append(
+            MetricWinRate(
+                metric_name=metric_name,
+                mean_value=round(mean_val, 4),
+                above_threshold_count=above,
+                total_count=len(values),
+            )
+        )
+
+    # 3. Border cases: validation TCs within +/-5% of their type threshold
+    border_cases: list[BorderCase] = []
+    for tc in val_tcs:
+        threshold = effective_thresholds.get(tc.output_type or "unknown", 0.80)
+        delta = tc.composite_score - threshold
+        if abs(delta) <= 0.05:
+            border_cases.append(
+                BorderCase(
+                    test_case_id=tc.id,
+                    output_type=tc.output_type or "unknown",
+                    composite_score=tc.composite_score,
+                    threshold=threshold,
+                    delta_to_threshold=delta,
+                )
+            )
+    border_cases.sort(key=lambda b: b.delta_to_threshold)
+    border_cases = border_cases[:20]
+
+    # 4. Regression summary: pair baseline and validation TCs by insertion order
+    baseline_tcs = list(
+        session.exec(
+            select(TestCaseRecord)
+            .where(TestCaseRecord.migration_id == record.id)
+            .where(TestCaseRecord.phase == "baseline")
+            .order_by(TestCaseRecord.id)
+        ).all()
+    )
+    improved_count = stable_count = regressed_count = at_risk_count = 0
+    worst_regressed: list[dict[str, Any]] = []
+    for base_tc, val_tc in zip(baseline_tcs, val_tcs):
+        b_score = base_tc.composite_score
+        v_score = val_tc.composite_score
+        delta = v_score - b_score
+        out_type = val_tc.output_type or base_tc.output_type or "unknown"
+        threshold = effective_thresholds.get(out_type, 0.80)
+        if delta >= 0.05:
+            improved_count += 1
+            status = "improved"
+        elif delta >= -0.05:
+            stable_count += 1
+            status = "stable"
+        elif v_score >= threshold:
+            regressed_count += 1
+            status = "regressed"
+        else:
+            at_risk_count += 1
+            status = "at_risk"
+        if status in ("regressed", "at_risk"):
+            try:
+                base_scores = json.loads(base_tc.scores_json) if base_tc.scores_json else {}
+            except (json.JSONDecodeError, TypeError):
+                base_scores = {}
+            try:
+                val_scores = json.loads(val_tc.scores_json) if val_tc.scores_json else {}
+            except (json.JSONDecodeError, TypeError):
+                val_scores = {}
+            metric_deltas: dict[str, float] = {
+                m: round(val_scores[m] - base_scores[m], 4)
+                for m in base_scores
+                if m in val_scores
+                and isinstance(base_scores[m], (int, float))
+                and isinstance(val_scores[m], (int, float))
+            }
+            worst_regressed.append(
+                {
+                    "test_case_id": val_tc.id,
+                    "output_type": out_type,
+                    "delta": round(delta, 4),
+                    "status": status,
+                    "metric_deltas": metric_deltas,
+                }
+            )
+    worst_regressed.sort(key=lambda r: r["delta"])
+    worst_regressed = worst_regressed[:10]
+    regression_summary = RegressionSummary(
+        improved_count=improved_count,
+        stable_count=stable_count,
+        regressed_count=regressed_count,
+        at_risk_count=at_risk_count,
+        worst_regressed=worst_regressed,
+    )
+
+    # 5. Safety: query WarningRecords with warning_type="safety"
+    safety_warnings = list(
+        session.exec(
+            select(WarningRecord)
+            .where(WarningRecord.migration_id == record.id)
+            .where(WarningRecord.warning_type == "safety")
+        ).all()
+    )
+    high_count = sum(1 for w in safety_warnings if w.severity == "HIGH")
+    medium_count = sum(1 for w in safety_warnings if w.severity == "MEDIUM")
+    low_count = sum(1 for w in safety_warnings if w.severity == "LOW")
+    high_severity_indices = [
+        w.id for w in safety_warnings if w.severity == "HIGH" and w.id is not None
+    ]
+    safety = SafetyDiagnostic(
+        high_count=high_count,
+        medium_count=medium_count,
+        low_count=low_count,
+        high_severity_indices=high_severity_indices,
+    )
+
+    return MigrationDiagnostics(
+        migration_id=record.id,  # type: ignore[arg-type]
+        recommendation=record.recommendation,
+        per_type=per_type_diagnostics,
+        metric_win_rates=metric_win_rates,
+        border_cases=border_cases,
+        regression_summary=regression_summary,
+        safety=safety,
+    )
+
+
+@router.get("/api/v1/migrations/{migration_id}/diagnostics", response_model=MigrationDiagnostics)
+async def get_migration_diagnostics(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    _user_id: str = Depends(get_current_user_id),
+) -> MigrationDiagnostics:
+    """Return comprehensive migration diagnostics — scores, counts, regressions, safety."""
+    record = _get_migration_or_404(migration_id, session)
+    check_resource_owner(record.owner_id, request)
+    if record.status not in ("complete", "dry_run_complete"):
+        raise HTTPException(
+            status_code=422,
+            detail="Diagnostics only available for completed migrations",
+        )
+    return _build_diagnostics(record, session)
+
+
+@router.get("/ui/migrations/{migration_id}/diagnostics-fragment")
+async def diagnostics_fragment(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """HTMX fragment: diagnostics panel for the migration detail page."""
+    record = _get_migration_or_404(migration_id, session)
+    if record.status not in ("complete", "dry_run_complete"):
+        return HTMLResponse("<p class='text-sm text-on-surface-variant p-4'>Not available yet.</p>")
+    diag = _build_diagnostics(record, session)
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "fragments/diagnostics_panel.html",
+        {"request": request, "diag": diag},
+    )
 
 
 @router.get(

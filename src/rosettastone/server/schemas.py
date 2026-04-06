@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 
@@ -84,6 +84,63 @@ class ScoreDistribution(BaseModel):
     output_type: str
     stats: TypeScoreStats
     histogram: list[int] = []  # bucket counts for chart rendering
+
+
+# F1: Migration diagnostics schemas
+
+
+class TypeDiagnostic(BaseModel):
+    output_type: str
+    win_rate: float
+    ci_lower: float
+    ci_upper: float
+    p10: float
+    p50: float
+    p90: float
+    sample_count: int
+    threshold: float
+    passes: bool
+
+
+class MetricWinRate(BaseModel):
+    metric_name: str
+    mean_value: float
+    above_threshold_count: int
+    total_count: int
+
+
+class BorderCase(BaseModel):
+    test_case_id: int
+    output_type: str
+    composite_score: float
+    threshold: float
+    delta_to_threshold: float  # positive = above threshold, negative = below
+
+
+class RegressionSummary(BaseModel):
+    improved_count: int
+    stable_count: int
+    regressed_count: int
+    at_risk_count: int
+    # [{test_case_id, output_type, delta, status, metric_deltas}]
+    worst_regressed: list[dict[str, Any]]
+
+
+class SafetyDiagnostic(BaseModel):
+    high_count: int
+    medium_count: int
+    low_count: int
+    high_severity_indices: list[int]  # warning record IDs — NOT pair indices, NOT text
+
+
+class MigrationDiagnostics(BaseModel):
+    migration_id: int
+    recommendation: str | None
+    per_type: list[TypeDiagnostic]
+    metric_win_rates: list[MetricWinRate]
+    border_cases: list[BorderCase]
+    regression_summary: RegressionSummary
+    safety: SafetyDiagnostic
 
 
 class MigrationDetail(BaseModel):

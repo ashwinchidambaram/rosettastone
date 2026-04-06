@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rosettastone.utils.logging import get_logger
 
@@ -126,6 +126,14 @@ class Migrator:
         )
         from rosettastone.core.types import MigrationResult
 
+        def _record_stage(stage_name: str, elapsed: float) -> None:
+            try:
+                from rosettastone.server.metrics import record_stage_duration
+
+                record_stage_duration(stage_name, elapsed, "success")
+            except Exception:
+                pass
+
         if self.config.dry_run:
             if self.config.skip_preflight:
                 return MigrationResult(
@@ -207,6 +215,7 @@ class Migrator:
         t0 = time.time()
         train, val, test = load_and_split_data(self.config, ctx)
         ctx.timing["ingest"] = time.time() - t0
+        _record_stage("ingest", ctx.timing["ingest"])
         if not _already_done("ingest"):
             self._checkpoint("ingest", {"pair_count": len(train) + len(val) + len(test)})
         self._emit("data_load", 1.0, 0.25)
@@ -215,6 +224,7 @@ class Migrator:
         t0 = time.time()
         run_pii_scan(train + val + test, ctx, self.config)
         ctx.timing["pii_scan"] = time.time() - t0
+        _record_stage("pii_scan", ctx.timing["pii_scan"])
         self._emit("pii_scan", 1.0, 0.37)
 
         # Step 2: Baseline — restore from checkpoint or run
@@ -233,6 +243,7 @@ class Migrator:
             t0 = time.time()
             baseline = evaluate_baseline(test, self.config, ctx=ctx)
             ctx.timing["baseline_eval"] = time.time() - t0
+            _record_stage("baseline_eval", ctx.timing["baseline_eval"])
             if not _already_done("baseline_eval"):
                 baseline_score = sum(1 for r in baseline if r.is_win) / max(len(baseline), 1)
                 self._checkpoint(
@@ -250,6 +261,7 @@ class Migrator:
 
         def _make_gepa_cost_callback(
             gepa_cost_accumulator: list[float],
+            ctx: Any = None,
             max_cost_usd: float | None = None,
         ) -> Callable[[dict, object, object, object], None]:
             def _gepa_cost_callback(
@@ -260,12 +272,23 @@ class Migrator:
             ) -> None:
                 cost = kwargs.get("response_cost", 0.0) or 0.0
                 gepa_cost_accumulator[0] += cost
+                # Accumulate token counts if ctx is available
+                if ctx is not None:
+                    try:
+                        _usage = getattr(completion_response, "usage", None)
+                        if _usage is not None:
+                            _pt = getattr(_usage, "prompt_tokens", 0) or 0
+                            _ct = getattr(_usage, "completion_tokens", 0) or 0
+                            ctx.add_tokens("optimization", int(_pt), int(_ct))
+                    except Exception:
+                        pass
                 if max_cost_usd is not None and gepa_cost_accumulator[0] > max_cost_usd:
                     raise CostLimitExceeded(gepa_cost_accumulator[0], max_cost_usd)
 
             return _gepa_cost_callback
 
         # Step 3: Optimize — restore optimized prompt from checkpoint if available
+        _iteration_history: list[dict] = []
         if _already_done("optimize"):
             # Try to recover the optimized prompt from checkpoint data
             saved_prompt = resume_data.get("stage_output", {})
@@ -277,13 +300,14 @@ class Migrator:
             if not optimized_prompt:
                 _gepa_cost: list[float] = [0.0]
                 _gepa_cb = _make_gepa_cost_callback(
-                    _gepa_cost, max_cost_usd=self.config.max_cost_usd
+                    _gepa_cost, ctx=ctx, max_cost_usd=self.config.max_cost_usd
                 )
                 _litellm.success_callback.append(_gepa_cb)
                 t0 = time.time()
                 try:
                     optimized_prompt = optimize_prompt(
-                        train, val, self.config, self._gepa_iteration_callback
+                        train, val, self.config, self._gepa_iteration_callback,
+                        iteration_history_out=_iteration_history,
                     )
                 except GEPATimeoutWithResult as exc:
                     ctx.warnings.append(exc.message)
@@ -303,16 +327,20 @@ class Migrator:
                         pass
                     ctx.add_cost("optimization", _gepa_cost[0])
                 ctx.timing["optimize"] = time.time() - t0
+                _record_stage("optimize", ctx.timing["optimize"])
             else:
                 ctx.timing["optimize"] = 0.0
         else:
             _gepa_cost2: list[float] = [0.0]
-            _gepa_cb2 = _make_gepa_cost_callback(_gepa_cost2, max_cost_usd=self.config.max_cost_usd)
+            _gepa_cb2 = _make_gepa_cost_callback(
+                _gepa_cost2, ctx=ctx, max_cost_usd=self.config.max_cost_usd
+            )
             _litellm.success_callback.append(_gepa_cb2)
             t0 = time.time()
             try:
                 optimized_prompt = optimize_prompt(
-                    train, val, self.config, self._gepa_iteration_callback
+                    train, val, self.config, self._gepa_iteration_callback,
+                    iteration_history_out=_iteration_history,
                 )
             except GEPATimeoutWithResult as exc:
                 ctx.warnings.append(exc.message)
@@ -332,6 +360,7 @@ class Migrator:
                     pass
                 ctx.add_cost("optimization", _gepa_cost2[0])
             ctx.timing["optimize"] = time.time() - t0
+            _record_stage("optimize", ctx.timing["optimize"])
             self._checkpoint("optimize", {"optimized_prompt": optimized_prompt})
         self._emit("optimize", 1.0, 0.75)
 
@@ -341,6 +370,7 @@ class Migrator:
         self._emit("pii_scan_text", 1.0, 0.80)
         run_prompt_audit(optimized_prompt, train, ctx, self.config)
         ctx.timing["prompt_safety"] = time.time() - t0
+        _record_stage("prompt_safety", ctx.timing["prompt_safety"])
         self._emit("prompt_audit", 1.0, 0.85)
 
         # Step 4: Validate — restore from checkpoint or run
@@ -361,6 +391,7 @@ class Migrator:
             t0 = time.time()
             validation = evaluate_optimized(test, optimized_prompt, self.config, ctx=ctx)
             ctx.timing["validation_eval"] = time.time() - t0
+            _record_stage("validation_eval", ctx.timing["validation_eval"])
             if not _already_done("validation_eval"):
                 val_score = sum(1 for r in validation if r.is_win) / max(len(validation), 1)
                 self._checkpoint(
@@ -387,11 +418,13 @@ class Migrator:
         rec, reasoning, per_type = make_recommendation(validation, ctx, self.config)
         ctx.recommendation = (rec, reasoning, per_type)
         ctx.timing["recommendation"] = time.time() - t0
+        _record_stage("recommendation", ctx.timing["recommendation"])
         self._emit("recommendation", 1.0, 0.98)
 
         # Step 5: Report
         duration = time.time() - start
         result = build_result(self.config, optimized_prompt, baseline, validation, duration, ctx)
+        result.optimization_iterations = _iteration_history
         generate_report(result, self.config.output_dir)
         self._emit("report", 1.0, 1.0)
 

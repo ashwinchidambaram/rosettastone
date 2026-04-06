@@ -113,6 +113,13 @@
         <button id="mobile-menu-btn" data-action="toggle-mobile-nav" class="md:hidden p-2 text-[#BDBDBD] hover:bg-stone-800/50 rounded-lg transition-all active:scale-95" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav-drawer">
             <span class="material-symbols-outlined" aria-hidden="true">menu</span>
         </button>
+        <!-- System health indicator -->
+        <div id="sys-health-dot"
+             class="w-2.5 h-2.5 rounded-full bg-success transition-colors duration-300"
+             title="System: checking..."
+             aria-label="System health status"
+             role="status"
+             aria-live="polite"></div>
         <button data-action="toggle-theme" class="p-2 text-[#BDBDBD] hover:bg-stone-800/50 rounded-lg transition-all active:scale-95" aria-label="Toggle dark/light theme">
             <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
         </button>
@@ -201,5 +208,39 @@
 </div>
 
 <script nonce="{{ request.state.csp_nonce }}" src="/static/js/app.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+  var dot = document.getElementById('sys-health-dot');
+  if (!dot) return;
+
+  function applyStatus(status) {
+    dot.classList.remove('bg-success', 'bg-warn', 'bg-error', 'bg-gray-500');
+    if (status === 'ok') {
+      dot.classList.add('bg-success');
+      dot.title = 'System: healthy';
+    } else if (status === 'degraded') {
+      dot.classList.add('bg-warn');
+      dot.title = 'System: degraded';
+    } else {
+      dot.classList.add('bg-error');
+      dot.title = 'System: unavailable';
+    }
+  }
+
+  function checkHealth() {
+    fetch('/api/v1/health/ready', { credentials: 'same-origin' })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) { applyStatus(data.status || 'ok'); })
+      .catch(function() {
+        dot.classList.remove('bg-success', 'bg-warn', 'bg-error');
+        dot.classList.add('bg-error');
+        dot.title = 'System: unreachable';
+      });
+  }
+
+  checkHealth();
+  setInterval(checkHealth, 60000);
+})();
+</script>
 </body>
 </html>

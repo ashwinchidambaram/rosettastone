@@ -88,3 +88,39 @@ def test_migrations_total_counter_exists() -> None:
     # Verify it's a Counter with the expected label names
     assert hasattr(MIGRATIONS_TOTAL, "_labelnames")
     assert set(MIGRATIONS_TOTAL._labelnames) == {"status", "source_model", "target_model"}
+
+
+def test_new_prometheus_instruments_exist():
+    """Verify all 4 new instruments are defined when prometheus_client is available."""
+    pytest.importorskip("prometheus_client")
+    from rosettastone.server.metrics import (
+        EVALUATOR_DURATION_SECONDS,
+        PIPELINE_STAGE_DURATION_SECONDS,
+        RATE_LIMIT_HITS_TOTAL,
+        TASK_QUEUE_WAIT_SECONDS,
+    )
+
+    assert hasattr(PIPELINE_STAGE_DURATION_SECONDS, "_labelnames")
+    assert set(PIPELINE_STAGE_DURATION_SECONDS._labelnames) == {"stage", "status"}
+    assert set(EVALUATOR_DURATION_SECONDS._labelnames) == {"evaluator_name", "output_type"}
+    assert set(RATE_LIMIT_HITS_TOTAL._labelnames) == {"endpoint", "user_id_hash"}
+    # TASK_QUEUE_WAIT_SECONDS has no labels
+    assert TASK_QUEUE_WAIT_SECONDS is not None
+
+
+def test_helper_functions_are_callable():
+    """Verify all 4 helpers exist and do not raise on call."""
+    from rosettastone.server.metrics import (
+        record_evaluator_duration,
+        record_rate_limit_hit,
+        record_stage_duration,
+        record_task_queue_wait,
+    )
+
+    # None of these should raise
+    record_stage_duration("ingest", 1.5, "success")
+    record_stage_duration("optimize", 30.0, "failed")
+    record_evaluator_duration("json_validator", "json", 0.05)
+    record_task_queue_wait(3.0)
+    record_rate_limit_hit("submit", "ip:127.0.0.1")
+    record_rate_limit_hit("submit", "user:42")

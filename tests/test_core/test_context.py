@@ -89,3 +89,35 @@ class TestPipelineContext:
         ctx2 = PipelineContext()
         ctx1.warnings.append("only in ctx1")
         assert ctx2.warnings == []
+
+
+def test_add_tokens_accumulates():
+    ctx = PipelineContext()
+    ctx.add_tokens("evaluation", 100, 50)
+    ctx.add_tokens("evaluation", 200, 100)
+    ctx.add_tokens("optimization", 300, 200)
+
+    assert ctx.token_counts["evaluation"] == 450
+    assert ctx.token_counts["optimization"] == 500
+
+
+def test_add_tokens_thread_safe():
+    """4 threads each calling add_tokens 100 times — final sum must be correct."""
+    import threading
+
+    ctx = PipelineContext()
+    n_threads = 4
+    calls_per_thread = 100
+
+    def worker():
+        for _ in range(calls_per_thread):
+            ctx.add_tokens("test", 1, 1)
+
+    threads = [threading.Thread(target=worker) for _ in range(n_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    expected = n_threads * calls_per_thread * 2  # 1 prompt + 1 completion per call
+    assert ctx.token_counts["test"] == expected

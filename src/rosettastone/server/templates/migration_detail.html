@@ -256,6 +256,23 @@ function showPersonaView(view) {
                 <div class="text-3xl font-bold text-success font-headline mb-1">+{{ migration.improvement }}%</div>
                 <div class="text-xs text-on-surface-variant/70 font-medium">Improvement from GEPA</div>
             </div>
+            {% if migration.total_tokens %}
+            <div class="bg-surface-container-low p-6 rounded-xl">
+              <div class="text-3xl font-bold font-headline mb-1 text-primary">
+                {{ "{:,}".format(migration.total_tokens) }}
+              </div>
+              <div class="text-xs text-on-surface-variant/70 font-medium">Total Tokens</div>
+              {% if migration.token_breakdown %}
+              <div class="mt-2 space-y-0.5">
+                {% for phase, count in migration.token_breakdown.items() %}
+                <div class="text-[10px] text-on-surface-variant/50 font-mono">
+                  {{ phase }}: {{ "{:,}".format(count) }}
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+            {% endif %}
         </section>
 
         {% if migration.source_latency_p50 %}
@@ -422,6 +439,42 @@ function showPersonaView(view) {
                 </div>
             </div>
         </section>
+
+        {% if migration.has_optimization_trace %}
+        <div class="collapsible-section mt-6">
+          <button class="collapsible-trigger w-full flex justify-between items-center p-4 bg-surface-container rounded-xl">
+            <span class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-base">timeline</span>
+              <span class="text-[11px] font-mono uppercase tracking-widest">Optimization Trace</span>
+            </span>
+            <span class="collapsible-chevron material-symbols-outlined">expand_more</span>
+          </button>
+          <div class="collapsible-content hidden mt-2"
+               hx-get="/ui/migrations/{{ migration.id }}/optimization-trace-fragment"
+               hx-trigger="revealed"
+               hx-swap="innerHTML">
+            <div class="p-4 text-sm text-on-surface-variant">Loading trace...</div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if migration.status in ('complete', 'dry_run_complete') %}
+        <div class="collapsible-section mt-6">
+          <button class="collapsible-trigger w-full flex justify-between items-center p-4 bg-surface-container rounded-xl">
+            <span class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-base">troubleshoot</span>
+              <span class="text-[11px] font-mono uppercase tracking-widest">Diagnostics</span>
+            </span>
+            <span class="collapsible-chevron material-symbols-outlined">expand_more</span>
+          </button>
+          <div class="collapsible-content hidden mt-2"
+               hx-get="/ui/migrations/{{ migration.id }}/diagnostics-fragment"
+               hx-trigger="revealed"
+               hx-swap="innerHTML">
+            <div class="p-4 text-sm text-on-surface-variant">Loading diagnostics...</div>
+          </div>
+        </div>
+        {% endif %}
 
         <!-- Quick Stats -->
         <section class="bg-gradient-to-br from-surface-container-low to-surface-container-lowest p-6 rounded-xl border border-outline-variant/5">

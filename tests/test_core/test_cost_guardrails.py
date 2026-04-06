@@ -144,7 +144,7 @@ def test_migrator_raises_cost_limit_exceeded_during_optimize():
 
     eval_result = _make_eval_result(is_win=True)
 
-    def _fake_optimize(train, val, cfg, gepa_cb=None):
+    def _fake_optimize(train, val, cfg, gepa_cb=None, **kwargs):
         # Simulate a litellm success_callback firing mid-optimize by
         # invoking whatever callback was most recently appended.
         import litellm
