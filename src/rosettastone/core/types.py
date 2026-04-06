@@ -42,6 +42,9 @@ class EvalResult(BaseModel):
     score_std: float = 0.0
     is_non_deterministic: bool = False
 
+    # F6: Failure reason taxonomy (categorical only, no PII)
+    failure_reason: str | None = None
+
 
 class PromptRegression(BaseModel):
     prompt_index: int

@@ -18,9 +18,7 @@ class TestCheckpointWriter:
 
         # Create a migration record
         with Session(engine) as sess:
-            record = MigrationRecord(
-                source_model="a/b", target_model="c/d", status="running"
-            )
+            record = MigrationRecord(source_model="a/b", target_model="c/d", status="running")
             sess.add(record)
             sess.commit()
             sess.refresh(record)
@@ -39,9 +37,7 @@ class TestCheckpointWriter:
         from rosettastone.server.api.tasks import _make_checkpoint_writer
 
         with Session(engine) as sess:
-            record = MigrationRecord(
-                source_model="a/b", target_model="c/d", status="running"
-            )
+            record = MigrationRecord(source_model="a/b", target_model="c/d", status="running")
             sess.add(record)
             sess.commit()
             sess.refresh(record)
@@ -246,7 +242,10 @@ class TestMigratorCheckpointing:
         )
 
         with (
-            patch("rosettastone.core.pipeline.load_and_split_data", return_value=([pair], [pair], [pair])),
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data",
+                return_value=([pair], [pair], [pair]),
+            ),
             patch("rosettastone.core.pipeline.run_pii_scan"),
             patch("rosettastone.core.pipeline.evaluate_baseline", return_value=[eval_result]),
             patch("rosettastone.core.pipeline.optimize_prompt", return_value="opt prompt"),
@@ -302,7 +301,10 @@ class TestMigratorCheckpointing:
         )
 
         with (
-            patch("rosettastone.core.pipeline.load_and_split_data", return_value=([pair], [pair], [pair])),
+            patch(
+                "rosettastone.core.pipeline.load_and_split_data",
+                return_value=([pair], [pair], [pair]),
+            ),
             patch("rosettastone.core.pipeline.run_pii_scan"),
             patch("rosettastone.core.pipeline.evaluate_baseline", return_value=[eval_result]),
             patch("rosettastone.core.pipeline.optimize_prompt", return_value="opt"),

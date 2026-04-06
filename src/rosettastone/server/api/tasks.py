@@ -16,7 +16,12 @@ from rosettastone.server.api.audit import log_audit
 from rosettastone.server.api.versioning import create_version
 from rosettastone.server.database import get_engine
 from rosettastone.server.logging_config import set_request_id
-from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningRecord
+from rosettastone.server.models import (
+    GEPAIterationRecord,
+    MigrationRecord,
+    TestCaseRecord,
+    WarningRecord,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +130,7 @@ def _make_checkpoint_writer(migration_id: int, engine: Any) -> Callable[[str, st
     return write_checkpoint
 
 
-def _make_gepa_callback(migration_id: int) -> Callable[[int, int, float], None]:
+def _make_gepa_callback(migration_id: int, engine: Any = None) -> Callable[[int, int, float], None]:
     """Return a callback that emits SSE gepa_iteration events from the GEPA optimizer thread."""
 
     def on_iteration(iteration: int, total_iterations: int, mean_score: float) -> None:
@@ -141,6 +146,27 @@ def _make_gepa_callback(migration_id: int) -> Callable[[int, int, float], None]:
                 "running_mean_score": mean_score,
             },
         )
+
+        # Fire-and-forget DB write — swallow any error so SSE is unaffected
+        try:
+            _eng = engine if engine is not None else get_engine()
+            with Session(_eng) as _s:
+                _s.add(
+                    GEPAIterationRecord(
+                        migration_id=migration_id,
+                        iteration=iteration,
+                        total_iterations=total_iterations,
+                        mean_score=mean_score,
+                    )
+                )
+                _s.commit()
+        except Exception as exc:
+            logger.warning(
+                "Failed to persist GEPA iteration %d for migration %d: %s",
+                iteration,
+                migration_id,
+                exc,
+            )
 
     return on_iteration
 
@@ -226,7 +252,7 @@ def run_migration_background(
         config = MigrationConfig(**config_dict)
 
         progress_cb = _make_progress_writer(migration_id, engine)
-        gepa_cb = _make_gepa_callback(migration_id)
+        gepa_cb = _make_gepa_callback(migration_id, engine)
         checkpoint_cb = _make_checkpoint_writer(migration_id, engine)
         result = Migrator(
             config,
@@ -279,7 +305,15 @@ def run_migration_background(
                 record.projected_source_cost_per_call = cost_data.get("source_cost")
                 record.projected_target_cost_per_call = cost_data.get("target_cost")
 
-            record.config_json = json.dumps(config_dict)
+            # Embed observability fields into config_json for persistence
+            # (no new DB columns needed — values are numeric/categorical only, no PII)
+            config_dict_with_obs = dict(config_dict)
+            config_dict_with_obs["_stage_timing"] = getattr(result, "stage_timing", {})
+            config_dict_with_obs["_non_deterministic_count"] = getattr(
+                result, "non_deterministic_count", 0
+            )
+            config_dict_with_obs["_eval_runs"] = getattr(result, "eval_runs", 1)
+            record.config_json = json.dumps(config_dict_with_obs)
             record.per_type_scores_json = json.dumps(result.per_type_scores)
             record.warnings_json = json.dumps(result.warnings)
             record.safety_warnings_json = json.dumps(
@@ -311,6 +345,7 @@ def run_migration_background(
                         response_length=len(eval_result.prompt_pair.response),
                         new_response_length=len(eval_result.new_response),
                         evaluators_used=", ".join(eval_result.scores.keys()),
+                        failure_reason=eval_result.failure_reason,
                     )
 
                     if store_content:
@@ -417,9 +452,7 @@ def run_migration_background(
                     return
                 if is_blocked:
                     record.status = "blocked"
-                    record.recommendation_reasoning = (
-                        f"Blocked by preflight: {type(exc).__name__}"
-                    )
+                    record.recommendation_reasoning = f"Blocked by preflight: {type(exc).__name__}"
                     logger.debug("Migration %s blocked: %s", migration_id, str(exc))
                     log_audit(session, "migration", migration_id, "blocked")
                 elif is_cost_exceeded:

@@ -34,6 +34,7 @@ class TestCaseSummary(BaseModel):
     new_token_count: int | None
     evaluators_used: str | None
     fallback_triggered: bool
+    failure_reason: str | None = None
 
 
 class TestCaseDetail(BaseModel):
@@ -50,6 +51,7 @@ class TestCaseDetail(BaseModel):
     new_token_count: int | None
     evaluators_used: str | None
     fallback_triggered: bool
+    failure_reason: str | None = None
     diff: DiffData | None = None
 
 
@@ -176,6 +178,11 @@ class MigrationDetail(BaseModel):
     safety_warnings: list[WarningSchema]
 
     cluster_summary: dict[str, object] | None = None
+
+    # Phase A observability fields
+    stage_timing: dict[str, float] = {}
+    non_deterministic_count: int = 0
+    eval_runs: int = 1
 
     test_cases: list[TestCaseSummary]
 
@@ -428,3 +435,10 @@ class ApprovalSummary(BaseModel):
     decision: str
     comment: str | None
     created_at: datetime
+
+
+class GEPAIterationOut(BaseModel):
+    iteration: int
+    total_iterations: int
+    mean_score: float
+    recorded_at: datetime

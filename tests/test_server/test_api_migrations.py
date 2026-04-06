@@ -445,7 +445,7 @@ class TestUIEndpoints:
         body = resp.text
         assert "Classification" in body
         assert "0.72" in body
-        assert "BERTScore" in body
+        assert "Bertscore" in body  # dynamic label: bertscore key → title-cased
 
     def test_case_fragment_dummy_fallback(self, ui_client: TestClient) -> None:
         """Returns 200 with dummy fallback when TC is not in the DB."""
@@ -461,8 +461,8 @@ class TestUIEndpoints:
         resp = ui_client.get("/ui/fragments/test-case/1/42")
         assert resp.status_code == 200
         body = resp.text
-        assert "BERTScore" in body
-        assert "Embedding similarity" in body
+        assert "Bertscore" in body  # dynamic label: bertscore key → title-cased
+        assert "Embedding" in body  # dynamic label: embedding key → title-cased
         assert "Composite" in body
         assert "Test Case Metadata" in body
         # Dummy tc_id 42 has composite_score 0.31 and output_type Classification

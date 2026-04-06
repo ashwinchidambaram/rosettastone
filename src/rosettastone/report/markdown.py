@@ -34,6 +34,17 @@ def _build_sample_comparisons(
     pairs = []
     for i, (b, v) in enumerate(zip(baseline_results, validation_results)):
         delta = v.composite_score - b.composite_score
+        # Compute per-metric deltas for the top improved metric annotation.
+        base_scores: dict[str, float] = getattr(b, "scores", {}) or {}
+        val_scores: dict[str, float] = getattr(v, "scores", {}) or {}
+        metric_deltas = {m: val_scores[m] - base_scores[m] for m in base_scores if m in val_scores}
+        # Pick the single metric with the largest positive delta for the summary note.
+        top_metric: str | None = None
+        top_delta: float = 0.0
+        for m, d in metric_deltas.items():
+            if d > top_delta:
+                top_delta = d
+                top_metric = m
         pairs.append(
             {
                 "index": i,
@@ -43,6 +54,8 @@ def _build_sample_comparisons(
                 "delta": delta,
                 "is_win_before": b.is_win,
                 "is_win_after": v.is_win,
+                "top_metric": top_metric,
+                "top_metric_delta": top_delta,
             }
         )
     pairs.sort(key=lambda x: x["delta"], reverse=True)
@@ -61,6 +74,16 @@ def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
     sample_comparisons = _build_sample_comparisons(
         result.baseline_results, result.validation_results, n=3
     )
+
+    # F6: Aggregate failure reasons across both result sets
+    # Count skipped attempts across both phases (a pair may appear in both baseline and validation)
+    all_results = list(result.baseline_results) + list(result.validation_results)
+    skipped_results = [r for r in all_results if getattr(r, "failure_reason", None) is not None]
+    skipped_count = len(skipped_results)
+    failure_reason_counts: dict[str, int] = {}
+    for r in skipped_results:
+        reason: str = r.failure_reason  # type: ignore[assignment]
+        failure_reason_counts[reason] = failure_reason_counts.get(reason, 0) + 1
 
     report_content = template.render(
         config=result.config,
@@ -89,8 +112,13 @@ def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
         eval_runs=getattr(result, "eval_runs", 1),
         non_deterministic_count=getattr(result, "non_deterministic_count", 0),
         variance_flag_threshold=result.config.get("variance_flag_threshold", 0.1),
+        # Phase A: stage timing breakdown
+        stage_timing=getattr(result, "stage_timing", {}),
         # Prompt evolution / sample comparisons
         sample_comparisons=sample_comparisons,
+        # F6: failure reason taxonomy
+        skipped_count=skipped_count,
+        failure_reason_counts=failure_reason_counts,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

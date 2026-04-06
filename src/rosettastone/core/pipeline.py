@@ -416,9 +416,7 @@ def build_result(
         v_score = val_r.composite_score
         delta = v_score - b_score
         out_type = (
-            val_r.details.get("output_type")
-            or base_r.details.get("output_type")
-            or "unknown"
+            val_r.details.get("output_type") or base_r.details.get("output_type") or "unknown"
         )
         threshold = win_thresholds.get(out_type, DEFAULT_THRESHOLDS.get(out_type, 0.80))
 
@@ -462,9 +460,7 @@ def build_result(
     at_risk_count = sum(1 for r in prompt_regressions if r.status == "at_risk")
 
     # T4: Multi-run metadata
-    non_deterministic_count = sum(
-        1 for r in validation if r.is_non_deterministic
-    )
+    non_deterministic_count = sum(1 for r in validation if r.is_non_deterministic)
     eval_runs_value = config.eval_runs
 
     return MigrationResult(

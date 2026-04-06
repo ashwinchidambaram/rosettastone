@@ -37,6 +37,9 @@ EXPECTED_APP_TABLES: set[str] = {
     "approvals",
     "task_queue",
     "user_budgets",
+    # Added by observability branch migrations
+    "dataset_generation_runs",
+    "gepa_iterations",
 }
 
 
@@ -273,6 +276,20 @@ def test_migrations_table_exists_after_upgrade(upgraded_db):
         f"alembic_version contains '{recorded_revision}' "
         f"but expected head revision '{head_revision}'"
     )
+
+
+def test_observability_columns_exist_after_upgrade(upgraded_db):
+    """Feature 6: failure_reason column must exist on test_cases after upgrade head."""
+    engine = sqlalchemy.create_engine(f"sqlite:///{upgraded_db}")
+    inspector = sqlalchemy.inspect(engine)
+    tc_columns = {col["name"] for col in inspector.get_columns("test_cases")}
+    gepa_columns = {col["name"] for col in inspector.get_columns("gepa_iterations")}
+    engine.dispose()
+
+    assert "failure_reason" in tc_columns, "failure_reason column missing from test_cases"
+    expected_gepa_cols = {"id", "migration_id", "iteration", "total_iterations", "mean_score", "recorded_at"}
+    missing_gepa = expected_gepa_cols - gepa_columns
+    assert not missing_gepa, f"Columns missing from gepa_iterations: {missing_gepa}"
 
 
 def test_new_migrations_columns_exist_after_upgrade(upgraded_db):

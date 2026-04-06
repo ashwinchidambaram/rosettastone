@@ -212,8 +212,13 @@ class TestTimeoutWithIntermediate:
             patch("rosettastone.optimize.gepa.dspy.GEPA", side_effect=fake_gepa_init),
             patch("rosettastone.optimize.gepa.dspy.context") as mock_ctx,
             patch("rosettastone.optimize.gepa.concurrent.futures.ThreadPoolExecutor") as mock_exec,
-            patch("rosettastone.optimize.gepa.extract_optimized_instructions", side_effect=fake_extract),
-            patch("rosettastone.optimize.gepa.build_migration_metric", return_value=fake_base_metric),
+            patch(
+                "rosettastone.optimize.gepa.extract_optimized_instructions",
+                side_effect=fake_extract,
+            ),
+            patch(
+                "rosettastone.optimize.gepa.build_migration_metric", return_value=fake_base_metric
+            ),
         ):
             mock_ctx.return_value.__enter__ = lambda s: s
             mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
@@ -423,8 +428,13 @@ class TestTimeoutWithImmediateCallback:
             patch("rosettastone.optimize.gepa.dspy.GEPA", side_effect=fake_gepa_init),
             patch("rosettastone.optimize.gepa.dspy.context") as mock_ctx,
             patch("rosettastone.optimize.gepa.concurrent.futures.ThreadPoolExecutor") as mock_exec,
-            patch("rosettastone.optimize.gepa.extract_optimized_instructions", side_effect=fake_extract),
-            patch("rosettastone.optimize.gepa.build_migration_metric", return_value=fake_base_metric),
+            patch(
+                "rosettastone.optimize.gepa.extract_optimized_instructions",
+                side_effect=fake_extract,
+            ),
+            patch(
+                "rosettastone.optimize.gepa.build_migration_metric", return_value=fake_base_metric
+            ),
         ):
             mock_ctx.return_value.__enter__ = lambda s: s
             mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
@@ -507,9 +517,7 @@ class TestConfigValidation:
 def _make_migrator_config(tmp_path):
     """Build a minimal MigrationConfig for migrator-level tests."""
     data_file = tmp_path / "data.jsonl"
-    data_file.write_text(
-        '{"prompt": "q", "response": "a", "source_model": "openai/gpt-4o"}\n' * 5
-    )
+    data_file.write_text('{"prompt": "q", "response": "a", "source_model": "openai/gpt-4o"}\n' * 5)
     return MigrationConfig(
         source_model="openai/gpt-4o",
         target_model="anthropic/claude-sonnet-4",
@@ -554,14 +562,19 @@ class TestMigratorTimeoutHandling:
         mock_result = _make_migration_result()
 
         with (
-            patch(f"{_PIPELINE_PATCH_BASE}.load_and_split_data", return_value=(dummy_pairs, dummy_pairs, dummy_pairs)),
+            patch(
+                f"{_PIPELINE_PATCH_BASE}.load_and_split_data",
+                return_value=(dummy_pairs, dummy_pairs, dummy_pairs),
+            ),
             patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan"),
             patch(f"{_PIPELINE_PATCH_BASE}.evaluate_baseline", return_value=[]),
             patch(f"{_PIPELINE_PATCH_BASE}.optimize_prompt", side_effect=optimize_side_effect),
             patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan_text"),
             patch(f"{_PIPELINE_PATCH_BASE}.run_prompt_audit"),
             patch(f"{_PIPELINE_PATCH_BASE}.evaluate_optimized", return_value=[]),
-            patch(f"{_PIPELINE_PATCH_BASE}.make_recommendation", return_value=("GO", "looks good", {})),
+            patch(
+                f"{_PIPELINE_PATCH_BASE}.make_recommendation", return_value=("GO", "looks good", {})
+            ),
             patch(f"{_PIPELINE_PATCH_BASE}.build_result", return_value=mock_result),
             patch(f"{_PIPELINE_PATCH_BASE}.generate_report"),
         ):
@@ -592,14 +605,19 @@ class TestMigratorTimeoutHandling:
             return _make_migration_result()
 
         with (
-            patch(f"{_PIPELINE_PATCH_BASE}.load_and_split_data", return_value=(dummy_pairs, dummy_pairs, dummy_pairs)),
+            patch(
+                f"{_PIPELINE_PATCH_BASE}.load_and_split_data",
+                return_value=(dummy_pairs, dummy_pairs, dummy_pairs),
+            ),
             patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan"),
             patch(f"{_PIPELINE_PATCH_BASE}.evaluate_baseline", return_value=[]),
             patch(f"{_PIPELINE_PATCH_BASE}.optimize_prompt", side_effect=exc),
             patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan_text"),
             patch(f"{_PIPELINE_PATCH_BASE}.run_prompt_audit"),
             patch(f"{_PIPELINE_PATCH_BASE}.evaluate_optimized", return_value=[]),
-            patch(f"{_PIPELINE_PATCH_BASE}.make_recommendation", return_value=("GO", "looks good", {})),
+            patch(
+                f"{_PIPELINE_PATCH_BASE}.make_recommendation", return_value=("GO", "looks good", {})
+            ),
             patch(f"{_PIPELINE_PATCH_BASE}.build_result", side_effect=capturing_build_result),
             patch(f"{_PIPELINE_PATCH_BASE}.generate_report"),
         ):
@@ -629,14 +647,19 @@ class TestMigratorTimeoutHandling:
             return _make_migration_result()
 
         with (
-            patch(f"{_PIPELINE_PATCH_BASE}.load_and_split_data", return_value=(dummy_pairs, dummy_pairs, dummy_pairs)),
+            patch(
+                f"{_PIPELINE_PATCH_BASE}.load_and_split_data",
+                return_value=(dummy_pairs, dummy_pairs, dummy_pairs),
+            ),
             patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan"),
             patch(f"{_PIPELINE_PATCH_BASE}.evaluate_baseline", return_value=[]),
             patch(f"{_PIPELINE_PATCH_BASE}.optimize_prompt", side_effect=exc),
             patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan_text"),
             patch(f"{_PIPELINE_PATCH_BASE}.run_prompt_audit"),
             patch(f"{_PIPELINE_PATCH_BASE}.evaluate_optimized", return_value=[]),
-            patch(f"{_PIPELINE_PATCH_BASE}.make_recommendation", return_value=("GO", "looks good", {})),
+            patch(
+                f"{_PIPELINE_PATCH_BASE}.make_recommendation", return_value=("GO", "looks good", {})
+            ),
             patch(f"{_PIPELINE_PATCH_BASE}.build_result", side_effect=capturing_build_result),
             patch(f"{_PIPELINE_PATCH_BASE}.generate_report"),
         ):
@@ -660,14 +683,22 @@ class TestMigratorTimeoutHandling:
 
         dummy_pairs = []
         with (
-            patch(f"{_PIPELINE_PATCH_BASE}.load_and_split_data", return_value=(dummy_pairs, dummy_pairs, dummy_pairs)),
+            patch(
+                f"{_PIPELINE_PATCH_BASE}.load_and_split_data",
+                return_value=(dummy_pairs, dummy_pairs, dummy_pairs),
+            ),
             patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan"),
             patch(f"{_PIPELINE_PATCH_BASE}.evaluate_baseline", return_value=[]),
-            patch(f"{_PIPELINE_PATCH_BASE}.optimize_prompt", side_effect=TimeoutError("GEPA timed out")),
+            patch(
+                f"{_PIPELINE_PATCH_BASE}.optimize_prompt",
+                side_effect=TimeoutError("GEPA timed out"),
+            ),
             patch(f"{_PIPELINE_PATCH_BASE}.run_pii_scan_text"),
             patch(f"{_PIPELINE_PATCH_BASE}.run_prompt_audit"),
             patch(f"{_PIPELINE_PATCH_BASE}.evaluate_optimized", return_value=[]),
-            patch(f"{_PIPELINE_PATCH_BASE}.make_recommendation", return_value=("GO", "looks good", {})),
+            patch(
+                f"{_PIPELINE_PATCH_BASE}.make_recommendation", return_value=("GO", "looks good", {})
+            ),
             patch(f"{_PIPELINE_PATCH_BASE}.build_result", return_value=_make_migration_result()),
             patch(f"{_PIPELINE_PATCH_BASE}.generate_report"),
         ):

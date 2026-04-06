@@ -1,4 +1,5 @@
 """Model deprecation registry — importable without the web stack."""
+
 from __future__ import annotations
 
 from datetime import UTC, date, datetime

@@ -2,6 +2,7 @@
 
 This asserts the invariant: "never log prompt content at any level".
 """
+
 from __future__ import annotations
 
 import ast

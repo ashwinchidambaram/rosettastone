@@ -59,7 +59,9 @@ class TestScanTextPhoneDetection:
     def test_detects_standard_us_phone(self):
         """This test proves that a standard US phone number is detected."""
         findings = scan_text("Call me at (555) 123-4567")
-        assert any(pii_type == "us_phone" for pii_type, *_ in findings), "Expected US phone detected"
+        assert any(pii_type == "us_phone" for pii_type, *_ in findings), (
+            "Expected US phone detected"
+        )
 
     def test_detects_us_phone_without_parentheses(self):
         """This test proves that US phone without parentheses is detected."""
@@ -446,7 +448,9 @@ class TestScanPairsCountField:
         """
         text = "a@example.com, b@example.com, c@example.com"
         findings = scan_text(text)
-        email_findings = [(pii_type, count) for pii_type, _sev, count in findings if pii_type == "email"]
+        email_findings = [
+            (pii_type, count) for pii_type, _sev, count in findings if pii_type == "email"
+        ]
         assert len(email_findings) == 1, f"Expected one email entry, got {email_findings}"
         _pii_type, occurrence_count = email_findings[0]
         assert occurrence_count == 3, (

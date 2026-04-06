@@ -1,4 +1,5 @@
 """Tests for per-prompt regression analysis in build_result()."""
+
 from __future__ import annotations
 
 from pathlib import Path

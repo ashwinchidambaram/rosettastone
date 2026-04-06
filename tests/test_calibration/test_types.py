@@ -1,4 +1,5 @@
 """Tests for calibration dataset types."""
+
 from __future__ import annotations
 
 from rosettastone.calibration.types import (
@@ -73,9 +74,14 @@ class TestLabeledPair:
 class TestCalibrationDataset:
     def test_by_output_type(self):
         pairs = [
-            LabeledPair(pair_id=f"p{i}", output_type=ot, prompt="q",
-                        source_response="a", target_response="b",
-                        scores=DimensionalScores())
+            LabeledPair(
+                pair_id=f"p{i}",
+                output_type=ot,
+                prompt="q",
+                source_response="a",
+                target_response="b",
+                scores=DimensionalScores(),
+            )
             for i, ot in enumerate(["json", "classification", "json", "long_text"])
         ]
         dataset = CalibrationDataset(pairs=pairs)
@@ -85,14 +91,20 @@ class TestCalibrationDataset:
 
     def test_labeled_pairs_filters_unlabeled(self):
         labeled = LabeledPair(
-            pair_id="p1", output_type="json", prompt="q",
-            source_response="a", target_response="b",
+            pair_id="p1",
+            output_type="json",
+            prompt="q",
+            source_response="a",
+            target_response="b",
             scores=DimensionalScores(),
             labels=[HumanLabel(reviewer_id="r1", safety=ProductionSafety.SAFE)],
         )
         unlabeled = LabeledPair(
-            pair_id="p2", output_type="json", prompt="q",
-            source_response="a", target_response="b",
+            pair_id="p2",
+            output_type="json",
+            prompt="q",
+            source_response="a",
+            target_response="b",
             scores=DimensionalScores(),
         )
         dataset = CalibrationDataset(pairs=[labeled, unlabeled])

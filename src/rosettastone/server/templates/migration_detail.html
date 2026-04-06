@@ -152,6 +152,26 @@ function showPersonaView(view) {
         <span class="material-symbols-outlined text-sm">schedule</span>
         Auto-refreshing every 5 seconds
     </div>
+    <!-- GEPA Optimizer Progress Panel (shown when gepa_iteration SSE events arrive) -->
+    <div id="gepa-progress-panel" class="hidden mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 w-full max-w-md text-left">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Optimizer Progress</span>
+        <span id="gepa-iteration-counter" class="text-xs text-gray-500 font-mono">0 / &#8212;</span>
+      </div>
+      <!-- Sparkline -->
+      <div id="gepa-sparkline" class="flex items-end h-10 mb-2 gap-px"></div>
+      <!-- Table -->
+      <table class="w-full">
+        <thead>
+          <tr class="text-xs text-gray-500 border-b border-gray-200 dark:border-gray-700">
+            <th class="text-left px-2 py-1">Iter</th>
+            <th class="text-left px-2 py-1">Score</th>
+            <th class="text-left px-2 py-1">&#916;</th>
+          </tr>
+        </thead>
+        <tbody id="gepa-iterations-tbody" data-prev-score=""></tbody>
+      </table>
+    </div>
 </div>
 </div>
 
@@ -243,7 +263,7 @@ function showPersonaView(view) {
         </section>
 
         <!-- KPI Grid -->
-        <section class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <section class="grid grid-cols-1 sm:grid-cols-3 {% if migration.non_deterministic_count > 0 %}lg:grid-cols-4{% endif %} gap-6">
             <div class="bg-surface-container-low p-6 rounded-xl">
                 <div class="text-3xl font-bold text-success font-headline mb-1">{{ migration.confidence }}%</div>
                 <div class="text-xs text-on-surface-variant/70 font-medium">Parity Score</div>
@@ -271,6 +291,12 @@ function showPersonaView(view) {
                 {% endfor %}
               </div>
               {% endif %}
+            </div>
+            {% endif %}
+            {% if migration.non_deterministic_count > 0 %}
+            <div class="bg-surface-container-low p-6 rounded-xl border border-[#D4A574]/30" title="{{ migration.non_deterministic_count }} test pair(s) showed high score variance across evaluation runs">
+                <div class="text-3xl font-bold text-[#D4A574] font-headline mb-1">{{ migration.non_deterministic_count }} unstable</div>
+                <div class="text-xs text-on-surface-variant/70 font-medium">High-variance test pairs</div>
             </div>
             {% endif %}
         </section>
@@ -313,9 +339,17 @@ function showPersonaView(view) {
                     <div>
                         <div class="text-sm font-semibold text-on-surface-variant mb-1">{{ pt.type }}</div>
                         <div class="text-2xl font-bold font-headline">{{ pt.wins }}/{{ pt.total }} <span class="text-sm text-on-surface-variant font-normal">({{ (pt.wins / pt.total * 100)|int if pt.total else 0 }}%)</span></div>
+                        {% if pt.ci_lower is defined and (pt.ci_lower != 0.0 or pt.ci_upper != 0.0) %}
+                        <div class="text-[11px] text-on-surface-variant/60 mt-1">CI: [{{ "%.0f"|format(pt.ci_lower * 100) }}% – {{ "%.0f"|format(pt.ci_upper * 100) }}%]</div>
+                        {% endif %}
                     </div>
-                    <span class="px-3 py-1 text-[10px] font-bold rounded
-                        {% if pt.badge == 'PASS' %}bg-success/10 text-success border border-success/30{% elif pt.badge == 'WARN' %}bg-warn/10 text-warn border border-warn/30{% else %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% endif %}">{{ pt.badge }}</span>
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="px-3 py-1 text-[10px] font-bold rounded
+                            {% if pt.badge == 'PASS' %}bg-success/10 text-success border border-success/30{% elif pt.badge == 'WARN' %}bg-warn/10 text-warn border border-warn/30{% else %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% endif %}">{{ pt.badge }}</span>
+                        {% if pt.p90 is defined and pt.p10 is defined and (pt.p90 - pt.p10) > 0.25 %}
+                        <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/30">high variance</span>
+                        {% endif %}
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -408,6 +442,15 @@ function showPersonaView(view) {
                         <div class="text-on-surface-variant/50 mb-1">Expected: <span class="text-success/70">{{ reg.expected }}</span></div>
                         <div class="text-on-surface">Got: <span class="text-error/70">{{ reg.got }}</span></div>
                     </div>
+                    {% if reg.metric_deltas %}
+                    <div class="flex flex-wrap gap-1">
+                        {% for metric, delta in reg.metric_deltas.items() %}
+                        <span class="text-[10px] px-1.5 py-0.5 rounded font-mono {% if delta < 0 %}bg-error/10 text-error/80{% else %}bg-success/10 text-success/80{% endif %}">
+                            {{ metric | replace('_', ' ') }}: {% if delta > 0 %}+{% endif %}{{ delta }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     <button class="text-primary text-[11px] font-bold flex items-center gap-1 hover:underline"
                             hx-get="/ui/fragments/diff/{{ migration.id }}/{{ reg.tc_id }}"
                             hx-target="#diff-content"
@@ -418,6 +461,27 @@ function showPersonaView(view) {
                 {% if not loop.last %}
                 <div class="h-px bg-outline-variant/10"></div>
                 {% endif %}
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Skipped Pairs Subsection (F6) -->
+        {% if migration.skipped_count > 0 %}
+        <section class="bg-surface-container-low rounded-xl overflow-hidden">
+            <div class="px-6 py-5 bg-surface-container-high border-b border-outline-variant/10 flex justify-between items-center">
+                <h3 class="font-bold text-sm uppercase tracking-wider text-on-surface/70">Skipped Pairs</h3>
+                <span class="px-2 py-0.5 bg-red-500/10 text-red-400 text-[10px] font-bold rounded-full">{{ migration.skipped_count }} SKIPPED</span>
+            </div>
+            <div class="p-6 space-y-2">
+                {% for reason, count in migration.skipped_pairs_by_reason.items() %}
+                <div class="flex items-center justify-between text-xs">
+                    <a class="font-mono text-red-400 hover:text-red-300 underline underline-offset-2 transition-colors"
+                       hx-get="/ui/migrations/{{ migration.id }}/test-cases-table?failure_reason={{ reason }}"
+                       hx-target="#test-cases-grid"
+                       hx-swap="innerHTML">{{ reason | replace('_', ' ') }}</a>
+                    <span class="font-mono text-on-surface-variant">{{ count }}</span>
+                </div>
                 {% endfor %}
             </div>
         </section>
@@ -476,6 +540,45 @@ function showPersonaView(view) {
         </div>
         {% endif %}
 
+        <!-- Pipeline Stages Section -->
+        {% if migration.stage_timing %}
+        <details class="mt-4">
+          <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400 select-none">Pipeline Stages</summary>
+          <div class="mt-2 bg-surface-container-low rounded-xl p-4">
+            <table class="w-full text-xs">
+              <thead>
+                <tr>
+                  <th class="text-left text-on-surface-variant pb-2">Stage</th>
+                  <th class="text-right text-on-surface-variant pb-2">Duration</th>
+                  <th class="text-right text-on-surface-variant pb-2">Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% set total = migration.duration_seconds if migration.duration_seconds is defined else 0 %}
+                {% for stage, secs in migration.stage_timing.items() %}
+                <tr>
+                  <td class="text-gray-700 dark:text-gray-300 py-1">{{ stage }}</td>
+                  <td class="text-right text-gray-600 dark:text-gray-400">{{ "%.1f"|format(secs) }}s</td>
+                  <td class="text-right text-gray-500">{{ "%.0f"|format(secs / total * 100) if total > 0 else "—" }}%</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </details>
+        {% endif %}
+
+        <!-- Optimizer History Section -->
+        <details class="mt-4" id="optimizer-history-details">
+          <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400">Optimizer History</summary>
+          <div id="optimizer-history-content"
+               hx-get="/ui/migrations/{{ migration.id }}/optimizer-history"
+               hx-trigger="revealed"
+               hx-swap="innerHTML">
+            <span class="text-xs text-gray-400">Loading...</span>
+          </div>
+        </details>
+
         <!-- Quick Stats -->
         <section class="bg-gradient-to-br from-surface-container-low to-surface-container-lowest p-6 rounded-xl border border-outline-variant/5">
             <h4 class="text-[10px] font-label uppercase tracking-[0.2em] text-on-surface-variant mb-6">Model Metadata</h4>
@@ -524,7 +627,7 @@ function showPersonaView(view) {
 </div>
 
 <!-- KPI Cards Row -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+<div class="grid grid-cols-1 md:grid-cols-3 {% if migration.non_deterministic_count > 0 %}lg:grid-cols-4{% endif %} gap-8 mb-16">
     <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
         <span class="text-[32px] font-bold text-[#D85650] mb-2">{{ migration.confidence }}%</span>
         <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Confidence (after optimization)</span>
@@ -537,6 +640,12 @@ function showPersonaView(view) {
         <span class="text-[32px] font-bold text-[#BDBDBD] mb-2">+{{ migration.improvement }}%</span>
         <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Improvement from GEPA</span>
     </div>
+    {% if migration.non_deterministic_count > 0 %}
+    <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center border border-[#D4A574]/30" title="{{ migration.non_deterministic_count }} test pair(s) showed high score variance across evaluation runs">
+        <span class="text-[32px] font-bold text-[#D4A574] mb-2">{{ migration.non_deterministic_count }} unstable</span>
+        <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">High-variance test pairs</span>
+    </div>
+    {% endif %}
 </div>
 
 {% if migration.source_latency_p50 %}
@@ -577,9 +686,17 @@ function showPersonaView(view) {
                 <p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant mb-2">{{ pt.type }}</p>
                 <p class="text-2xl font-bold mb-1">{{ pt.wins }}/{{ pt.total }} ({{ (pt.wins / pt.total * 100)|int if pt.total else 0 }}%)</p>
                 <p class="text-sm {% if pt.badge == 'FAIL' %}text-[#D85650]{% elif pt.badge == 'WARN' %}text-tertiary-container{% else %}text-secondary{% endif %}">{{ pt.desc }}</p>
+                {% if pt.ci_lower is defined and (pt.ci_lower != 0.0 or pt.ci_upper != 0.0) %}
+                <p class="text-[11px] text-on-surface-variant/60 mt-1">CI: [{{ "%.0f"|format(pt.ci_lower * 100) }}% – {{ "%.0f"|format(pt.ci_upper * 100) }}%]</p>
+                {% endif %}
             </div>
-            <span class="px-2 py-1 rounded text-[10px] font-bold tracking-tighter
-                {% if pt.badge == 'FAIL' %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% elif pt.badge == 'WARN' %}bg-tertiary-container/10 text-tertiary-container border border-tertiary-container/20{% else %}bg-secondary/10 text-secondary border border-secondary/20{% endif %}">{{ pt.badge }}</span>
+            <div class="flex flex-col items-end gap-2">
+                <span class="px-2 py-1 rounded text-[10px] font-bold tracking-tighter
+                    {% if pt.badge == 'FAIL' %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% elif pt.badge == 'WARN' %}bg-tertiary-container/10 text-tertiary-container border border-tertiary-container/20{% else %}bg-secondary/10 text-secondary border border-secondary/20{% endif %}">{{ pt.badge }}</span>
+                {% if pt.p90 is defined and pt.p10 is defined and (pt.p90 - pt.p10) > 0.25 %}
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/30">high variance</span>
+                {% endif %}
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -648,6 +765,45 @@ function showPersonaView(view) {
 </div>
 {% endif %}
 
+<!-- Pipeline Stages Section -->
+{% if migration.stage_timing %}
+<details class="mt-4 mb-8">
+  <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400 select-none">Pipeline Stages</summary>
+  <div class="mt-2 bg-surface-container-low rounded-xl p-4">
+    <table class="w-full text-xs">
+      <thead>
+        <tr>
+          <th class="text-left text-on-surface-variant pb-2">Stage</th>
+          <th class="text-right text-on-surface-variant pb-2">Duration</th>
+          <th class="text-right text-on-surface-variant pb-2">Share</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set total = migration.duration_seconds if migration.duration_seconds is defined else 0 %}
+        {% for stage, secs in migration.stage_timing.items() %}
+        <tr>
+          <td class="text-gray-700 dark:text-gray-300 py-1">{{ stage }}</td>
+          <td class="text-right text-gray-600 dark:text-gray-400">{{ "%.1f"|format(secs) }}s</td>
+          <td class="text-right text-gray-500">{{ "%.0f"|format(secs / total * 100) if total > 0 else "—" }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+{% endif %}
+
+<!-- Optimizer History Section -->
+<details class="mt-4 mb-8" id="optimizer-history-details">
+  <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400">Optimizer History</summary>
+  <div id="optimizer-history-content"
+       hx-get="/ui/migrations/{{ migration.id }}/optimizer-history"
+       hx-trigger="revealed"
+       hx-swap="innerHTML">
+    <span class="text-xs text-gray-400">Loading...</span>
+  </div>
+</details>
+
 <!-- Critical Regressions List -->
 {% if migration.regressions %}
 <div>
@@ -657,18 +813,50 @@ function showPersonaView(view) {
     </div>
     <div class="space-y-4">
         {% for reg in migration.regressions %}
-        <div class="bg-surface-container-lowest p-5 rounded-lg flex items-center justify-between group hover:bg-surface-container-low transition-all">
-            <div class="flex items-center gap-4">
-                <span class="material-symbols-outlined text-[#D85650]">warning</span>
-                <div>
-                    <p class="font-mono text-sm">{{ reg.title }}</p>
-                    <p class="text-xs text-on-surface-variant mt-1">Expected: {{ reg.expected }} / Got: {{ reg.got }}</p>
+        <div class="bg-surface-container-lowest p-5 rounded-lg group hover:bg-surface-container-low transition-all">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <span class="material-symbols-outlined text-[#D85650]">warning</span>
+                    <div>
+                        <p class="font-mono text-sm">{{ reg.title }}</p>
+                        <p class="text-xs text-on-surface-variant mt-1">Expected: {{ reg.expected }} / Got: {{ reg.got }}</p>
+                    </div>
                 </div>
+                <a class="text-primary text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                   hx-get="/ui/fragments/diff/{{ migration.id }}/{{ reg.tc_id }}"
+                   hx-target="#diff-content"
+                   hx-swap="innerHTML">View diff &rarr;</a>
             </div>
-            <a class="text-primary text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-               hx-get="/ui/fragments/diff/{{ migration.id }}/{{ reg.tc_id }}"
-               hx-target="#diff-content"
-               hx-swap="innerHTML">View diff &rarr;</a>
+            {% if reg.metric_deltas %}
+            <div class="flex flex-wrap gap-1 mt-3 ml-10">
+                {% for metric, delta in reg.metric_deltas.items() %}
+                <span class="text-[10px] px-1.5 py-0.5 rounded font-mono {% if delta < 0 %}bg-[#D85650]/10 text-[#D85650]/80{% else %}bg-[#8B9D83]/10 text-[#8B9D83]/80{% endif %}">
+                    {{ metric | replace('_', ' ') }}: {% if delta > 0 %}+{% endif %}{{ delta }}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Skipped Pairs (F6) — layout 2 -->
+{% if migration.skipped_count > 0 %}
+<div class="mt-8">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="headline-sm font-bold text-[#E8DCC4]">Skipped Pairs</h3>
+        <span class="text-xs font-mono text-red-400">{{ migration.skipped_count }} skipped</span>
+    </div>
+    <div class="space-y-2">
+        {% for reason, count in migration.skipped_pairs_by_reason.items() %}
+        <div class="flex items-center justify-between bg-surface-container-lowest p-3 rounded-lg text-xs">
+            <a class="font-mono text-red-400 hover:text-red-300 underline underline-offset-2 transition-colors"
+               hx-get="/ui/migrations/{{ migration.id }}/test-cases-table?failure_reason={{ reason }}"
+               hx-target="#test-cases-grid"
+               hx-swap="innerHTML">{{ reason | replace('_', ' ') }}</a>
+            <span class="font-mono text-on-surface-variant">{{ count }}</span>
         </div>
         {% endfor %}
     </div>
@@ -701,7 +889,7 @@ function showPersonaView(view) {
 </div>
 
 <!-- KPI Cards Row -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+<div class="grid grid-cols-1 md:grid-cols-3 {% if migration.non_deterministic_count > 0 %}lg:grid-cols-4{% endif %} gap-8 mb-16">
     <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center">
         <span class="text-[32px] font-bold text-[#D4A574] mb-2">{{ migration.confidence }}%</span>
         <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Confidence (after optimization)</span>
@@ -714,6 +902,12 @@ function showPersonaView(view) {
         <span class="text-[32px] font-bold text-[#BDBDBD] mb-2">+{{ migration.improvement }}%</span>
         <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">Improvement from GEPA</span>
     </div>
+    {% if migration.non_deterministic_count > 0 %}
+    <div class="bg-surface-container-low p-8 rounded-xl flex flex-col items-center text-center border border-[#D4A574]/30" title="{{ migration.non_deterministic_count }} test pair(s) showed high score variance across evaluation runs">
+        <span class="text-[32px] font-bold text-[#D4A574] mb-2">{{ migration.non_deterministic_count }} unstable</span>
+        <span class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">High-variance test pairs</span>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Results Grid (if available) -->
@@ -729,9 +923,17 @@ function showPersonaView(view) {
                 <p class="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant mb-2">{{ pt.type }}</p>
                 <p class="text-2xl font-bold mb-1">{{ pt.wins }}/{{ pt.total }} ({{ (pt.wins / pt.total * 100)|int if pt.total else 0 }}%)</p>
                 <p class="text-sm {% if pt.badge == 'FAIL' %}text-[#D85650]{% elif pt.badge == 'WARN' %}text-[#D4A574]{% else %}text-secondary{% endif %}">{{ pt.desc }}</p>
+                {% if pt.ci_lower is defined and (pt.ci_lower != 0.0 or pt.ci_upper != 0.0) %}
+                <p class="text-[11px] text-on-surface-variant/60 mt-1">CI: [{{ "%.0f"|format(pt.ci_lower * 100) }}% – {{ "%.0f"|format(pt.ci_upper * 100) }}%]</p>
+                {% endif %}
             </div>
-            <span class="px-2 py-1 rounded text-[10px] font-bold tracking-tighter
-                {% if pt.badge == 'FAIL' %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% elif pt.badge == 'WARN' %}bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/20{% else %}bg-secondary/10 text-secondary border border-secondary/20{% endif %}">{{ pt.badge }}</span>
+            <div class="flex flex-col items-end gap-2">
+                <span class="px-2 py-1 rounded text-[10px] font-bold tracking-tighter
+                    {% if pt.badge == 'FAIL' %}bg-[#D85650]/10 text-[#D85650] border border-[#D85650]/20{% elif pt.badge == 'WARN' %}bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/20{% else %}bg-secondary/10 text-secondary border border-secondary/20{% endif %}">{{ pt.badge }}</span>
+                {% if pt.p90 is defined and pt.p10 is defined and (pt.p90 - pt.p10) > 0.25 %}
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-[#D4A574]/10 text-[#D4A574] border border-[#D4A574]/30">high variance</span>
+                {% endif %}
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -800,6 +1002,45 @@ function showPersonaView(view) {
 </div>
 {% endif %}
 
+<!-- Pipeline Stages Section -->
+{% if migration.stage_timing %}
+<details class="mt-4 mb-8">
+  <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400 select-none">Pipeline Stages</summary>
+  <div class="mt-2 bg-surface-container-low rounded-xl p-4">
+    <table class="w-full text-xs">
+      <thead>
+        <tr>
+          <th class="text-left text-on-surface-variant pb-2">Stage</th>
+          <th class="text-right text-on-surface-variant pb-2">Duration</th>
+          <th class="text-right text-on-surface-variant pb-2">Share</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set total = migration.duration_seconds if migration.duration_seconds is defined else 0 %}
+        {% for stage, secs in migration.stage_timing.items() %}
+        <tr>
+          <td class="text-gray-700 dark:text-gray-300 py-1">{{ stage }}</td>
+          <td class="text-right text-gray-600 dark:text-gray-400">{{ "%.1f"|format(secs) }}s</td>
+          <td class="text-right text-gray-500">{{ "%.0f"|format(secs / total * 100) if total > 0 else "—" }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+{% endif %}
+
+<!-- Optimizer History Section -->
+<details class="mt-4 mb-8" id="optimizer-history-details">
+  <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400">Optimizer History</summary>
+  <div id="optimizer-history-content"
+       hx-get="/ui/migrations/{{ migration.id }}/optimizer-history"
+       hx-trigger="revealed"
+       hx-swap="innerHTML">
+    <span class="text-xs text-gray-400">Loading...</span>
+  </div>
+</details>
+
 <!-- Regressions (Needs Review) -->
 {% if migration.regressions %}
 <div>
@@ -809,18 +1050,50 @@ function showPersonaView(view) {
     </div>
     <div class="space-y-4">
         {% for reg in migration.regressions %}
-        <div class="bg-surface-container-lowest p-5 rounded-lg flex items-center justify-between group hover:bg-surface-container-low transition-all">
-            <div class="flex items-center gap-4">
-                <span class="material-symbols-outlined text-[#D4A574]">warning</span>
-                <div>
-                    <p class="font-mono text-sm">{{ reg.title }}</p>
-                    <p class="text-xs text-on-surface-variant mt-1">Expected: {{ reg.expected }} / Got: {{ reg.got }}</p>
+        <div class="bg-surface-container-lowest p-5 rounded-lg group hover:bg-surface-container-low transition-all">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <span class="material-symbols-outlined text-[#D4A574]">warning</span>
+                    <div>
+                        <p class="font-mono text-sm">{{ reg.title }}</p>
+                        <p class="text-xs text-on-surface-variant mt-1">Expected: {{ reg.expected }} / Got: {{ reg.got }}</p>
+                    </div>
                 </div>
+                <a class="text-primary text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                   hx-get="/ui/fragments/diff/{{ migration.id }}/{{ reg.tc_id }}"
+                   hx-target="#diff-content"
+                   hx-swap="innerHTML">View diff &rarr;</a>
             </div>
-            <a class="text-primary text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-               hx-get="/ui/fragments/diff/{{ migration.id }}/{{ reg.tc_id }}"
-               hx-target="#diff-content"
-               hx-swap="innerHTML">View diff &rarr;</a>
+            {% if reg.metric_deltas %}
+            <div class="flex flex-wrap gap-1 mt-3 ml-10">
+                {% for metric, delta in reg.metric_deltas.items() %}
+                <span class="text-[10px] px-1.5 py-0.5 rounded font-mono {% if delta < 0 %}bg-[#D85650]/10 text-[#D85650]/80{% else %}bg-[#8B9D83]/10 text-[#8B9D83]/80{% endif %}">
+                    {{ metric | replace('_', ' ') }}: {% if delta > 0 %}+{% endif %}{{ delta }}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Skipped Pairs (F6) — layout 3 -->
+{% if migration.skipped_count > 0 %}
+<div class="mt-8">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="headline-sm font-bold text-[#E8DCC4]">Skipped Pairs</h3>
+        <span class="text-xs font-mono text-red-400">{{ migration.skipped_count }} skipped</span>
+    </div>
+    <div class="space-y-2">
+        {% for reason, count in migration.skipped_pairs_by_reason.items() %}
+        <div class="flex items-center justify-between bg-surface-container-lowest p-3 rounded-lg text-xs">
+            <a class="font-mono text-red-400 hover:text-red-300 underline underline-offset-2 transition-colors"
+               hx-get="/ui/migrations/{{ migration.id }}/test-cases-table?failure_reason={{ reason }}"
+               hx-target="#test-cases-grid"
+               hx-swap="innerHTML">{{ reason | replace('_', ' ') }}</a>
+            <span class="font-mono text-on-surface-variant">{{ count }}</span>
         </div>
         {% endfor %}
     </div>
@@ -915,6 +1188,42 @@ function showPersonaView(view) {
       // Ignore parse errors
     }
   };
+
+  es.addEventListener('gepa_iteration', function(e) {
+    try {
+      var data = JSON.parse(e.data);
+      var panel = document.getElementById('gepa-progress-panel');
+      if (panel) {
+        panel.classList.remove('hidden');
+        // Update counter
+        document.getElementById('gepa-iteration-counter').textContent =
+          data.iteration + ' / ' + data.total_iterations;
+        // Add row to table
+        var tbody = document.getElementById('gepa-iterations-tbody');
+        var prevScore = tbody.dataset.prevScore ? parseFloat(tbody.dataset.prevScore) : null;
+        var delta = prevScore !== null ? (data.running_mean_score - prevScore).toFixed(3) : '\u2014';
+        var sign = delta !== '\u2014' && parseFloat(delta) >= 0 ? '+' : '';
+        var row = '<tr>' +
+          '<td class="text-xs px-2 py-1 text-gray-600">' + data.iteration + '</td>' +
+          '<td class="text-xs px-2 py-1 font-mono">' + (data.running_mean_score * 100).toFixed(1) + '%</td>' +
+          '<td class="text-xs px-2 py-1 font-mono ' + (delta !== '\u2014' && parseFloat(delta) < 0 ? 'text-red-500' : 'text-green-600') + '">' + sign + delta + '</td>' +
+          '</tr>';
+        tbody.insertAdjacentHTML('beforeend', row);
+        tbody.dataset.prevScore = data.running_mean_score;
+        // Add sparkline bar
+        var sparkline = document.getElementById('gepa-sparkline');
+        if (sparkline) {
+          var bar = document.createElement('span');
+          bar.className = 'inline-block w-2 bg-blue-400 dark:bg-blue-600 rounded-sm mx-px';
+          bar.style.height = Math.round(data.running_mean_score * 40) + 'px';
+          bar.title = (data.running_mean_score * 100).toFixed(1) + '%';
+          sparkline.appendChild(bar);
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  });
 
   es.onerror = function() {
     es.close();

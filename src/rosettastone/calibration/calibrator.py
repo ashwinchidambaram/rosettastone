@@ -1,4 +1,5 @@
 """Threshold calibrator — ROC-based calibration against human labels."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -9,10 +10,10 @@ if TYPE_CHECKING:
 # Target false positive rates per output type
 # (higher = more permissive threshold = lower numeric threshold)
 FPR_TARGETS: dict[str, float] = {
-    "json": 0.02,           # 2% FPR — strict
-    "classification": 0.05, # 5% FPR
-    "short_text": 0.08,     # 8% FPR
-    "long_text": 0.10,      # 10% FPR — most permissive
+    "json": 0.02,  # 2% FPR — strict
+    "classification": 0.05,  # 5% FPR
+    "short_text": 0.08,  # 8% FPR
+    "long_text": 0.10,  # 10% FPR — most permissive
 }
 
 
@@ -49,13 +50,15 @@ class ThresholdCalibrator:
 
         for output_type in ["json", "classification", "short_text", "long_text"]:
             pairs = [
-                p for p in dataset.labeled_pairs()
+                p
+                for p in dataset.labeled_pairs()
                 if p.output_type == output_type and p.is_safe_majority is not None
             ]
 
             if len(pairs) < 5:
                 # Not enough data — fall back to default threshold
                 from rosettastone.decision.recommendation import DEFAULT_THRESHOLDS
+
                 thresholds[output_type] = DEFAULT_THRESHOLDS.get(output_type, 0.80)
                 continue
 
@@ -92,6 +95,7 @@ class ThresholdCalibrator:
             dataset: Labeled dataset with multiple reviewers per pair.
         """
         import logging
+
         try:
             import krippendorff
         except ImportError as exc:
@@ -122,9 +126,7 @@ class ThresholdCalibrator:
 
         # Build matrix: rows=reviewers, cols=pairs; None for missing
         reviewer_idx = {r: i for i, r in enumerate(reviewer_ids)}
-        matrix: list[list[float | None]] = [
-            [None] * len(labeled) for _ in reviewer_ids
-        ]
+        matrix: list[list[float | None]] = [[None] * len(labeled) for _ in reviewer_ids]
         for col, pair in enumerate(labeled):
             for label in pair.labels:
                 row = reviewer_idx[label.reviewer_id]
@@ -163,7 +165,8 @@ class ThresholdCalibrator:
         lines.append("## Per-Type Sample Counts")
         for ot in ["json", "classification", "short_text", "long_text"]:
             labeled_for_type = [
-                p for p in dataset.labeled_pairs()
+                p
+                for p in dataset.labeled_pairs()
                 if p.output_type == ot and p.is_safe_majority is not None
             ]
             lines.append(f"- {ot}: {len(labeled_for_type)} labeled pairs")

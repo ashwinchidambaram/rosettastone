@@ -95,7 +95,7 @@ def migrate(
         help=(
             "JSON object of extra kwargs forwarded to dspy.LM() and litellm.completion(). "
             "Required for custom OpenAI-compatible endpoints. "
-            "Example: '{\"api_base\": \"http://localhost:8123/v1\", \"api_key\": \"dummy\"}'"
+            'Example: \'{"api_base": "http://localhost:8123/v1", "api_key": "dummy"}\''
         ),
     ),
     num_threads: int = typer.Option(
@@ -203,6 +203,8 @@ def migrate(
     if result.per_type_scores:
         display.show_summary_table(result.validation_results, result.per_type_scores)
 
+    display.show_variance_warning(result.non_deterministic_count)
+
     # Prompt evolution: show before/after system instruction + top improvements
     if result.optimized_prompt:
         sample_comparisons = _build_sample_comparisons(
@@ -221,6 +223,8 @@ def migrate(
 
     if result.cost_usd > 0:
         display.show_cost_summary({"total": result.cost_usd})
+
+    display.show_timing_table(result.stage_timing)
 
     if result.warnings:
         console.print("\n[yellow]Warnings:[/yellow]")
@@ -392,9 +396,7 @@ def serve(
 
 @app.command(name="score-shadow")
 def score_shadow(
-    log_dir: Path = typer.Option(
-        Path("./shadow_logs"), "--log-dir", help="Shadow logs directory"
-    ),
+    log_dir: Path = typer.Option(Path("./shadow_logs"), "--log-dir", help="Shadow logs directory"),
     source: str = typer.Option(..., "--from", help="Source model"),
     target: str = typer.Option(..., "--to", help="Target model"),
     output: Path = typer.Option(Path("./shadow_report"), "--output", "-o"),

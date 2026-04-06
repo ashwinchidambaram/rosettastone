@@ -307,9 +307,7 @@ def test_oversized_prompt_beyond_sample_limit_not_caught():
 
         check_token_budget(_config(data_path))
 
-    assert not oversized_caught, (
-        "Expected prompt beyond 20-item sample limit not to be checked"
-    )
+    assert not oversized_caught, "Expected prompt beyond 20-item sample limit not to be checked"
 
 
 # ---------------------------------------------------------------------------

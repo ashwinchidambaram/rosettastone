@@ -73,6 +73,7 @@ class MigrationRecord(SQLModel, table=True):
 
     test_cases: list["TestCaseRecord"] = Relationship(back_populates="migration")
     warning_records: list["WarningRecord"] = Relationship(back_populates="migration")
+    gepa_iterations: list["GEPAIterationRecord"] = Relationship(back_populates="migration")
 
 
 class TestCaseRecord(SQLModel, table=True):
@@ -101,6 +102,10 @@ class TestCaseRecord(SQLModel, table=True):
     response_text: str | None = None
     new_response_text: str | None = None
 
+    # F6: Failure reason taxonomy (categorical only, no PII)
+    # Values: api_error / timeout / rate_limit / no_response / json_gate_failed
+    failure_reason: str | None = None
+
     migration: Optional["MigrationRecord"] = Relationship(back_populates="test_cases")
 
 
@@ -114,6 +119,19 @@ class WarningRecord(SQLModel, table=True):
     message: str
 
     migration: Optional["MigrationRecord"] = Relationship(back_populates="warning_records")
+
+
+class GEPAIterationRecord(SQLModel, table=True):
+    __tablename__ = "gepa_iterations"
+
+    id: int | None = Field(default=None, primary_key=True)
+    migration_id: int = Field(foreign_key="migrations.id", index=True)
+    iteration: int
+    total_iterations: int
+    mean_score: float
+    recorded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    migration: Optional["MigrationRecord"] = Relationship(back_populates="gepa_iterations")
 
 
 class Alert(SQLModel, table=True):

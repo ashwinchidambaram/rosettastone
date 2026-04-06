@@ -1,4 +1,5 @@
 """Calibration pair collection utilities."""
+
 from __future__ import annotations
 
 import random

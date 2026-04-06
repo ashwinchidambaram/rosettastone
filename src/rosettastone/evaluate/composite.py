@@ -71,8 +71,10 @@ class CompositeEvaluator:
         test_set: list[PromptPair],
         optimized_prompt: str | None = None,
     ) -> list[EvalResult]:
-        # Phase 1: collect LLM completions for all pairs in parallel
-        completions: list[tuple[PromptPair, str] | None] = [None] * len(test_set)
+        # Phase 1: collect LLM completions for all pairs in parallel.
+        # Each entry is either (PromptPair, response_str) on success
+        # or (failure_reason_str, PromptPair) on failure (F6 taxonomy).
+        completions: list[tuple[PromptPair, str] | tuple[str, PromptPair] | None] = [None] * len(test_set)
         skipped_count = 0
         total_eval_cost = 0.0
 
@@ -89,11 +91,11 @@ class CompositeEvaluator:
 
         def _call_one(
             args: tuple[int, PromptPair, list[dict[str, str]]],
-        ) -> tuple[int, tuple[PromptPair, str] | None, float, int, int]:
+        ) -> tuple[int, tuple[PromptPair, str] | tuple[str, PromptPair], float, int, int]:
             idx, pair, msgs = args
             try:
-                extra_kwargs: dict[str, object] = (
-                    dict(getattr(self.config, "lm_extra_kwargs", None) or {})
+                extra_kwargs: dict[str, Any] = dict(
+                    getattr(self.config, "lm_extra_kwargs", None) or {}
                 )
                 response = litellm.completion(
                     model=self.config.target_model,
@@ -109,16 +111,26 @@ class CompositeEvaluator:
                     _pt, _ct = 0, 0
                 if not response.choices:
                     logger.warning("Pair %d: empty choices in response, skipping", idx)
-                    return idx, None, cost, _pt, _ct
+                    return idx, ("no_response", pair), cost, _pt, _ct
                 new_response = response.choices[0].message.content or ""
+                if not new_response:
+                    logger.warning("Pair %d: null/empty content in response, skipping", idx)
+                    return idx, ("no_response", pair), cost, _pt, _ct
                 return idx, (pair, new_response), cost, _pt, _ct
             except Exception as e:
+                exc_type = type(e).__name__.lower()
+                if "timeout" in exc_type:
+                    failure_cat = "timeout"
+                elif "ratelimit" in exc_type or "rate_limit" in exc_type or "quota" in exc_type:
+                    failure_cat = "rate_limit"
+                else:
+                    failure_cat = "api_error"
                 logger.warning(
                     "Pair %d: litellm.completion failed (%s), skipping",
                     idx,
                     type(e).__name__,
                 )
-                return idx, None, 0.0, 0, 0
+                return idx, (failure_cat, pair), 0.0, 0, 0
 
         total_eval_prompt_tokens = 0
         total_eval_completion_tokens = 0
@@ -132,7 +144,7 @@ class CompositeEvaluator:
                 total_eval_cost += _cost
                 total_eval_prompt_tokens += _pt
                 total_eval_completion_tokens += _ct
-                if _result is None:
+                if isinstance(_result[0], str):
                     skipped_count += 1
 
         if self._ctx is not None and total_eval_cost > 0:
@@ -164,6 +176,9 @@ class CompositeEvaluator:
         for idx, entry in enumerate(completions):
             if entry is None:
                 continue
+            # Skip failure entries: (failure_reason_str, PromptPair)
+            if isinstance(entry[0], str):
+                continue
             pair, new_response = entry
             output_type = pair.output_type or detect_output_type(pair.response)
             if output_type in (OutputType.SHORT_TEXT, OutputType.LONG_TEXT):
@@ -186,6 +201,29 @@ class CompositeEvaluator:
         for idx, entry in enumerate(completions):
             if entry is None:
                 continue
+            # Failure entry: (failure_reason: str, pair: PromptPair)
+            if isinstance(entry[0], str):
+                failure_reason, pair = entry  # type: ignore[misc]
+                output_type = pair.output_type or detect_output_type(pair.response)
+                results.append(
+                    EvalResult(
+                        prompt_pair=pair,
+                        new_response="",
+                        scores={},
+                        composite_score=0.0,
+                        is_win=False,
+                        details={
+                            "output_type": output_type.value,
+                            "evaluators_used": [],
+                            "threshold": self._get_threshold(output_type),
+                            "skipped": True,
+                        },
+                        failure_reason=failure_reason,
+                    )
+                )
+                if self.on_progress:
+                    self.on_progress(idx + 1, len(test_set))
+                continue
             pair, new_response = entry
             output_type = pair.output_type or detect_output_type(pair.response)
 
@@ -199,6 +237,11 @@ class CompositeEvaluator:
             composite = self._composite_score(scores, output_type)
             threshold = self._get_threshold(output_type)
 
+            # F6: detect JSON gate failure (json_valid == 0 forces composite to 0)
+            json_failure: str | None = None
+            if output_type == OutputType.JSON and scores.get("json_valid", 1.0) == 0.0:
+                json_failure = "json_gate_failed"
+
             results.append(
                 EvalResult(
                     prompt_pair=pair,
@@ -211,6 +254,7 @@ class CompositeEvaluator:
                         "evaluators_used": list(scores.keys()),
                         "threshold": threshold,
                     },
+                    failure_reason=json_failure,
                 )
             )
 
@@ -291,7 +335,8 @@ class CompositeEvaluator:
             new_response=base.new_response,
             scores=base.scores,
             composite_score=agg_score,
-            is_win=agg_score >= self._get_threshold(
+            is_win=agg_score
+            >= self._get_threshold(
                 base.prompt_pair.output_type or detect_output_type(base.prompt_pair.response)
             ),
             details=base.details,

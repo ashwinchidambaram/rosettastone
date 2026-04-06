@@ -15,7 +15,12 @@ from sqlmodel import Session, func, select
 
 from rosettastone.server.api.utils import _get_migration_or_404
 from rosettastone.server.database import get_session
-from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningRecord
+from rosettastone.server.models import (
+    GEPAIterationRecord,
+    MigrationRecord,
+    TestCaseRecord,
+    WarningRecord,
+)
 from rosettastone.server.rate_limit import check_rate_limit
 from rosettastone.server.rbac import (
     check_resource_owner,
@@ -24,6 +29,7 @@ from rosettastone.server.rbac import (
     require_role,
 )
 from rosettastone.server.schemas import (
+    GEPAIterationOut,
     MigrationDetail,
     MigrationDiagnostics,
     MigrationSummary,
@@ -153,6 +159,21 @@ DUMMY_MIGRATIONS = [
         "wins": 146,
         "losses": 10,
         "score_histogram": [0, 0, 1, 2, 3, 4, 12, 30, 64, 40],
+        # Phase A observability fields
+        "non_deterministic_count": 0,
+        "eval_runs": 1,
+        "stage_timing": {},
+        # Feature 6 failure reason fields
+        "skipped_count": 0,
+        "skipped_pairs_by_reason": {},
+        # Latency/checkpoint fields
+        "checkpoint_stage": None,
+        "source_latency_p50": None,
+        "source_latency_p95": None,
+        "target_latency_p50": None,
+        "target_latency_p95": None,
+        "projected_source_cost_per_call": None,
+        "projected_target_cost_per_call": None,
     },
     {
         "id": 2,
@@ -175,6 +196,18 @@ DUMMY_MIGRATIONS = [
         "wins": 34,
         "losses": 9,
         "score_histogram": [0, 1, 2, 3, 4, 5, 8, 10, 7, 4],
+        "non_deterministic_count": 0,
+        "eval_runs": 1,
+        "stage_timing": {},
+        "skipped_count": 0,
+        "skipped_pairs_by_reason": {},
+        "checkpoint_stage": None,
+        "source_latency_p50": None,
+        "source_latency_p95": None,
+        "target_latency_p50": None,
+        "target_latency_p95": None,
+        "projected_source_cost_per_call": None,
+        "projected_target_cost_per_call": None,
     },
     {
         "id": 3,
@@ -248,6 +281,18 @@ DUMMY_MIGRATIONS = [
         "wins": 60,
         "losses": 29,
         "score_histogram": [2, 5, 8, 10, 4, 6, 12, 18, 14, 10],
+        "non_deterministic_count": 0,
+        "eval_runs": 1,
+        "stage_timing": {},
+        "skipped_count": 0,
+        "skipped_pairs_by_reason": {},
+        "checkpoint_stage": None,
+        "source_latency_p50": None,
+        "source_latency_p95": None,
+        "target_latency_p50": None,
+        "target_latency_p95": None,
+        "projected_source_cost_per_call": None,
+        "projected_target_cost_per_call": None,
     },
 ]
 
@@ -461,6 +506,11 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
         else:
             desc = "Strong semantic match"
 
+        ci = stats.get("confidence_interval", [0.0, 0.0])
+        if not isinstance(ci, (list, tuple)) or len(ci) < 2:
+            ci = [0.0, 0.0]
+        p10 = stats.get("p10", 0.0)
+        p90 = stats.get("p90", 0.0)
         per_type.append(
             {
                 "type": type_name.replace("_", " ").title(),
@@ -468,15 +518,51 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
                 "total": sample_count,
                 "badge": badge,
                 "desc": desc,
+                "ci_lower": ci[0],
+                "ci_upper": ci[1],
+                "p10": p10,
+                "p90": p90,
             }
         )
     result["per_type"] = per_type
 
-    # Regressions: worst non-winning test cases (up to 5)
+    # Regressions: worst non-winning validation test cases (up to 5), with metric deltas
+    # Build a positional map: validation TC id → corresponding baseline scores
+    _baseline_stmt = (
+        select(TestCaseRecord)
+        .where(
+            TestCaseRecord.migration_id == record.id,
+            TestCaseRecord.phase == "baseline",
+        )
+        .order_by(TestCaseRecord.id)  # type: ignore[attr-defined]
+    )
+    _val_order_stmt = (
+        select(TestCaseRecord)
+        .where(
+            TestCaseRecord.migration_id == record.id,
+            TestCaseRecord.phase == "validation",
+        )
+        .order_by(TestCaseRecord.id)  # type: ignore[attr-defined]
+    )
+    _baseline_tcs = list(session.exec(_baseline_stmt).all())
+    _val_tcs_ordered = list(session.exec(_val_order_stmt).all())
+    # Map: validation tc.id → baseline scores dict (positional match by insertion order).
+    # Guard: if counts differ (e.g. due to checkpoint resume), skip positional matching entirely
+    # so that delta badges are absent rather than silently wrong.
+    _baseline_scores_by_val_id: dict[int, dict[str, float]] = {}
+    if len(_baseline_tcs) == len(_val_tcs_ordered):
+        for _idx, _val_tc in enumerate(_val_tcs_ordered):
+            _b_raw = _baseline_tcs[_idx].scores_json
+            _b_scores = json.loads(_b_raw) if _b_raw else {}
+            _baseline_scores_by_val_id[_val_tc.id] = {
+                k: v for k, v in _b_scores.items() if isinstance(v, (int, float))
+            }
+
     tc_stmt = (
         select(TestCaseRecord)
         .where(
             TestCaseRecord.migration_id == record.id,
+            TestCaseRecord.phase == "validation",
             TestCaseRecord.is_win == False,  # noqa: E712
         )
         .order_by(TestCaseRecord.composite_score.asc())  # type: ignore[attr-defined]
@@ -498,6 +584,18 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
         else:
             reg["expected"] = "Content not stored"
             reg["got"] = "Content not stored"
+        val_scores = json.loads(tc.scores_json) if tc.scores_json else {}
+        baseline_scores = _baseline_scores_by_val_id.get(tc.id, {})
+        # Compute per-metric deltas; only include those with abs(delta) > 0.05
+        metric_deltas: dict[str, float] = {}
+        for m, v_score in val_scores.items():
+            if not isinstance(v_score, (int, float)):
+                continue
+            if m in baseline_scores:
+                delta = float(v_score) - float(baseline_scores[m])
+                if abs(delta) > 0.05:
+                    metric_deltas[m] = round(delta, 3)
+        reg["metric_deltas"] = metric_deltas
         regressions.append(reg)
     result["regressions"] = regressions
 
@@ -514,31 +612,43 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
     result["losses"] = chart_losses
     result["score_histogram"] = score_histogram
 
+    # Phase A observability: stage timing and eval reliability
+    _raw_config = json.loads(record.config_json) if record.config_json else {}
+    _stage_timing_raw = _raw_config.pop("_stage_timing", {})
+    result["stage_timing"] = (
+        {k: float(v) for k, v in _stage_timing_raw.items()}
+        if isinstance(_stage_timing_raw, dict)
+        else {}
+    )
+    result["non_deterministic_count"] = int(_raw_config.pop("_non_deterministic_count", 0) or 0)
+    result["eval_runs"] = int(_raw_config.pop("_eval_runs", 1) or 1)
+
+    # F6: Skipped pairs grouped by failure reason (for "Needs Attention" panel)
+    skipped_stmt = select(TestCaseRecord).where(
+        TestCaseRecord.migration_id == record.id,
+        TestCaseRecord.failure_reason != None,  # noqa: E711
+    )
+    skipped_tcs = list(session.exec(skipped_stmt).all())
+    skipped_by_reason: dict[str, int] = {}
+    for _stc in skipped_tcs:
+        reason = _stc.failure_reason or "unknown"
+        skipped_by_reason[reason] = skipped_by_reason.get(reason, 0) + 1
+    result["skipped_pairs_by_reason"] = skipped_by_reason
+    result["skipped_count"] = len(skipped_tcs)
+
     return result
 
 
 def _test_case_to_diff_dict(tc: TestCaseRecord, migration: MigrationRecord) -> dict[str, Any]:
     """Convert TestCaseRecord to the diff dict shape the template expects."""
-    scores = json.loads(tc.scores_json)
+    _raw_scores = json.loads(tc.scores_json) if tc.scores_json else {}
+    scores = {k: round(v, 2) for k, v in _raw_scores.items() if isinstance(v, (int, float))}
     return {
         "tc_id": tc.id,
         "is_win": tc.is_win,
         "composite_score": round(tc.composite_score, 2),
         "output_type": tc.output_type.replace("_", " ").title(),
-        "scores": {
-            "bertscore": round(
-                scores.get("bertscore_f1", scores.get("bertscore", scores.get("bert_score", 0))),
-                2,
-            ),
-            "embedding": round(
-                scores.get(
-                    "embedding_sim",
-                    scores.get("embedding_similarity", scores.get("embedding", 0)),
-                ),
-                2,
-            ),
-            "composite": round(tc.composite_score, 2),
-        },
+        "scores": scores,
         "source_model": (
             migration.source_model.split("/")[-1]
             if "/" in migration.source_model
@@ -588,6 +698,7 @@ def _test_case_to_summary(tc: TestCaseRecord) -> TestCaseSummary:
         new_token_count=tc.new_token_count,
         evaluators_used=tc.evaluators_used,
         fallback_triggered=tc.fallback_triggered,
+        failure_reason=tc.failure_reason,
     )
 
 
@@ -618,6 +729,7 @@ def _test_case_to_detail(tc: TestCaseRecord) -> TestCaseDetail:
         new_token_count=tc.new_token_count,
         evaluators_used=tc.evaluators_used,
         fallback_triggered=tc.fallback_triggered,
+        failure_reason=tc.failure_reason,
         diff=diff,
     )
 
@@ -694,6 +806,14 @@ def _migration_to_detail(record: MigrationRecord, session: Session) -> Migration
                 "representative_pairs": cluster_info.get("representative_pairs"),
             }
 
+    # Extract Phase A observability fields stored in config_json
+    stage_timing: dict[str, float] = {}
+    _stage_timing_raw = config.pop("_stage_timing", None)
+    if isinstance(_stage_timing_raw, dict):
+        stage_timing = {k: float(v) for k, v in _stage_timing_raw.items()}
+    non_deterministic_count: int = int(config.pop("_non_deterministic_count", 0) or 0)
+    eval_runs: int = int(config.pop("_eval_runs", 1) or 1)
+
     return MigrationDetail(
         id=record.id,  # type: ignore[arg-type]
         source_model=record.source_model,
@@ -719,6 +839,9 @@ def _migration_to_detail(record: MigrationRecord, session: Session) -> Migration
         warnings=warnings,
         safety_warnings=safety_warnings,
         cluster_summary=cluster_summary,
+        stage_timing=stage_timing,
+        non_deterministic_count=non_deterministic_count,
+        eval_runs=eval_runs,
         test_cases=test_case_summaries,
     )
 
@@ -775,6 +898,24 @@ async def get_migration(
     record = _get_migration_or_404(migration_id, session)
     check_resource_owner(record.owner_id, request)
     return _migration_to_detail(record, session)
+
+
+@router.get(
+    "/api/v1/migrations/{migration_id}/optimizer-history",
+    response_model=list[GEPAIterationOut],
+)
+async def get_optimizer_history(
+    migration_id: int,
+    session: Session = Depends(get_session),
+) -> list[GEPAIterationOut]:
+    """Get GEPA optimizer iteration history for a migration, sorted by iteration asc."""
+    _get_migration_or_404(migration_id, session)
+    records = session.exec(
+        select(GEPAIterationRecord)
+        .where(GEPAIterationRecord.migration_id == migration_id)
+        .order_by(GEPAIterationRecord.iteration)  # type: ignore[arg-type]
+    ).all()
+    return [GEPAIterationOut(**r.model_dump()) for r in records]
 
 
 @router.post(
@@ -871,6 +1012,7 @@ async def list_test_cases(
     limit: int = Query(20, ge=1, le=100),
     phase: str | None = Query(None),
     output_type: str | None = Query(None),
+    failure_reason: str | None = Query(None),
     session: Session = Depends(get_session),
 ) -> PaginatedResponse[TestCaseSummary]:
     """List test cases for a migration with optional filters."""
@@ -882,6 +1024,8 @@ async def list_test_cases(
         conditions.append(TestCaseRecord.phase == phase)
     if output_type:
         conditions.append(TestCaseRecord.output_type == output_type)
+    if failure_reason:
+        conditions.append(TestCaseRecord.failure_reason == failure_reason)
 
     count_stmt = select(func.count()).select_from(TestCaseRecord).where(*conditions)
     total = session.exec(count_stmt).one()
@@ -1905,34 +2049,27 @@ async def test_case_fragment(
     db_tc = session.get(TestCaseRecord, tc_id) if migration else None
 
     if db_tc and db_tc.migration_id == migration_id:
-        scores = json.loads(db_tc.scores_json)
+        raw_scores: dict[str, float] = json.loads(db_tc.scores_json) if db_tc.scores_json else {}
+        # Build dynamic scores dict: all stored per-metric scores rounded to 2 dp,
+        # with composite appended last if not already present.
+        dynamic_scores: dict[str, float] = {
+            k: round(v, 2) for k, v in raw_scores.items() if isinstance(v, (int, float))
+        }
+        if "composite" not in dynamic_scores and "composite_score" not in dynamic_scores:
+            dynamic_scores["composite"] = round(db_tc.composite_score, 2)
         tc = {
             "tc_id": db_tc.id,
             "is_win": db_tc.is_win,
             "composite_score": round(db_tc.composite_score, 2),
             "output_type": db_tc.output_type.replace("_", " ").title(),
             "phase": db_tc.phase,
-            "scores": {
-                "bertscore": round(
-                    scores.get(
-                        "bertscore_f1", scores.get("bertscore", scores.get("bert_score", 0))
-                    ),
-                    2,
-                ),
-                "embedding": round(
-                    scores.get(
-                        "embedding_sim",
-                        scores.get("embedding_similarity", scores.get("embedding", 0)),
-                    ),
-                    2,
-                ),
-                "composite": round(db_tc.composite_score, 2),
-            },
+            "scores": dynamic_scores,
             "prompt": db_tc.prompt_text,
             "source_response": db_tc.response_text,
             "target_response": db_tc.new_response_text,
             "evaluators_used": db_tc.evaluators_used,
             "fallback_triggered": db_tc.fallback_triggered,
+            "failure_reason": db_tc.failure_reason,
         }
     else:
         tc = DUMMY_TEST_CASES.get(
@@ -1951,10 +2088,11 @@ async def test_case_fragment(
 async def test_cases_table_fragment(
     migration_id: int,
     request: Request,
-    outcome: str = Query("all"),  # "win" | "loss" | "all"
+    outcome: str = Query("all"),  # "win" | "loss" | "skipped" | "all"
     search: str = Query(""),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    failure_reason: str = Query(""),
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """HTMX partial for filterable test case grid."""
@@ -1965,6 +2103,10 @@ async def test_cases_table_fragment(
         conditions.append(TestCaseRecord.is_win == True)  # noqa: E712
     elif outcome == "loss":
         conditions.append(TestCaseRecord.is_win == False)  # noqa: E712
+    elif outcome == "skipped":
+        conditions.append(TestCaseRecord.failure_reason != None)  # noqa: E711
+    if failure_reason:
+        conditions.append(TestCaseRecord.failure_reason == failure_reason)
     if search:
         conditions.append(TestCaseRecord.prompt_text.contains(search))  # type: ignore[union-attr]
 
@@ -1992,6 +2134,7 @@ async def test_cases_table_fragment(
                 "output_type": tc.output_type.replace("_", " ").title(),
                 "composite_score": round(tc.composite_score, 2),
                 "is_win": tc.is_win,
+                "failure_reason": tc.failure_reason,
             }
         )
 
@@ -2003,6 +2146,7 @@ async def test_cases_table_fragment(
             "test_cases": tc_list,
             "outcome": outcome,
             "search": search,
+            "failure_reason": failure_reason,
             "page": page,
             "page_size": page_size,
             "total": total,
@@ -2083,3 +2227,28 @@ async def ui_resume_migration(
         },
     )
     return RedirectResponse(url=f"/ui/migrations/{migration_id}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# GEPA optimizer history UI fragment
+# ---------------------------------------------------------------------------
+
+
+@router.get("/ui/migrations/{migration_id}/optimizer-history", response_class=HTMLResponse)
+async def optimizer_history_fragment(
+    migration_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """HTMX fragment: optimizer iteration history for a completed migration."""
+    _get_migration_or_404(migration_id, session)
+    records = session.exec(
+        select(GEPAIterationRecord)
+        .where(GEPAIterationRecord.migration_id == migration_id)
+        .order_by(GEPAIterationRecord.iteration)  # type: ignore[arg-type]
+    ).all()
+    return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
+        request,
+        "fragments/optimizer_history.html",
+        {"records": records, "migration_id": migration_id},
+    )

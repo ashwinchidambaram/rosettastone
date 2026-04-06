@@ -1,0 +1,37 @@
+{% if records %}
+<div class="mt-2">
+  <!-- Sparkline -->
+  <div class="flex items-end h-10 mb-3 gap-px">
+    {% for r in records %}
+    <span class="inline-block w-2 bg-blue-400 dark:bg-blue-600 rounded-sm mx-px"
+          style="height: {{ (r.mean_score * 40) | int }}px"
+          title="Iter {{ r.iteration }}: {{ '%.1f' | format(r.mean_score * 100) }}%"></span>
+    {% endfor %}
+  </div>
+  <!-- Table -->
+  <table class="w-full text-xs">
+    <thead>
+      <tr class="text-gray-500 border-b border-gray-200 dark:border-gray-700">
+        <th class="text-left px-2 py-1">Iter</th>
+        <th class="text-left px-2 py-1">Score</th>
+        <th class="text-left px-2 py-1">&#916;</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in records %}
+      {% set prev_score = records[loop.index0 - 1].mean_score if loop.index0 > 0 else none %}
+      {% set delta = r.mean_score - prev_score if prev_score is not none else none %}
+      <tr class="border-b border-gray-100 dark:border-gray-800">
+        <td class="px-2 py-1 text-gray-600">{{ r.iteration }}</td>
+        <td class="px-2 py-1 font-mono">{{ '%.1f' | format(r.mean_score * 100) }}%</td>
+        <td class="px-2 py-1 font-mono {% if delta is not none and delta < 0 %}text-red-500{% elif delta is not none %}text-green-600{% endif %}">
+          {% if delta is not none %}{{ '+' if delta >= 0 else '' }}{{ '%.3f' | format(delta) }}{% else %}&#8212;{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-xs text-gray-400 mt-2 italic">No optimizer history recorded (CLI run or dry run).</p>
+{% endif %}

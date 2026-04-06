@@ -42,6 +42,12 @@ def _make_migration_result(**overrides) -> MagicMock:
         baseline_results=[],
         optimized_prompt="You are a helpful assistant.",
         config={},
+        # Observability / monitoring fields
+        non_deterministic_count=0,
+        stage_timing={},
+        total_tokens=0,
+        token_breakdown={},
+        optimization_iterations=[],
     )
     defaults.update(overrides)
     return MagicMock(**defaults)
@@ -393,9 +399,7 @@ def test_migrate_lm_extra_kwargs_multiple_keys():
 
 def test_migrate_lm_extra_kwargs_invalid_json():
     """--lm-extra-kwargs with invalid JSON exits with error."""
-    result = runner.invoke(
-        app, ["migrate"] + BASE_ARGS + ["--lm-extra-kwargs", "not json"]
-    )
+    result = runner.invoke(app, ["migrate"] + BASE_ARGS + ["--lm-extra-kwargs", "not json"])
 
     assert result.exit_code != 0
     assert "must be valid JSON" in result.output
@@ -423,9 +427,7 @@ def test_migrate_gepa_timeout_seconds_set():
     with patch("rosettastone.core.migrator.Migrator") as mock_cls:
         mock_cls.return_value.run.return_value = _make_migration_result()
 
-        result = runner.invoke(
-            app, ["migrate"] + BASE_ARGS + ["--gepa-timeout-seconds", "60"]
-        )
+        result = runner.invoke(app, ["migrate"] + BASE_ARGS + ["--gepa-timeout-seconds", "60"])
 
         assert result.exit_code == 0, result.output
         config = mock_cls.call_args[0][0]
@@ -437,9 +439,7 @@ def test_migrate_gepa_timeout_seconds_different_value():
     with patch("rosettastone.core.migrator.Migrator") as mock_cls:
         mock_cls.return_value.run.return_value = _make_migration_result()
 
-        result = runner.invoke(
-            app, ["migrate"] + BASE_ARGS + ["--gepa-timeout-seconds", "120"]
-        )
+        result = runner.invoke(app, ["migrate"] + BASE_ARGS + ["--gepa-timeout-seconds", "120"])
 
         assert result.exit_code == 0, result.output
         config = mock_cls.call_args[0][0]

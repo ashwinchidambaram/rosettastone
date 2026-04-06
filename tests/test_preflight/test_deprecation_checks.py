@@ -1,4 +1,5 @@
 """Tests for deprecation checks in the preflight module."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -61,9 +62,7 @@ def test_deprecation_check_soon_to_retire() -> None:
     report = run_all_checks(config)
 
     # Should have a warning about imminent retirement
-    deprecation_warnings = [
-        w for w in report.warnings if "3.5-turbo-0613" in w and "retir" in w
-    ]
+    deprecation_warnings = [w for w in report.warnings if "3.5-turbo-0613" in w and "retir" in w]
     assert len(deprecation_warnings) >= 1
 
 

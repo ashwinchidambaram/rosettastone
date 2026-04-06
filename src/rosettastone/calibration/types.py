@@ -1,4 +1,5 @@
 """Calibration dataset types."""
+
 from __future__ import annotations
 
 from enum import StrEnum
@@ -9,13 +10,15 @@ from pydantic import BaseModel, Field
 
 class ProductionSafety(StrEnum):
     """Human-assigned production safety label."""
-    SAFE = "safe"           # OK to deploy: behavior is equivalent
-    UNSAFE = "unsafe"       # Do NOT deploy: behavior is meaningfully different
+
+    SAFE = "safe"  # OK to deploy: behavior is equivalent
+    UNSAFE = "unsafe"  # Do NOT deploy: behavior is meaningfully different
     BORDERLINE = "borderline"  # Reviewer uncertain
 
 
 class DimensionalScores(BaseModel):
     """Per-metric scores for a single evaluation."""
+
     bertscore_f1: float = 0.0
     embedding_sim: float = 0.0
     exact_match: float = 0.0
@@ -25,6 +28,7 @@ class DimensionalScores(BaseModel):
 
 class HumanLabel(BaseModel):
     """A human reviewer's label for a prompt/response pair."""
+
     reviewer_id: str
     safety: ProductionSafety
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
@@ -33,6 +37,7 @@ class HumanLabel(BaseModel):
 
 class LabeledPair(BaseModel):
     """A prompt/response pair with automated scores and human labels."""
+
     pair_id: str
     output_type: str  # "json", "classification", "short_text", "long_text"
     prompt: str
@@ -64,6 +69,7 @@ class LabeledPair(BaseModel):
 
 class CalibrationDataset(BaseModel):
     """Collection of labeled pairs for threshold calibration."""
+
     version: str = "1.0"
     pairs: list[LabeledPair] = []
     metadata: dict[str, Any] = {}

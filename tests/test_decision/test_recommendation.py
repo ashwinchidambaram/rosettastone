@@ -151,8 +151,8 @@ def test_go_when_all_types_pass():
     Wilson CI lower bound for MIN_RELIABLE_SAMPLES=30 samples at 100% win rate
     (≈0.886) comfortably clears the threshold.
     """
-    results = (
-        _enough_results("long_text", win_rate=1.0) + _enough_results("short_text", win_rate=1.0)
+    results = _enough_results("long_text", win_rate=1.0) + _enough_results(
+        "short_text", win_rate=1.0
     )
     rec = make_recommendation(results, [], {})
     assert rec.recommendation == Recommendation.GO

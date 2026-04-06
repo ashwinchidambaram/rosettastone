@@ -1,4 +1,5 @@
 """Tests for core deprecations module — no web stack dependency."""
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta

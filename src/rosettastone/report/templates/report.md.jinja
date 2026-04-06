@@ -46,10 +46,10 @@ total cost: ${{ "%.4f" | format(cost_usd) }}.
 
 Top {{ sample_comparisons | length }} test cases by score improvement (content omitted for PII safety — see `--output` dir for full pairs):
 
-| # | Output Type | Before | After | Delta | Win? |
-|---|-------------|--------|-------|-------|------|
+| # | Output Type | Before | After | Delta | Win? | Top Metric |
+|---|-------------|--------|-------|-------|------|------------|
 {% for s in sample_comparisons -%}
-| {{ s.index }} | {{ s.output_type }} | {{ "%.3f" | format(s.baseline_score) }} | {{ "%.3f" | format(s.optimized_score) }} | {{ "+" if s.delta >= 0 else "" }}{{ "%.3f" | format(s.delta) }} | {{ "no→yes" if (not s.is_win_before and s.is_win_after) else ("yes→yes" if (s.is_win_before and s.is_win_after) else ("yes→no" if (s.is_win_before and not s.is_win_after) else "no→no")) }} |
+| {{ s.index }} | {{ s.output_type }} | {{ "%.3f" | format(s.baseline_score) }} | {{ "%.3f" | format(s.optimized_score) }} | {{ "+" if s.delta >= 0 else "" }}{{ "%.3f" | format(s.delta) }} | {{ "no→yes" if (not s.is_win_before and s.is_win_after) else ("yes→yes" if (s.is_win_before and s.is_win_after) else ("yes→no" if (s.is_win_before and not s.is_win_after) else "no→no")) }} | {{ (s.top_metric ~ ": +" ~ "%.2f" | format(s.top_metric_delta)) if s.top_metric else "—" }} |
 {% endfor %}
 
 ---
@@ -58,11 +58,13 @@ Top {{ sample_comparisons | length }} test cases by score improvement (content o
 ## Per-Output-Type Breakdown
 
 {% if per_type_scores %}
-| Output Type | Win Rate | Threshold | Samples | P10 | P50 | P90 | CI (95%) |
-|-------------|----------|-----------|---------|-----|-----|-----|----------|
+| Output Type | Win Rate | Threshold | Samples | P10 | P50 | P90 | 95% CI |
+|-------------|----------|-----------|---------|-----|-----|-----|--------|
 {% for type_name, stats in per_type_scores.items() -%}
 {% set threshold = config.get('win_thresholds', {}).get(type_name, 0.80) -%}
-| {{ type_name }} | {{ "%.1f" | format((stats.get('win_rate', 0) * 100)) }}% | {{ "%.1f" | format(threshold * 100) }}% | {{ stats.get('sample_count', 0) }} | {{ "%.3f" | format(stats.get('p10', 0)) }} | {{ "%.3f" | format(stats.get('p50', 0)) }} | {{ "%.3f" | format(stats.get('p90', 0)) }} | [{{ "%.3f" | format(stats.get('confidence_interval', [0, 0])[0]) }}, {{ "%.3f" | format(stats.get('confidence_interval', [0, 0])[1]) }}] |
+{% set ci = stats.get('confidence_interval', [0.0, 0.0]) -%}
+{% set ci_str = "[" ~ "%.0f" | format(ci[0] * 100) ~ "%–" ~ "%.0f" | format(ci[1] * 100) ~ "%]" if (ci[0] != 0.0 or ci[1] != 0.0) else "—" -%}
+| {{ type_name }} | {{ "%.1f" | format((stats.get('win_rate', 0) * 100)) }}% | {{ "%.1f" | format(threshold * 100) }}% | {{ stats.get('sample_count', 0) }} | {{ "%.3f" | format(stats.get('p10', 0)) }} | {{ "%.3f" | format(stats.get('p50', 0)) }} | {{ "%.3f" | format(stats.get('p90', 0)) }} | {{ ci_str }} |
 {% endfor %}
 {% else %}
 _No per-type statistics available._
@@ -121,20 +123,22 @@ _No validation results available._
 {% if at_risk_list %}
 ### At Risk (Below Threshold After Optimization)
 
-| # | Output Type | Baseline | Optimized | Delta | Win Before | Win After |
-|---|-------------|----------|-----------|-------|------------|-----------|
+| # | Output Type | Baseline | Optimized | Delta | Win Before | Win After | Key Metric Changes |
+|---|-------------|----------|-----------|-------|------------|-----------|-------------------|
 {% for r in at_risk_list -%}
-| {{ r.prompt_index }} | {{ r.output_type }} | {{ "%.3f" | format(r.baseline_score) }} | {{ "%.3f" | format(r.optimized_score) }} | {{ "%+.3f" | format(r.delta) }} | {{ "yes" if r.baseline_is_win else "no" }} | {{ "yes" if r.optimized_is_win else "no" }} |
+{% set sig_deltas = [] %}{% for m, d in (r.metric_deltas.items() if r.metric_deltas else []) %}{% if d | abs > 0.03 %}{% set _ = sig_deltas.append(m ~ ": " ~ ("%+.2f" | format(d))) %}{% endif %}{% endfor %}
+| {{ r.prompt_index }} | {{ r.output_type }} | {{ "%.3f" | format(r.baseline_score) }} | {{ "%.3f" | format(r.optimized_score) }} | {{ "%+.3f" | format(r.delta) }} | {{ "yes" if r.baseline_is_win else "no" }} | {{ "yes" if r.optimized_is_win else "no" }} | {{ sig_deltas | join(" · ") if sig_deltas else "—" }} |
 {% endfor %}
 {% endif %}
 
 {% if regressed_list %}
 ### Regressed (Score Dropped, Still Above Threshold)
 
-| # | Output Type | Baseline | Optimized | Delta | Win Before | Win After |
-|---|-------------|----------|-----------|-------|------------|-----------|
+| # | Output Type | Baseline | Optimized | Delta | Win Before | Win After | Key Metric Changes |
+|---|-------------|----------|-----------|-------|------------|-----------|-------------------|
 {% for r in regressed_list[:10] -%}
-| {{ r.prompt_index }} | {{ r.output_type }} | {{ "%.3f" | format(r.baseline_score) }} | {{ "%.3f" | format(r.optimized_score) }} | {{ "%+.3f" | format(r.delta) }} | {{ "yes" if r.baseline_is_win else "no" }} | {{ "yes" if r.optimized_is_win else "no" }} |
+{% set sig_deltas = [] %}{% for m, d in (r.metric_deltas.items() if r.metric_deltas else []) %}{% if d | abs > 0.03 %}{% set _ = sig_deltas.append(m ~ ": " ~ ("%+.2f" | format(d))) %}{% endif %}{% endfor %}
+| {{ r.prompt_index }} | {{ r.output_type }} | {{ "%.3f" | format(r.baseline_score) }} | {{ "%.3f" | format(r.optimized_score) }} | {{ "%+.3f" | format(r.delta) }} | {{ "yes" if r.baseline_is_win else "no" }} | {{ "yes" if r.optimized_is_win else "no" }} | {{ sig_deltas | join(" · ") if sig_deltas else "—" }} |
 {% endfor %}
 {% if regressed_list | length > 10 %}
 _...and {{ regressed_list | length - 10 }} more regressed prompts not shown._
@@ -193,7 +197,39 @@ No issues found.
 | Total | ${{ "%.4f" | format(cost_usd) }} |
 {% endif %}
 
+{% if stage_timing %}
+## Pipeline Timing
+
+| Stage | Duration | Share |
+|-------|----------|-------|
+{% for stage, secs in stage_timing.items() -%}
+| {{ stage }} | {{ "%.1f" | format(secs) }}s | {{ "%.0f" | format(secs / duration_seconds * 100) if duration_seconds > 0 else "—" }}% |
+{% endfor %}
 ---
+
+{% endif %}
+
+{% if eval_runs > 1 or non_deterministic_count > 0 %}
+## Evaluation Reliability
+
+Evaluation runs: {{ eval_runs }} | Non-deterministic pairs: {{ non_deterministic_count }} / {{ baseline_results | length + validation_results | length }}
+
+---
+{% endif %}
+
+{% if skipped_count > 0 %}
+## Skipped Pairs
+
+{{ skipped_count }} pairs could not be evaluated:
+
+| Reason | Count |
+|--------|-------|
+{% for reason, count in failure_reason_counts.items() -%}
+| {{ reason | replace('_', ' ') }} | {{ count }} |
+{% endfor %}
+
+---
+{% endif %}
 
 ## Optimized Prompt
 

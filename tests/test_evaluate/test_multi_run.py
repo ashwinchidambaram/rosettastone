@@ -1,4 +1,5 @@
 """Tests for multi-run evaluation and variance tracking."""
+
 from __future__ import annotations
 
 from pathlib import Path

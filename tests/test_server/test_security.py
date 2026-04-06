@@ -276,7 +276,9 @@ class TestCORSAlwaysRegistered:
 
     def test_cors_middleware_registered_with_env_var(self, monkeypatch) -> None:
         """CORSMiddleware must respond correctly to allowed origins when env var is set."""
-        client = _make_client(monkeypatch, {"ROSETTASTONE_CORS_ORIGINS": "https://trusted.example.com"})
+        client = _make_client(
+            monkeypatch, {"ROSETTASTONE_CORS_ORIGINS": "https://trusted.example.com"}
+        )
         resp = client.get(
             "/api/v1/health",
             headers={"Origin": "https://trusted.example.com"},

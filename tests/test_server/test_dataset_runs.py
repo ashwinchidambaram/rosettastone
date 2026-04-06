@@ -106,9 +106,7 @@ class TestPatchRun:
         )
         assert resp.status_code == 404
 
-    def test_patch_partial_cost_update_recalculates_total(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_patch_partial_cost_update_recalculates_total(self, client: TestClient, engine) -> None:
         """PATCH with only tuning_cost recalculates total from both fields."""
         with Session(engine) as session:
             run = _create_run(session)
@@ -164,9 +162,7 @@ class TestClientSilentOnServerUnavailable:
         monkeypatch.setenv("ROSETTASTONE_SERVER_URL", "http://127.0.0.1:19999")
 
         # Force reload of the module so it picks up the new env var
-        scripts_path = str(
-            __import__("pathlib").Path(__file__).parent.parent.parent / "scripts"
-        )
+        scripts_path = str(__import__("pathlib").Path(__file__).parent.parent.parent / "scripts")
         if scripts_path not in sys.path:
             sys.path.insert(0, scripts_path)
 
@@ -185,9 +181,7 @@ class TestClientSilentOnServerUnavailable:
 
         monkeypatch.setenv("ROSETTASTONE_SERVER_URL", "http://127.0.0.1:19999")
 
-        scripts_path = str(
-            __import__("pathlib").Path(__file__).parent.parent.parent / "scripts"
-        )
+        scripts_path = str(__import__("pathlib").Path(__file__).parent.parent.parent / "scripts")
         if scripts_path not in sys.path:
             sys.path.insert(0, scripts_path)
 

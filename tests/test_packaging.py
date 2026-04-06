@@ -1,4 +1,5 @@
 """Tests for package metadata and distribution."""
+
 from __future__ import annotations
 
 

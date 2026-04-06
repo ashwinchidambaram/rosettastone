@@ -353,20 +353,18 @@ class TestCompositeEvaluatorEvaluate:
         evaluator.evaluate(pairs)
         assert progress_calls == [(1, 2), (2, 2)]
 
-    def test_evaluate_logs_warning_on_skipped_pairs(self) -> None:
-        """When litellm.completion raises for some pairs, skipped pairs are excluded from
-        results and a warning is logged.
+    def test_logs_warning_on_skipped_pairs(self) -> None:
+        """When litellm.completion raises for some pairs, all pairs are included in
+        results — skipped ones with failure_reason set — and a warning is logged.
         """
         import logging
         import unittest
 
-        pairs = [
-            make_pair(f"Q{i}", "positive", OutputType.CLASSIFICATION) for i in range(5)
-        ]
+        pairs = [make_pair(f"Q{i}", "positive", OutputType.CLASSIFICATION) for i in range(5)]
 
         call_count = 0
 
-        def side_effect(*args, **kwargs):
+        def side_effect(*_, **__):
             nonlocal call_count
             call_count += 1
             # Fail for pairs 0, 2, 4 (indices 0, 2, 4); succeed for 1 and 3
@@ -380,11 +378,111 @@ class TestCompositeEvaluatorEvaluate:
             with tc.assertLogs("rosettastone.evaluate.composite", level=logging.WARNING) as log_ctx:
                 results = self.evaluator.evaluate(pairs)
 
-        # Only 2 successful completions should produce results
-        assert len(results) == 2, f"Expected 2 results (non-skipped), got {len(results)}"
+        # All 5 pairs return EvalResults: 3 skipped (failure_reason set) + 2 successful
+        assert len(results) == 5, f"Expected 5 results (all pairs), got {len(results)}"
+
+        skipped = [r for r in results if r.failure_reason is not None]
+        successful = [r for r in results if r.failure_reason is None]
+        assert len(skipped) == 3, f"Expected 3 skipped, got {len(skipped)}"
+        assert len(successful) == 2, f"Expected 2 successful, got {len(successful)}"
 
         # A warning about skipped pairs must have been logged
         warning_messages = "\n".join(log_ctx.output)
         assert "skipped" in warning_messages.lower() or "Skipped" in warning_messages, (
             f"Expected a 'skipped' warning in logs, got: {warning_messages}"
         )
+
+    @patch("rosettastone.evaluate.composite.litellm.completion")
+    def test_failure_reason_none_on_success(self, mock_completion: MagicMock) -> None:
+        """EvalResult.failure_reason is None when scoring succeeds."""
+        mock_completion.return_value = make_litellm_response("positive")
+        pair = make_pair(
+            prompt="Classify sentiment",
+            response="positive",
+            output_type=OutputType.CLASSIFICATION,
+        )
+        results = self.evaluator.evaluate([pair])
+        assert len(results) == 1
+        assert results[0].failure_reason is None
+
+    def test_failure_reason_api_error_on_exception(self) -> None:
+        """EvalResult.failure_reason is 'api_error' when litellm raises a generic exception."""
+        pair = make_pair("Q1", "positive", OutputType.CLASSIFICATION)
+
+        with patch(
+            "rosettastone.evaluate.composite.litellm.completion",
+            side_effect=ConnectionError("Connection refused"),
+        ):
+            results = self.evaluator.evaluate([pair])
+
+        assert len(results) == 1
+        assert results[0].failure_reason == "api_error"
+        assert results[0].composite_score == 0.0
+        assert results[0].is_win is False
+
+    def test_failure_reason_timeout_on_timeout_exception(self) -> None:
+        """EvalResult.failure_reason is 'timeout' when a timeout exception is raised."""
+        pair = make_pair("Q1", "positive", OutputType.CLASSIFICATION)
+
+        class FakeTimeoutError(Exception):
+            pass
+
+        with patch(
+            "rosettastone.evaluate.composite.litellm.completion",
+            side_effect=FakeTimeoutError("Request timed out"),
+        ):
+            results = self.evaluator.evaluate([pair])
+
+        assert len(results) == 1
+        assert results[0].failure_reason == "timeout"
+
+    @patch("rosettastone.evaluate.composite.litellm.completion")
+    def test_failure_reason_json_gate(self, mock_completion: MagicMock) -> None:
+        """EvalResult.failure_reason is 'json_gate_failed' when JSON validity gate fires."""
+        # Return invalid JSON so json_valid == 0
+        mock_completion.return_value = make_litellm_response("not valid json at all")
+        pair = make_pair(
+            prompt="Give me JSON",
+            response='{"key": "value"}',
+            output_type=OutputType.JSON,
+        )
+        results = self.evaluator.evaluate([pair])
+        assert len(results) == 1
+        assert results[0].failure_reason == "json_gate_failed"
+        assert results[0].composite_score == 0.0
+
+    def test_failure_reason_rate_limit_on_ratelimit_exception(self) -> None:
+        """EvalResult.failure_reason is 'rate_limit' when a rate-limit exception is raised."""
+        pair = make_pair("Q1", "positive", OutputType.CLASSIFICATION)
+
+        class FakeRateLimitError(Exception):
+            pass
+
+        with patch(
+            "rosettastone.evaluate.composite.litellm.completion",
+            side_effect=FakeRateLimitError("quota exceeded"),
+        ):
+            results = self.evaluator.evaluate([pair])
+
+        assert len(results) == 1
+        assert results[0].failure_reason == "rate_limit"
+        assert results[0].composite_score == 0.0
+        assert results[0].is_win is False
+
+    def test_failure_reason_no_response_on_empty_choices(self) -> None:
+        """EvalResult.failure_reason is 'no_response' when response has empty choices list."""
+        pair = make_pair("Q1", "positive", OutputType.CLASSIFICATION)
+
+        mock_response = MagicMock()
+        mock_response.choices = []
+        mock_response._hidden_params = {}
+
+        with patch(
+            "rosettastone.evaluate.composite.litellm.completion", return_value=mock_response
+        ):
+            results = self.evaluator.evaluate([pair])
+
+        assert len(results) == 1
+        assert results[0].failure_reason == "no_response"
+        assert results[0].composite_score == 0.0
+        assert results[0].is_win is False
