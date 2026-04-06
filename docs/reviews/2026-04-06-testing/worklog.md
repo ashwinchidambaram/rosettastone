@@ -7,12 +7,43 @@
 - Scope: service and plugin boundaries, path to production
 
 ## Current Status
-- Current phase: Step 0 complete, entering Phase 1
-- Last action: 2026-04-06T02:03 worklog initialized
-- Next action: Read context files, build service inventory
+- Current phase: Phase 1 complete, entering Phase 2
+- Last action: 2026-04-06T02:06 Phase 1 context ingestion complete
+- Next action: Build service inventory, propose subagent split
 
 ## Phase Log
 (newest at top)
+
+### 2026-04-06 02:06 — Phase 1 — Context Ingestion Complete
+
+**Test suite snapshot:** 1663 tests passing, 2 skipped, ~100 test files across 15 directories.
+
+**Test tiers that exist:**
+- **Unit:** evaluate (10 files, ~40 tests), optimize (10 files, ~30), preflight (4 files, ~15), report (6 files, ~15), safety (3 files, ~10), decision (3 files, ~10), core (6 files, ~15), calibration (2 files), cluster (1 file), ingest (9 files, ~100+), batch (1 file, 10)
+- **Server/API:** 25+ test files covering migrations, comparisons, models, pipelines, costs, alerts, annotations, approvals, audit, teams, users, auth (CSRF, JWT, RBAC), security, health probes, metrics, rate limiting, SSE, tasks, checkpointing, logging, negative/stress
+- **Integration:** test_phase2_pipeline (~10 tests)
+- **E2E:** smoke, cross-provider (A1-A3), model upgrade (B1-B2), model downgrade (C1-C2), Playwright UI (~85 tests), ollama migration, ray migration
+- **CLI:** commands (17 tests), display (~5)
+
+**Coverage posture:**
+- Strong mock-based adapter tests (Redis, LangSmith, Braintrust, OTel, CSV, JSONL)
+- Good Playwright UI coverage (~85/87 planned tests implemented)
+- Zero Alembic migration tests
+- Zero Postgres integration tests
+- Zero Docker Compose E2E tests
+- Zero chaos/resilience tests
+- Zero cross-adapter parity tests
+- Batch E2E and CLI E2E not yet implemented
+
+**Existing analysis:** TEST_PLAN.md (2026-03-31) has detailed gap analysis, 20 priority-ranked missing tests, and CI pipeline recommendations. ROADMAP.md has P0.1-P0.5 production blockers and deferred code review items.
+
+**Surprising findings:**
+- Playwright tests have hardcoded `/Users/ashwinchidambaram/...` path — blocks CI
+- 35 pre-existing mypy errors
+- ThreadPoolExecutor(max_workers=1) for task dispatch — zero persistence
+- JWT default secret used silently in multi-user mode (P0.3)
+- `testing/` module in src has synth_data, redis_populator, scenarios, domains — infrastructure for test data generation exists but unclear how much is wired
+- `server_stitch/` exists alongside `server/` — separate app variant
 
 ### 2026-04-06 02:03 — Step 0 — Setup complete
 - Branch created: review/testing-2026-04-06
