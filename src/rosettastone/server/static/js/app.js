@@ -223,4 +223,74 @@
             dropdown.classList.add("hidden");
         }
     });
+
+    /* ─── Settings Link ───────────────────────────────────────── */
+    document.addEventListener("click", function (e) {
+        if (e.target.closest("[data-action='settings-link']")) {
+            window.location.href = "/ui/";
+        }
+    });
+
+    /* ─── Account Menu Dropdown ───────────────────────────────── */
+    document.addEventListener("click", function (e) {
+        var trigger = e.target.closest("[data-action='toggle-account-menu']");
+        if (trigger) {
+            var dropdown = document.getElementById("account-dropdown");
+            if (!dropdown) return;
+            var isHidden = dropdown.classList.contains("hidden");
+            dropdown.classList.toggle("hidden");
+            trigger.setAttribute("aria-expanded", String(isHidden));
+            return;
+        }
+
+        // Click outside — close
+        var dropdown = document.getElementById("account-dropdown");
+        var btn = document.querySelector("[data-action='toggle-account-menu']");
+        if (dropdown && !dropdown.classList.contains("hidden") &&
+            !dropdown.contains(e.target) && e.target !== btn && (!btn || !btn.contains(e.target))) {
+            dropdown.classList.add("hidden");
+            if (btn) btn.setAttribute("aria-expanded", "false");
+        }
+    });
+
+    /* ─── Add Model Row ───────────────────────────────────────── */
+    document.addEventListener("click", function (e) {
+        if (!e.target.closest("[data-action='add-model-row']")) return;
+        var rows = document.querySelectorAll(".model-input-row");
+        if (!rows.length) return;
+        var lastRow = rows[rows.length - 1];
+        var clone = lastRow.cloneNode(true);
+        // Clear input values in the clone
+        clone.querySelectorAll("input").forEach(function (inp) { inp.value = ""; });
+        lastRow.parentNode.insertBefore(clone, lastRow.nextSibling);
+    });
+
+    /* ─── Period Dropdown ─────────────────────────────────────── */
+    document.addEventListener("click", function (e) {
+        var trigger = e.target.closest("[data-action='toggle-period-dropdown']");
+        if (trigger) {
+            var dropdown = document.getElementById("period-dropdown");
+            if (dropdown) dropdown.classList.toggle("hidden");
+            return;
+        }
+
+        // Click outside — close
+        var dropdown = document.getElementById("period-dropdown");
+        if (dropdown && !dropdown.classList.contains("hidden") && !dropdown.contains(e.target)) {
+            dropdown.classList.add("hidden");
+        }
+    });
+
+    /* ─── Toast Notification ─────────────────────────────────── */
+    window.showToast = function (message, duration) {
+        duration = duration || 2500;
+        var toast = document.createElement("div");
+        toast.className = "fixed bottom-6 right-6 z-[300] px-5 py-3 bg-surface-container-highest border border-outline-variant/30 rounded-lg shadow-xl text-sm text-on-surface font-medium transition-all";
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(function () {
+            toast.style.opacity = "0";
+            setTimeout(function () { toast.remove(); }, 300);
+        }, duration);
+    };
 })();

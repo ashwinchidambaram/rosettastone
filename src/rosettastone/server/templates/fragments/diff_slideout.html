@@ -19,11 +19,16 @@
 <!-- Metric Bars -->
 <div class="px-8 py-6 space-y-5">
     {% if diff.scores %}
+    {% set _METRIC_LABELS = {
+        'bertscore': 'BERTScore', 'bert_score': 'BERTScore',
+        'embedding': 'Embedding similarity', 'embedding_similarity': 'Embedding similarity',
+        'composite': 'Composite', 'composite_score': 'Composite'
+    } %}
     {% for metric_name, score in diff.scores.items() %}
-    {% set is_composite = metric_name in ('composite', 'composite_score') %}
+    {% set is_composite = metric_name | lower in ('composite', 'composite_score') %}
     <div class="space-y-2">
         <div class="flex justify-between text-[11px] font-mono text-on-surface/60 uppercase tracking-widest">
-            <span>{{ metric_name | replace('_', ' ') | title }}</span>
+            <span>{{ _METRIC_LABELS.get(metric_name, metric_name | replace('_', ' ') | title) }}</span>
             <span class="{% if is_composite %}text-[#D4A574] font-bold{% else %}text-on-surface{% endif %}">{{ score }}</span>
         </div>
         <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
@@ -56,9 +61,27 @@
 
 <!-- Tab Toggle -->
 <div class="px-8 border-b border-white/5 flex gap-8">
-    <button class="pb-3 text-sm font-bold text-on-surface border-b-2 border-[#D4745E] tracking-tight">Side-by-side</button>
-    <button class="pb-3 text-sm font-bold text-on-surface/40 hover:text-on-surface/70 transition-colors tracking-tight">Unified</button>
+    <button id="tab-sidebyside" onclick="switchDiffTab('sidebyside')" class="pb-3 text-sm font-bold text-on-surface border-b-2 border-[#D4745E] tracking-tight">Side-by-side</button>
+    <button id="tab-unified" onclick="switchDiffTab('unified')" class="pb-3 text-sm font-bold text-on-surface/40 hover:text-on-surface/70 transition-colors tracking-tight">Unified</button>
 </div>
+<script nonce="{{ request.state.csp_nonce }}">
+function switchDiffTab(tab) {
+    var sbs = document.getElementById('diff-sidebyside');
+    var uni = document.getElementById('diff-unified');
+    var tSbs = document.getElementById('tab-sidebyside');
+    var tUni = document.getElementById('tab-unified');
+    if (!sbs || !uni) return;
+    if (tab === 'sidebyside') {
+        sbs.classList.remove('hidden'); uni.classList.add('hidden');
+        tSbs.className = 'pb-3 text-sm font-bold text-on-surface border-b-2 border-[#D4745E] tracking-tight';
+        tUni.className = 'pb-3 text-sm font-bold text-on-surface/40 hover:text-on-surface/70 transition-colors tracking-tight';
+    } else {
+        sbs.classList.add('hidden'); uni.classList.remove('hidden');
+        tUni.className = 'pb-3 text-sm font-bold text-on-surface border-b-2 border-[#D4745E] tracking-tight';
+        tSbs.className = 'pb-3 text-sm font-bold text-on-surface/40 hover:text-on-surface/70 transition-colors tracking-tight';
+    }
+}
+</script>
 
 <!-- Scrollable Content Area -->
 <div class="flex-1 overflow-y-auto custom-scrollbar">
@@ -69,8 +92,13 @@
         <p class="text-[14px] text-[#D4A574] font-medium">Content may contain sensitive data from production prompts</p>
     </div>
 
-    <!-- Diff View -->
-    <div class="mx-6 mb-8 rounded-xl bg-[#1A1A1A] overflow-hidden border border-white/5">
+    <style>
+        .diff-del { background-color: rgba(216,86,80,0.20); color: #D85650; border-radius: 2px; padding: 0 2px; }
+        .diff-add { background-color: rgba(139,157,131,0.20); color: #8B9D83; border-radius: 2px; padding: 0 2px; }
+    </style>
+
+    <!-- Side-by-side Diff View -->
+    <div id="diff-sidebyside" class="mx-6 mb-8 rounded-xl bg-[#1A1A1A] overflow-hidden border border-white/5">
         <div class="grid grid-cols-2 border-b border-white/5">
             <div class="px-5 py-3 border-r border-white/5">
                 <span class="text-[12px] font-mono text-[#9E9E9E] uppercase tracking-tighter">Expected ({{ diff.source_model|default('') }})</span>
@@ -79,16 +107,24 @@
                 <span class="text-[12px] font-mono text-[#9E9E9E] uppercase tracking-tighter">Actual ({{ diff.target_model|default('') }})</span>
             </div>
         </div>
-        <style>
-            .diff-del { background-color: rgba(216,86,80,0.20); color: #D85650; border-radius: 2px; padding: 0 2px; }
-            .diff-add { background-color: rgba(139,157,131,0.20); color: #8B9D83; border-radius: 2px; padding: 0 2px; }
-        </style>
         <div class="grid grid-cols-2 font-mono text-[14px] leading-relaxed">
             <!-- Left Column (Expected) -->
             <div class="p-5 border-r border-white/5 text-[#E8DCC4] whitespace-pre-wrap">{% if diff.expected_html %}{{ diff.expected_html | safe }}{% else %}{{ diff.expected }}{% endif %}</div>
             <!-- Right Column (Actual) -->
             <div class="p-5 text-[#E8DCC4] whitespace-pre-wrap">{% if diff.actual_html %}{{ diff.actual_html | safe }}{% else %}{{ diff.actual|default('') }}{% endif %}</div>
         </div>
+    </div>
+
+    <!-- Unified Diff View (hidden by default) -->
+    <div id="diff-unified" class="hidden mx-6 mb-8 rounded-xl bg-[#1A1A1A] overflow-hidden border border-white/5 font-mono text-[14px] leading-relaxed">
+        <div class="px-5 py-3 border-b border-white/5">
+            <span class="text-[12px] font-mono text-[#9E9E9E] uppercase tracking-tighter">Expected ({{ diff.source_model|default('') }})</span>
+        </div>
+        <div class="p-5 text-[#E8DCC4] whitespace-pre-wrap border-b border-white/5">{% if diff.expected_html %}{{ diff.expected_html | safe }}{% else %}{{ diff.expected }}{% endif %}</div>
+        <div class="px-5 py-3 border-b border-white/5">
+            <span class="text-[12px] font-mono text-[#9E9E9E] uppercase tracking-tighter">Actual ({{ diff.target_model|default('') }})</span>
+        </div>
+        <div class="p-5 text-[#E8DCC4] whitespace-pre-wrap">{% if diff.actual_html %}{{ diff.actual_html | safe }}{% else %}{{ diff.actual|default('') }}{% endif %}</div>
     </div>
     {% else %}
     <!-- Content not available info message -->
@@ -122,5 +158,5 @@
 <!-- Footer CTA -->
 <div class="p-6 bg-surface-container-high border-t border-white/5 flex justify-end gap-3">
     <button data-action="close-slideout" class="px-6 py-2 text-xs font-bold text-on-surface/60 hover:text-on-surface transition-colors">CLOSE</button>
-    <button class="px-6 py-2 bg-[#D4A574] text-surface-container-lowest text-xs font-black rounded-md hover:brightness-110 transition-all">APPROVE VARIANCE</button>
+    <button onclick="this.textContent='✓ NOTED'; this.disabled=true; this.classList.add('opacity-60');" title="Full approval workflow available in multi-user mode" class="px-6 py-2 bg-[#D4A574] text-surface-container-lowest text-xs font-black rounded-md hover:brightness-110 transition-all">APPROVE VARIANCE</button>
 </div>

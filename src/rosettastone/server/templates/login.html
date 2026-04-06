@@ -145,6 +145,8 @@
         <p class="text-center text-xs text-on-surface-variant/40 mt-8 font-label">
             {% if multi_user %}
             Multi-user mode enabled
+            {% elif auth_enabled %}
+            Enter your API key to sign in
             {% else %}
             Set <span class="text-on-surface-variant/60">ROSETTASTONE_API_KEY</span> to enable authentication
             {% endif %}

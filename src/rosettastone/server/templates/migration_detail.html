@@ -82,11 +82,11 @@ function showPersonaView(view) {
         </div>
         <div class="flex items-center gap-3">
             {% if migration.recommendation == "Safe to ship" %}
-            <button class="flex items-center gap-2 px-4 py-2 bg-surface-container-high hover:bg-surface-bright text-on-surface text-sm font-medium rounded-lg transition-all" aria-label="View version history">
+            <a href="/ui/migrations/{{ migration.id }}/versions" class="flex items-center gap-2 px-4 py-2 bg-surface-container-high hover:bg-surface-bright text-on-surface text-sm font-medium rounded-lg transition-all" aria-label="View version history">
                 <span class="material-symbols-outlined text-[18px]">history</span>
                 Version History
-            </button>
-            <button class="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-primary-container to-primary text-on-primary-container text-sm font-bold rounded-lg transition-all active:scale-95 shadow-lg shadow-primary/10" aria-label="Deploy migration to production">
+            </a>
+            <button onclick="document.getElementById('deploy-modal').classList.remove('hidden')" class="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-primary-container to-primary text-on-primary-container text-sm font-bold rounded-lg transition-all active:scale-95 shadow-lg shadow-primary/10" aria-label="Deploy migration to production">
                 <span class="material-symbols-outlined text-[18px]">rocket_launch</span>
                 Deploy to Prod
             </button>
@@ -110,11 +110,7 @@ function showPersonaView(view) {
     Engineer
   </button>
   <button id="btn-executive"
-          onclick="showPersonaView('executive')"
-          hx-get="/ui/migrations/{{ migration.id }}/executive-summary"
-          hx-target="#executive-summary"
-          hx-trigger="click[!document.getElementById('executive-summary').innerHTML.trim()]"
-          hx-swap="innerHTML"
+          onclick="if(!document.getElementById('executive-summary').innerHTML.trim()){htmx.ajax('GET','/ui/migrations/{{ migration.id }}/executive-summary',{target:'#executive-summary',swap:'innerHTML'});}showPersonaView('executive');"
           class="px-4 py-1.5 text-sm font-medium rounded-lg bg-transparent text-on-surface-variant border border-outline-variant/20 hover:bg-surface-container-high transition-all"
           aria-pressed="false">
     <span class="material-symbols-outlined text-[16px] align-middle mr-1">business_center</span>
@@ -250,7 +246,7 @@ function showPersonaView(view) {
                         <a href="/ui/migrations/{{ migration.id }}/executive" class="px-6 py-2.5 bg-[#D4745E] text-white font-bold rounded-lg hover:brightness-110 transition-all active:scale-95 shadow-md shadow-[#D4745E]/20">
                             Export report
                         </a>
-                        <button class="px-6 py-2.5 bg-transparent border border-outline/30 text-on-surface font-medium rounded-lg hover:bg-surface-container-high transition-all">
+                        <button hx-get="/ui/migrations/{{ migration.id }}/optimizer-history" hx-target="#diff-content" hx-swap="innerHTML" onclick="openSlideout()" class="px-6 py-2.5 bg-transparent border border-outline/30 text-on-surface font-medium rounded-lg hover:bg-surface-container-high transition-all">
                             View optimized prompt
                         </button>
                     </div>
@@ -355,6 +351,7 @@ function showPersonaView(view) {
             </div>
         </section>
         <!-- Score Charts (P2.3) -->
+        {% if migration.score_histogram %}
         <div class="mt-8">
           <h3 class="text-base font-semibold mb-4 text-on-surface-variant uppercase tracking-widest text-[11px] font-mono">Score Distribution</h3>
           <div class="flex flex-wrap gap-6">
@@ -416,6 +413,7 @@ function showPersonaView(view) {
             })();
           </script>
         </div>
+        {% endif %}
         {% endif %}
     </div>
 
@@ -1231,5 +1229,27 @@ function showPersonaView(view) {
 })();
 </script>
 {% endif %}
+
+<!-- Deploy to Prod Modal -->
+<div id="deploy-modal" class="hidden fixed inset-0 z-[200] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="deploy-modal-title">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="document.getElementById('deploy-modal').classList.add('hidden')"></div>
+    <div class="relative bg-surface-container-high border border-outline-variant/20 rounded-2xl shadow-2xl max-w-md w-full p-8">
+        <div class="flex items-center gap-3 mb-4">
+            <span class="material-symbols-outlined text-success text-3xl" style="font-variation-settings:'FILL' 1;" aria-hidden="true">rocket_launch</span>
+            <h3 id="deploy-modal-title" class="text-xl font-bold text-on-surface font-headline">Ready to deploy</h3>
+        </div>
+        <p class="text-on-surface-variant leading-relaxed mb-6">
+            Your optimized prompt is ready. Download the executive report for the full summary, then apply the optimized prompt in your infrastructure following your team's deployment process.
+        </p>
+        <div class="flex flex-wrap gap-3">
+            <a href="/ui/migrations/{{ migration.id }}/executive" class="flex-1 text-center px-5 py-2.5 bg-[#D4745E] text-white font-bold rounded-lg hover:brightness-110 transition-all active:scale-95">
+                View executive report
+            </a>
+            <button onclick="document.getElementById('deploy-modal').classList.add('hidden')" class="px-5 py-2.5 bg-surface-container-low border border-outline-variant/20 text-on-surface-variant font-medium rounded-lg hover:bg-surface-container transition-all">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
 
 {% endblock %}
