@@ -37,6 +37,10 @@ from rosettastone.server.schemas import (
 router = APIRouter()
 
 _SENSITIVE_CONFIG_KEYS = frozenset({"lm_extra_kwargs"})
+# Generic fallback threshold used when computing per-metric above-threshold counts in diagnostics.
+# Individual metric scales vary (0-1 for BERTScore/embedding, binary for exact_match), so this
+# represents a reasonable midpoint rather than being sourced from DEFAULT_THRESHOLDS.
+_DIAGNOSTIC_METRIC_THRESHOLD = 0.7
 
 
 # ---------------------------------------------------------------------------
@@ -1091,6 +1095,8 @@ def _build_diagnostics(record: MigrationRecord, session: Session) -> MigrationDi
                 p90=stats.get("p90", 0.0),
                 sample_count=stats.get("sample_count", 0),
                 threshold=threshold,
+                # CI lower bound mirrors the recommendation engine's pass criterion
+                # (uses confidence_interval[0] < threshold for CONDITIONAL).
                 passes=ci_lower >= threshold,
             )
         )
@@ -1106,15 +1112,17 @@ def _build_diagnostics(record: MigrationRecord, session: Session) -> MigrationDi
     )
     metric_accumulator: dict[str, list[float]] = {}
     for tc in val_tcs:
-        scores = json.loads(tc.scores_json) if tc.scores_json else {}
+        try:
+            scores = json.loads(tc.scores_json) if tc.scores_json else {}
+        except (json.JSONDecodeError, TypeError):
+            scores = {}
         for metric_name, val in scores.items():
             if isinstance(val, (int, float)):
                 metric_accumulator.setdefault(metric_name, []).append(float(val))
     metric_win_rates: list[MetricWinRate] = []
-    _generic_metric_threshold = 0.7
     for metric_name, values in sorted(metric_accumulator.items()):
         mean_val = sum(values) / len(values) if values else 0.0
-        above = sum(1 for v in values if v >= _generic_metric_threshold)
+        above = sum(1 for v in values if v >= _DIAGNOSTIC_METRIC_THRESHOLD)
         metric_win_rates.append(
             MetricWinRate(
                 metric_name=metric_name,
@@ -1172,8 +1180,14 @@ def _build_diagnostics(record: MigrationRecord, session: Session) -> MigrationDi
             at_risk_count += 1
             status = "at_risk"
         if status in ("regressed", "at_risk"):
-            base_scores = json.loads(base_tc.scores_json) if base_tc.scores_json else {}
-            val_scores = json.loads(val_tc.scores_json) if val_tc.scores_json else {}
+            try:
+                base_scores = json.loads(base_tc.scores_json) if base_tc.scores_json else {}
+            except (json.JSONDecodeError, TypeError):
+                base_scores = {}
+            try:
+                val_scores = json.loads(val_tc.scores_json) if val_tc.scores_json else {}
+            except (json.JSONDecodeError, TypeError):
+                val_scores = {}
             metric_deltas: dict[str, float] = {
                 m: round(val_scores[m] - base_scores[m], 4)
                 for m in base_scores
@@ -1222,7 +1236,7 @@ def _build_diagnostics(record: MigrationRecord, session: Session) -> MigrationDi
     )
 
     return MigrationDiagnostics(
-        migration_id=record.id,
+        migration_id=record.id,  # type: ignore[arg-type]
         recommendation=record.recommendation,
         per_type=per_type_diagnostics,
         metric_win_rates=metric_win_rates,

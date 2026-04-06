@@ -1370,3 +1370,59 @@ def test_diagnostics_regression_counts(client, engine):
     assert rs["stable_count"] == 1
     assert rs["regressed_count"] == 1
     assert rs["at_risk_count"] == 0
+
+
+def test_diagnostics_at_risk_classification(client, engine):
+    """A pair with delta < -0.05 and val < threshold is classified as at_risk."""
+    import json as _json
+
+    from sqlmodel import Session
+
+    from rosettastone.server.models import MigrationRecord, TestCaseRecord  # noqa: F811
+
+    with Session(engine) as s:
+        record = MigrationRecord(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+            recommendation="NO_GO",
+        )
+        s.add(record)
+        s.commit()
+        s.refresh(record)
+        migration_id = record.id
+        # short_text threshold = 0.80; at_risk = delta < -0.05 AND val < threshold
+        s.add(
+            TestCaseRecord(
+                migration_id=migration_id,
+                phase="baseline",
+                output_type="short_text",
+                composite_score=0.90,
+                is_win=True,
+                scores_json=_json.dumps({"bertscore": 0.90}),
+                details_json=_json.dumps({}),
+            )
+        )
+        s.add(
+            TestCaseRecord(
+                migration_id=migration_id,
+                phase="validation",
+                output_type="short_text",
+                composite_score=0.70,  # delta = -0.20 < -0.05, val < 0.80 threshold
+                is_win=False,
+                scores_json=_json.dumps({"bertscore": 0.70}),
+                details_json=_json.dumps({}),
+            )
+        )
+        s.commit()
+
+    resp = client.get(f"/api/v1/migrations/{migration_id}/diagnostics")
+    assert resp.status_code == 200
+    rs = resp.json()["regression_summary"]
+    assert rs["at_risk_count"] == 1
+    assert rs["regressed_count"] == 0
+    assert rs["improved_count"] == 0
+    assert rs["stable_count"] == 0
+    # The at_risk pair must appear in worst_regressed
+    assert len(rs["worst_regressed"]) == 1
+    assert rs["worst_regressed"][0]["status"] == "at_risk"

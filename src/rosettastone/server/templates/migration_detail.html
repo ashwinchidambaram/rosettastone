@@ -458,7 +458,7 @@ function showPersonaView(view) {
         </div>
         {% endif %}
 
-        {% if migration.status == 'complete' %}
+        {% if migration.status in ('complete', 'dry_run_complete') %}
         <div class="collapsible-section mt-6">
           <button class="collapsible-trigger w-full flex justify-between items-center p-4 bg-surface-container rounded-xl">
             <span class="flex items-center gap-2">
