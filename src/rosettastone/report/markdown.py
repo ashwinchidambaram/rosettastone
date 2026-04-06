@@ -76,12 +76,13 @@ def generate_markdown_report(result: MigrationResult, output_dir: Path) -> Path:
     )
 
     # F6: Aggregate failure reasons across both result sets
+    # Count skipped attempts across both phases (a pair may appear in both baseline and validation)
     all_results = list(result.baseline_results) + list(result.validation_results)
     skipped_results = [r for r in all_results if getattr(r, "failure_reason", None) is not None]
     skipped_count = len(skipped_results)
     failure_reason_counts: dict[str, int] = {}
     for r in skipped_results:
-        reason = r.failure_reason or "unknown"
+        reason: str = r.failure_reason  # type: ignore[assignment]
         failure_reason_counts[reason] = failure_reason_counts.get(reason, 0) + 1
 
     report_content = template.render(

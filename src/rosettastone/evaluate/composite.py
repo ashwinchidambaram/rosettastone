@@ -87,7 +87,7 @@ class CompositeEvaluator:
                 messages = [{"role": "system", "content": optimized_prompt}] + messages
 
             try:
-                extra_kwargs: dict[str, object] = dict(
+                extra_kwargs: dict[str, Any] = dict(
                     getattr(self.config, "lm_extra_kwargs", None) or {}
                 )
                 response = litellm.completion(
@@ -112,7 +112,7 @@ class CompositeEvaluator:
                 completions.append((pair, new_response))
             except Exception as e:
                 exc_type = type(e).__name__.lower()
-                if "timeout" in exc_type or "timeout" in str(type(e).__module__).lower():
+                if "timeout" in exc_type:
                     failure_cat = "timeout"
                 elif "ratelimit" in exc_type or "rate_limit" in exc_type or "quota" in exc_type:
                     failure_cat = "rate_limit"
@@ -205,9 +205,9 @@ class CompositeEvaluator:
             threshold = self._get_threshold(output_type)
 
             # F6: detect JSON gate failure (json_valid == 0 forces composite to 0)
-            failure_reason: str | None = None
+            json_failure: str | None = None
             if output_type == OutputType.JSON and scores.get("json_valid", 1.0) == 0.0:
-                failure_reason = "json_gate_failed"
+                json_failure = "json_gate_failed"
 
             results.append(
                 EvalResult(
@@ -221,7 +221,7 @@ class CompositeEvaluator:
                         "evaluators_used": list(scores.keys()),
                         "threshold": threshold,
                     },
-                    failure_reason=failure_reason,
+                    failure_reason=json_failure,
                 )
             )
 
