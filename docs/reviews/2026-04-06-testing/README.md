@@ -2,6 +2,45 @@
 
 Service and plugin boundary testing review for RosettaStone. Plan-only: no code written, no tests modified or run.
 
+## Top-Level Summary
+
+8 service/plugin boundaries reviewed by independent subagents. Across all boundaries:
+
+- **8 CRITICAL risks** found, including: schema parity test that only checks table names (database), IDOR on 5 endpoint groups (server), PII regex with zero adversarial testing (safety), silent A/B batch commit corruption (orchestration), evaluator fallback chain degradation (evaluation), ci_output.py with zero tests (CLI)
+- **18 HIGH risks** found
+- **~260 new tests** recommended across all boundaries
+- **~170 hours** estimated total effort for full production hardening
+- **4 milestones** proposed, each independently shippable
+
+### Cross-Cutting Action List (de-duplicated)
+
+1. Build shared `migration_result_factory` — 6+ files duplicate this, causing drift (3h)
+2. Consolidate engine/session fixtures — identically redefined in 5+ test files (3h)
+3. Set up VCR cassette infrastructure with `pytest-recording` — needed by evaluation, optimization, and report boundaries (6h)
+4. Standardize Hypothesis strategy library — shared property-based generators in `tests/conftest_strategies.py` (4h)
+5. Fix Playwright hardcoded paths for CI — blocks all UI test execution in CI (4h)
+6. Add Postgres CI job — blocks concurrent safety testing and Postgres parity (4h)
+7. Create golden fixture directory structure under `tests/fixtures/` — organize by boundary (2h)
+
+### Read These First
+
+1. **path-to-production.md** — The headline deliverable. Sequenced 4-milestone plan.
+2. **summary.md** — Top 5 actions, coordination points, reading order.
+3. **server-http-security.md** — Real security bugs found (IDOR, JWT).
+4. **database-persistence.md** — False-confidence test hiding schema drift.
+5. **synthetic-data-strategy.md** — Unified test data approach.
+
+### Coordination Points Needing Human Input
+
+- Empty-string prompt/response handling (ingest ↔ evaluate ↔ report)
+- SQLite foreign key enforcement decision (database ↔ server)
+- `_migrate_add_columns` deprecation timeline (database)
+- `prompt_auditor.py` scope clarification (safety)
+- `majority_label` tie-breaking behavior (calibration)
+- GEPA background thread lifetime after timeout (optimization)
+
+---
+
 ## 1. Service & Plugin Boundary Inventory
 
 ### 1.1 Ingest Adapters & Data Pipeline
