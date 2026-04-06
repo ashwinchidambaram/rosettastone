@@ -1570,7 +1570,7 @@ class TestMiscEdgeCases:
     def test_diff_fragment_fallback_to_dummy(self, client: TestClient) -> None:
         resp = client.get("/ui/fragments/diff/999/999")
         assert resp.status_code == 200
-        assert "BERTScore" in resp.text
+        assert "Bertscore" in resp.text  # dynamic label: bertscore key → title-cased
 
     # --- 8e. Cost page with zero-cost migrations (no division by zero) --- P1
     def test_cost_page_zero_cost_no_crash(self, client: TestClient, engine) -> None:
