@@ -449,17 +449,23 @@ class CompositeEvaluator:
         try:
             from rosettastone.evaluate.bertscore import BERTScoreEvaluator
 
-            return BERTScoreEvaluator(config=self.config).score(expected, actual)
+            result = BERTScoreEvaluator(config=self.config).score(expected, actual)
+            logger.debug("Semantic scoring: using BERTScore")
+            return result
         except ImportError:
             if local_only:
                 logger.warning(
                     "BERTScore not available in local_only mode; falling back to string similarity"
                 )
+            logger.info("BERTScore unavailable, falling back to EmbeddingEvaluator")
             try:
                 from rosettastone.evaluate.embedding import EmbeddingEvaluator
 
-                return EmbeddingEvaluator(config=self.config).score(expected, actual)
+                result = EmbeddingEvaluator(config=self.config).score(expected, actual)
+                logger.debug("Semantic scoring: using EmbeddingEvaluator")
+                return result
             except ImportError:
+                logger.info("EmbeddingEvaluator unavailable, falling back to ExactMatchEvaluator")
                 return ExactMatchEvaluator(config=self.config).score(expected, actual)
 
     def _composite_score(self, scores: dict[str, float], output_type: OutputType) -> float:

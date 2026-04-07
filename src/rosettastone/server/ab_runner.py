@@ -221,12 +221,39 @@ def _evaluate_with_prompt(prompt_text: str, optimized_prompt: str) -> float:
         return 0.5
 
 
-def _commit_results(results: list[ABTestResult], engine: Any) -> None:
-    """Batch-commit a list of ABTestResult rows."""
+def _commit_results(results: list[ABTestResult], engine: Any) -> int:
+    """Batch-commit a list of ABTestResult rows with partial failure handling.
+
+    Returns the number of successfully committed results.
+    """
     with Session(engine) as session:
-        for r in results:
-            session.add(r)
-        session.commit()
+        try:
+            for r in results:
+                session.add(r)
+            session.commit()
+            return len(results)
+        except Exception:
+            session.rollback()
+            logger.warning(
+                "Batch commit failed for %d results, falling back to individual inserts",
+                len(results),
+            )
+
+    # Fall back to individual inserts
+    committed = 0
+    for r in results:
+        try:
+            with Session(engine) as s:
+                s.merge(r)
+                s.commit()
+                committed += 1
+        except Exception:
+            logger.warning(
+                "Failed to commit ABTestResult for test_case_id=%s",
+                getattr(r, "test_case_id", "unknown"),
+            )
+    logger.info("Partial commit: %d/%d results saved", committed, len(results))
+    return committed
 
 
 def _conclude_test(ab_test_id: int, engine: Any) -> None:

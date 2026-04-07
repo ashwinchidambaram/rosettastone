@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from unittest.mock import MagicMock, patch
 
-from sqlmodel import Session
+from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, SQLModel, create_engine, select
 
 import rosettastone.server.api.ab_testing as ab_testing_module
-from rosettastone.server.ab_runner import _determine_winner
+from rosettastone.server.ab_runner import _commit_results, _determine_winner
 from rosettastone.server.api.versioning import create_version
-from rosettastone.server.models import ABTestResult
+from rosettastone.server.models import ABTest, ABTestResult, MigrationRecord, MigrationVersion
 
 
 class TestCreateABTest:
@@ -448,3 +450,159 @@ class TestWinnerDetermination:
         assert _determine_winner(sig_insig, wins_a=10, wins_b=1) == "inconclusive", (
             "Non-significant result should always yield 'inconclusive'"
         )
+
+
+# ---------------------------------------------------------------------------
+# _commit_results unit tests
+# ---------------------------------------------------------------------------
+
+
+def _make_test_engine():
+    """Create a fresh in-memory SQLite engine with all tables."""
+    eng = create_engine(
+        "sqlite://",
+        echo=False,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    SQLModel.metadata.create_all(eng)
+    return eng
+
+
+def _seed_ab_test(eng) -> int:
+    """Insert the minimum rows (migration -> version -> ab_test) and return ab_test.id."""
+    with Session(eng) as s:
+        migration = MigrationRecord(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+        )
+        s.add(migration)
+        s.flush()
+
+        v1 = MigrationVersion(
+            migration_id=migration.id,
+            version_number=1,
+            snapshot_json="{}",
+        )
+        v2 = MigrationVersion(
+            migration_id=migration.id,
+            version_number=2,
+            snapshot_json="{}",
+        )
+        s.add(v1)
+        s.add(v2)
+        s.flush()
+
+        ab_test = ABTest(
+            migration_id=migration.id,
+            version_a_id=v1.id,
+            version_b_id=v2.id,
+            name="test",
+            status="running",
+        )
+        s.add(ab_test)
+        s.commit()
+        s.refresh(ab_test)
+        return ab_test.id
+
+
+class TestCommitResults:
+    """Unit tests for _commit_results() in ab_runner."""
+
+    def test_commit_results_happy_path(self):
+        """Committed results are persisted and retrievable from the DB."""
+        eng = _make_test_engine()
+        ab_test_id = _seed_ab_test(eng)
+
+        results = [
+            ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version="a",
+                score_a=0.9,
+                score_b=0.7,
+                winner="a",
+            ),
+            ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version="b",
+                score_a=0.6,
+                score_b=0.8,
+                winner="b",
+            ),
+            ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version="a",
+                score_a=0.75,
+                score_b=0.75,
+                winner="tie",
+            ),
+        ]
+
+        _commit_results(results, eng)
+
+        with Session(eng) as s:
+            rows = list(
+                s.exec(
+                    select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)
+                ).all()
+            )
+        assert len(rows) == 3
+        winners = {r.winner for r in rows}
+        assert winners == {"a", "b", "tie"}
+
+    def test_commit_results_returns_count(self):
+        """_commit_results returns the number of results successfully committed."""
+        eng = _make_test_engine()
+        ab_test_id = _seed_ab_test(eng)
+
+        results = [
+            ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version="a",
+                score_a=0.8,
+                score_b=0.6,
+                winner="a",
+            ),
+            ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version="b",
+                score_a=0.5,
+                score_b=0.9,
+                winner="b",
+            ),
+        ]
+
+        count = _commit_results(results, eng)
+        assert count == 2
+
+    def test_commit_results_partial_failure_logs(self, caplog):
+        """On batch commit failure, _commit_results logs a warning and falls back."""
+        eng = _make_test_engine()
+        ab_test_id = _seed_ab_test(eng)
+
+        results = [
+            ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version="a",
+                score_a=0.8,
+                score_b=0.6,
+                winner="a",
+            ),
+        ]
+
+        original_commit = Session.commit
+        call_count = {"n": 0}
+
+        def patched_commit(self):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise RuntimeError("Simulated batch commit failure")
+            original_commit(self)
+
+        with caplog.at_level(logging.WARNING, logger="rosettastone.server.ab_runner"):
+            with patch.object(Session, "commit", patched_commit):
+                _commit_results(results, eng)
+
+        warning_text = caplog.text
+        assert "Batch commit failed" in warning_text or "falling back" in warning_text

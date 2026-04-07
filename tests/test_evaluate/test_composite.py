@@ -486,3 +486,139 @@ class TestCompositeEvaluatorEvaluate:
         assert results[0].failure_reason == "no_response"
         assert results[0].composite_score == 0.0
         assert results[0].is_win is False
+
+
+# ---------------------------------------------------------------------------
+# _score_semantic fallback chain logging tests
+# ---------------------------------------------------------------------------
+
+
+def _clear_semantic_module_cache() -> None:
+    """Remove cached bertscore / embedding modules so imports re-run inside _score_semantic."""
+    for key in list(sys.modules.keys()):
+        if (
+            "rosettastone.evaluate.bertscore" in key
+            or "rosettastone.evaluate.embedding" in key
+        ):
+            del sys.modules[key]
+
+
+def _attach_capturing_handler(logger_name: str) -> tuple:
+    """Attach an INFO+ capturing handler directly to the named logger.
+
+    Returns (logger, handler, original_level). The caller must call
+    _detach_capturing_handler() after the test body.
+    """
+    import logging as _logging
+
+    captured: list[str] = []
+
+    class _CapturingHandler(_logging.Handler):
+        def emit(self, record: _logging.LogRecord) -> None:
+            if record.levelno >= _logging.INFO:
+                captured.append(self.format(record))
+
+    the_logger = _logging.getLogger(logger_name)
+    original_level = the_logger.level
+    handler = _CapturingHandler()
+    the_logger.addHandler(handler)
+    the_logger.setLevel(_logging.DEBUG)  # ensure INFO records are handled
+    return the_logger, handler, original_level, captured
+
+
+def _detach_capturing_handler(the_logger, handler, original_level: int) -> None:
+    the_logger.removeHandler(handler)
+    the_logger.setLevel(original_level)
+
+
+class TestScoreSemanticFallbackLogging:
+    """Verify that _score_semantic logs at each fallback tier.
+
+    The composite logger uses get_logger() which sets propagate=False and adds
+    its own StreamHandler. pytest's caplog fixture only intercepts loggers that
+    propagate to root, so we attach a handler directly to the named logger.
+    """
+
+    LOGGER_NAME = "rosettastone.evaluate.composite"
+
+    def setup_method(self) -> None:
+        self.evaluator = CompositeEvaluator(make_config())
+
+    def test_score_semantic_logs_bertscore_fallback_to_embedding(self) -> None:
+        """When BERTScore raises ImportError and Embedding succeeds, the fallback log appears."""
+        fake_embedding_evaluator = MagicMock()
+        fake_embedding_evaluator.score.return_value = {"embedding_sim": 0.85}
+        fake_embedding_cls = MagicMock(return_value=fake_embedding_evaluator)
+
+        # Clear cache BEFORE patch.dict so patch.dict's None value sticks
+        _clear_semantic_module_cache()
+
+        the_logger, handler, orig_level, captured = _attach_capturing_handler(self.LOGGER_NAME)
+        try:
+            # Setting the bertscore module to None causes ImportError on import
+            with patch.dict("sys.modules", {"rosettastone.evaluate.bertscore": None}):
+                with patch(
+                    "rosettastone.evaluate.embedding.EmbeddingEvaluator",
+                    fake_embedding_cls,
+                ):
+                    self.evaluator._score_semantic("hello", "hello")
+        finally:
+            _detach_capturing_handler(the_logger, handler, orig_level)
+
+        all_output = "\n".join(captured)
+        assert "BERTScore unavailable" in all_output or "EmbeddingEvaluator" in all_output, (
+            f"Expected fallback log message, got: {all_output!r}"
+        )
+
+    def test_score_semantic_logs_full_fallback_to_exact_match(self) -> None:
+        """When both BERTScore and Embedding raise ImportError, the ExactMatch fallback log appears."""
+        # Clear cache BEFORE patch.dict so None values stick
+        _clear_semantic_module_cache()
+
+        the_logger, handler, orig_level, captured = _attach_capturing_handler(self.LOGGER_NAME)
+        try:
+            with patch.dict(
+                "sys.modules",
+                {
+                    "rosettastone.evaluate.bertscore": None,
+                    "rosettastone.evaluate.embedding": None,
+                },
+            ):
+                result = self.evaluator._score_semantic("hello world", "hello world")
+        finally:
+            _detach_capturing_handler(the_logger, handler, orig_level)
+
+        assert len(result) > 0
+        all_output = "\n".join(captured)
+        assert "EmbeddingEvaluator unavailable" in all_output or "ExactMatchEvaluator" in all_output, (
+            f"Expected ExactMatch fallback log, got: {all_output!r}"
+        )
+
+    def test_score_semantic_no_fallback_log_on_happy_path(self) -> None:
+        """When BERTScore is available and works, no fallback INFO log messages appear."""
+        fake_bert_evaluator = MagicMock()
+        fake_bert_evaluator.score.return_value = {"bertscore_f1": 0.92}
+        fake_bert_cls = MagicMock(return_value=fake_bert_evaluator)
+
+        the_logger, handler, orig_level, captured = _attach_capturing_handler(self.LOGGER_NAME)
+        try:
+            # BERTScoreEvaluator is mocked to succeed — no ImportError, no fallback
+            with patch(
+                "rosettastone.evaluate.bertscore.BERTScoreEvaluator",
+                fake_bert_cls,
+            ):
+                _clear_semantic_module_cache()
+                self.evaluator._score_semantic("hello", "hello")
+        finally:
+            _detach_capturing_handler(the_logger, handler, orig_level)
+
+        fallback_phrases = [
+            "BERTScore unavailable",
+            "EmbeddingEvaluator unavailable",
+            "falling back",
+        ]
+        for phrase in fallback_phrases:
+            for msg in captured:
+                assert phrase not in msg, (
+                    f"Unexpected fallback log '{phrase}' found on happy path: {msg}"
+                )
