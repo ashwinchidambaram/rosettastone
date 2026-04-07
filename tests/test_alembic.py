@@ -378,3 +378,117 @@ def _assert_no_pending_migrations_manual(db_path: str) -> None:
     assert applied_revisions <= declared_revisions, (
         f"alembic_version contains unknown revisions: {applied_revisions - declared_revisions}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 7 — column-level schema parity: create_all() vs alembic upgrade head
+# ---------------------------------------------------------------------------
+
+
+def test_schema_parity_column_level(tmp_path, monkeypatch):
+    """The column names produced by SQLModel.metadata.create_all() and by
+    'alembic upgrade head' must match for every shared application table.
+
+    This test catches the most dangerous schema drift: a column existing in one
+    path but not the other. Type comparison is intentionally skipped because
+    SQLAlchemy type affinity differs between create_all and Alembic; column
+    name presence is the critical signal.
+    """
+    from sqlmodel import SQLModel
+
+    # --- DB 1: create_all path ---
+    db1_path = str(tmp_path / "col_create_all.db")
+    monkeypatch.setenv("ROSETTASTONE_DB_PATH", db1_path)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    from rosettastone.server.database import get_engine, reset_engine
+
+    reset_engine()
+    engine1 = get_engine()
+    SQLModel.metadata.create_all(engine1)
+
+    inspector1 = sqlalchemy.inspect(engine1)
+    tables_create_all = set(inspector1.get_table_names())
+    cols_create_all: dict[str, set[str]] = {
+        tbl: {col["name"] for col in inspector1.get_columns(tbl)}
+        for tbl in tables_create_all
+    }
+    engine1.dispose()
+    reset_engine()
+
+    # --- DB 2: alembic path ---
+    db2_path = str(tmp_path / "col_alembic.db")
+    monkeypatch.setenv("ROSETTASTONE_DB_PATH", db2_path)
+    reset_engine()
+
+    _run_upgrade(db2_path, "head")
+
+    engine2 = sqlalchemy.create_engine(f"sqlite:///{db2_path}")
+    inspector2 = sqlalchemy.inspect(engine2)
+    tables_alembic = set(inspector2.get_table_names()) - {"alembic_version"}
+    cols_alembic: dict[str, set[str]] = {
+        tbl: {col["name"] for col in inspector2.get_columns(tbl)}
+        for tbl in tables_alembic
+    }
+    engine2.dispose()
+    reset_engine()
+
+    # Only compare tables that appear in both paths (intersection).
+    shared_tables = tables_create_all & tables_alembic
+
+    failures: list[str] = []
+    for tbl in sorted(shared_tables):
+        only_in_create_all = cols_create_all[tbl] - cols_alembic[tbl]
+        only_in_alembic = cols_alembic[tbl] - cols_create_all[tbl]
+        if only_in_create_all:
+            failures.append(
+                f"Table '{tbl}': columns in create_all but missing from alembic: "
+                f"{sorted(only_in_create_all)}"
+            )
+        if only_in_alembic:
+            failures.append(
+                f"Table '{tbl}': columns in alembic but missing from create_all: "
+                f"{sorted(only_in_alembic)}"
+            )
+
+    assert not failures, (
+        "Column-level schema drift detected between create_all and alembic paths:\n"
+        + "\n".join(f"  - {msg}" for msg in failures)
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 8 — init_db() is idempotent
+# ---------------------------------------------------------------------------
+
+
+def test_init_db_idempotent(tmp_path, monkeypatch):
+    """Calling init_db() twice on the same SQLite file must not raise any
+    errors and must leave the schema intact on both calls."""
+    db_path = str(tmp_path / "idempotent.db")
+    monkeypatch.setenv("ROSETTASTONE_DB_PATH", db_path)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    from rosettastone.server.database import init_db, reset_engine
+
+    reset_engine()
+
+    # First call — creates tables from scratch.
+    init_db()
+
+    tables_after_first = get_table_names(db_path)
+    assert tables_after_first, "init_db() produced no tables on first call"
+
+    reset_engine()
+
+    # Second call — must be a no-op (tables already exist).
+    init_db()
+
+    tables_after_second = get_table_names(db_path)
+    assert tables_after_first == tables_after_second, (
+        f"Table set changed between first and second init_db() call.\n"
+        f"  Added:   {tables_after_second - tables_after_first}\n"
+        f"  Removed: {tables_after_first - tables_after_second}"
+    )
+
+    reset_engine()
