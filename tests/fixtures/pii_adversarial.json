@@ -1,0 +1,92 @@
+[
+  {
+    "input": "123​-45-6789",
+    "pii_type": "SSN",
+    "evasion_technique": "zero-width space between digits",
+    "expected_detection": false
+  },
+  {
+    "input": "123‍-45-6789",
+    "pii_type": "SSN",
+    "evasion_technique": "zero-width joiner",
+    "expected_detection": false
+  },
+  {
+    "input": "userаt@example.com",
+    "pii_type": "email",
+    "evasion_technique": "Cyrillic 'a' instead of Latin a",
+    "expected_detection": false
+  },
+  {
+    "input": "user＠example.com",
+    "pii_type": "email",
+    "evasion_technique": "fullwidth @ symbol",
+    "expected_detection": false
+  },
+  {
+    "input": "4111  1111  1111  1111",
+    "pii_type": "credit_card",
+    "evasion_technique": "space-padded digits",
+    "expected_detection": false
+  },
+  {
+    "input": "4111–1111–1111–1111",
+    "pii_type": "credit_card",
+    "evasion_technique": "en-dash instead of hyphen",
+    "expected_detection": false
+  },
+  {
+    "input": "（555） 123-4567",
+    "pii_type": "phone",
+    "evasion_technique": "fullwidth parentheses",
+    "expected_detection": false
+  },
+  {
+    "input": "１２３-45-6789",
+    "pii_type": "SSN",
+    "evasion_technique": "fullwidth digits",
+    "expected_detection": false
+  },
+  {
+    "input": "010.010.010.010",
+    "pii_type": "ip_address",
+    "evasion_technique": "leading zeros",
+    "expected_detection": false
+  },
+  {
+    "input": "user@exam­ple.com",
+    "pii_type": "email",
+    "evasion_technique": "soft hyphen in domain",
+    "expected_detection": false
+  },
+  {
+    "input": "123-45-6789",
+    "pii_type": "SSN",
+    "evasion_technique": "normal valid format",
+    "expected_detection": true
+  },
+  {
+    "input": "john.doe@example.com",
+    "pii_type": "email",
+    "evasion_technique": "normal valid format",
+    "expected_detection": true
+  },
+  {
+    "input": "4111-1111-1111-1111",
+    "pii_type": "credit_card",
+    "evasion_technique": "normal valid format",
+    "expected_detection": true
+  },
+  {
+    "input": "(555) 123-4567",
+    "pii_type": "phone",
+    "evasion_technique": "normal valid format",
+    "expected_detection": true
+  },
+  {
+    "input": "The quick brown fox jumps over the lazy dog.",
+    "pii_type": "none",
+    "evasion_technique": "clean text no PII",
+    "expected_detection": false
+  }
+]
