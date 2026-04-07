@@ -11,9 +11,9 @@ from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
 
 from rosettastone.server.api.migrations import _test_case_to_diff_dict
-from rosettastone.server.api.utils import _get_migration_or_404
+from rosettastone.server.api.utils import _get_migration_with_owner_check
 from rosettastone.server.database import get_session
-from rosettastone.server.models import MigrationRecord, TestCaseRecord
+from rosettastone.server.models import TestCaseRecord
 from rosettastone.server.schemas import DiffData, ScoreDistribution, TypeScoreStats
 
 router = APIRouter()
@@ -196,10 +196,11 @@ def _build_diff_data(tc: TestCaseRecord) -> DiffData:
 )
 async def get_distributions(
     migration_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> list[ScoreDistribution]:
     """Get score distributions per output type."""
-    _get_migration_or_404(migration_id, session)
+    _get_migration_with_owner_check(migration_id, session, request)
     return _compute_distributions(migration_id, session)
 
 
@@ -210,10 +211,11 @@ async def get_distributions(
 async def get_diff(
     migration_id: int,
     tc_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> DiffData:
     """Get diff data for a test case."""
-    _get_migration_or_404(migration_id, session)
+    _get_migration_with_owner_check(migration_id, session, request)
 
     tc = session.get(TestCaseRecord, tc_id)
     if tc is None or tc.migration_id != migration_id:
@@ -235,7 +237,12 @@ async def diff_fragment(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """HTMX partial for diff view."""
-    migration = session.get(MigrationRecord, migration_id)
+    try:
+        migration = _get_migration_with_owner_check(migration_id, session, request)
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            raise  # IDOR: deny cross-user access
+        migration = None  # 404: fall back to dummy diff
     tc = session.get(TestCaseRecord, tc_id) if migration else None
 
     if tc and tc.migration_id == migration_id:

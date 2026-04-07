@@ -201,3 +201,54 @@ class TestPipelineIsolation:
         resp = single_user_client.get("/api/v1/pipelines")
         assert resp.status_code == 200
         assert resp.json()["total"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Comparison / distribution isolation
+# ---------------------------------------------------------------------------
+
+
+class TestComparisonIsolation:
+    def test_user_cannot_access_other_users_distributions(self, multi_user_client, engine) -> None:
+        """IDOR: user 2 cannot access user 1's migration distributions."""
+        mid = _insert_migration(engine, owner_id=1)
+        resp = multi_user_client.get(f"/api/v1/migrations/{mid}/distributions", headers=_token(2))
+        assert resp.status_code == 403
+
+    def test_owner_can_access_own_distributions(self, multi_user_client, engine) -> None:
+        mid = _insert_migration(engine, owner_id=1)
+        resp = multi_user_client.get(f"/api/v1/migrations/{mid}/distributions", headers=_token(1))
+        # 200 or 404 (no test cases) is fine, NOT 403
+        assert resp.status_code != 403
+
+    def test_admin_can_access_any_distributions(self, multi_user_client, engine) -> None:
+        mid = _insert_migration(engine, owner_id=1)
+        resp = multi_user_client.get(
+            f"/api/v1/migrations/{mid}/distributions", headers=_token(99, role="admin")
+        )
+        assert resp.status_code != 403
+
+
+# ---------------------------------------------------------------------------
+# Report isolation
+# ---------------------------------------------------------------------------
+
+
+class TestReportIsolation:
+    def test_user_cannot_access_other_users_report(self, multi_user_client, engine) -> None:
+        """IDOR: user 2 cannot access user 1's migration report."""
+        mid = _insert_migration(engine, owner_id=1)
+        resp = multi_user_client.get(f"/api/v1/migrations/{mid}/report/markdown", headers=_token(2))
+        assert resp.status_code == 403
+
+    def test_owner_can_access_own_report(self, multi_user_client, engine) -> None:
+        mid = _insert_migration(engine, owner_id=1)
+        resp = multi_user_client.get(f"/api/v1/migrations/{mid}/report/markdown", headers=_token(1))
+        assert resp.status_code != 403
+
+    def test_admin_can_access_any_report(self, multi_user_client, engine) -> None:
+        mid = _insert_migration(engine, owner_id=1)
+        resp = multi_user_client.get(
+            f"/api/v1/migrations/{mid}/report/markdown", headers=_token(99, role="admin")
+        )
+        assert resp.status_code != 403
