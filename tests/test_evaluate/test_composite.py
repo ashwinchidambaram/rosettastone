@@ -6,9 +6,12 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
 from rosettastone.config import MigrationConfig
 from rosettastone.core.types import EvalResult, OutputType, PromptPair
-from rosettastone.evaluate.composite import DEFAULT_WIN_THRESHOLDS, CompositeEvaluator
+from rosettastone.evaluate.composite import DEFAULT_WIN_THRESHOLDS, METRIC_WEIGHTS, CompositeEvaluator
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -754,3 +757,39 @@ class TestBatchBERTScoreAlignment:
         assert abs(result.scores["bertscore_f1"] - expected_bert_score) < 1e-9, (
             f"Expected bertscore_f1={expected_bert_score}, got {result.scores['bertscore_f1']}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Property-based tests
+# ---------------------------------------------------------------------------
+
+# Build a strategy that generates score dicts using the known metric keys so
+# that weight lookup hits real entries in METRIC_WEIGHTS (edge-case: unknown
+# keys get weight 1.0 by default — also valid to test).
+_ALL_METRIC_KEYS = list(METRIC_WEIGHTS.keys()) + ["embedding_sim", "string_similarity"]
+
+
+def _st_score_dict():
+    """Strategy: non-empty dict of metric_name -> float in [0.0, 1.0]."""
+    return st.dictionaries(
+        keys=st.sampled_from(_ALL_METRIC_KEYS),
+        values=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
+        min_size=1,
+    )
+
+
+@given(
+    scores=_st_score_dict(),
+    output_type=st.sampled_from(list(OutputType)),
+)
+@settings(max_examples=100)
+def test_composite_score_bounded_property(
+    scores: dict[str, float], output_type: OutputType
+) -> None:
+    """Composite score is always in [0.0, 1.0] for any valid score dict and output type."""
+    evaluator = CompositeEvaluator(make_config())
+    result = evaluator._composite_score(scores, output_type)
+    assert 0.0 <= result <= 1.0, (
+        f"_composite_score returned {result!r} (out of [0,1]) "
+        f"for scores={scores!r}, output_type={output_type!r}"
+    )

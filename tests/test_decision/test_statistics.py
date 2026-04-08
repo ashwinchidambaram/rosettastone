@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from rosettastone.core.context import TypeStats
 from rosettastone.core.types import EvalResult, PromptPair
@@ -284,3 +286,21 @@ def test_compute_type_stats_returns_type_stats_instance():
     results = [_make_eval_result(0.85, "json")]
     stats = compute_type_stats(results, "json")
     assert isinstance(stats, TypeStats)
+
+
+# ── Property-based tests ──────────────────────────────────────────────────────
+
+
+@given(
+    wins=st.integers(min_value=0, max_value=10000),
+    total=st.integers(min_value=1, max_value=10000),
+)
+@settings(max_examples=200)
+def test_wilson_interval_bounds_property(wins: int, total: int) -> None:
+    """For all valid inputs, Wilson interval bounds are valid probabilities."""
+    # Clamp wins to not exceed total
+    wins = min(wins, total)
+    lower, upper = wilson_interval(wins, total)
+    assert 0.0 <= lower <= upper <= 1.0, (
+        f"Invalid bounds: ({lower}, {upper}) for wins={wins}, total={total}"
+    )
