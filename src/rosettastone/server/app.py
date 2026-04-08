@@ -195,6 +195,8 @@ def create_app() -> FastAPI:
     configure_logging()
     _init_sentry()
 
+    multi_user = os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
+
     app = FastAPI(
         title="RosettaStone",
         description="LLM Migration Dashboard",
@@ -220,7 +222,10 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
     )
 
-    app.add_middleware(CSRFMiddleware)
+    # CSRF middleware: enable when auth is active (API key or multi-user mode)
+    csrf_active = multi_user or bool(os.environ.get("ROSETTASTONE_API_KEY"))
+    if csrf_active:
+        app.add_middleware(CSRFMiddleware)
     app.add_middleware(AuthMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestIDMiddleware)
@@ -278,11 +283,7 @@ def create_app() -> FastAPI:
         )
 
     # Register API routes
-    from rosettastone.server.api.ab_testing import router as ab_testing_router
     from rosettastone.server.api.alerts import router as alerts_router
-    from rosettastone.server.api.annotations import router as annotations_router
-    from rosettastone.server.api.approvals import router as approvals_router
-    from rosettastone.server.api.audit import router as audit_router
     from rosettastone.server.api.auth import router as auth_router
     from rosettastone.server.api.comparisons import router as comparisons_router
     from rosettastone.server.api.costs import router as costs_router
@@ -291,10 +292,9 @@ def create_app() -> FastAPI:
     from rosettastone.server.api.models import router as models_router
     from rosettastone.server.api.pipelines import router as pipelines_router
     from rosettastone.server.api.reports import router as reports_router
-    from rosettastone.server.api.teams import router as teams_router
-    from rosettastone.server.api.users import router as users_router
     from rosettastone.server.api.versioning import router as versioning_router
 
+    # Core routers — always registered
     app.include_router(migrations_router)
     app.include_router(comparisons_router)
     app.include_router(reports_router)
@@ -304,13 +304,23 @@ def create_app() -> FastAPI:
     app.include_router(alerts_router)
     app.include_router(auth_router)
     app.include_router(versioning_router)
-    app.include_router(audit_router)
-    app.include_router(ab_testing_router)
     app.include_router(pipelines_router)
-    app.include_router(users_router)
-    app.include_router(teams_router)
-    app.include_router(annotations_router)
-    app.include_router(approvals_router)
+
+    # Enterprise routers — only registered when ROSETTASTONE_MULTI_USER is enabled
+    if multi_user:
+        from rosettastone.server.api.ab_testing import router as ab_testing_router
+        from rosettastone.server.api.annotations import router as annotations_router
+        from rosettastone.server.api.approvals import router as approvals_router
+        from rosettastone.server.api.audit import router as audit_router
+        from rosettastone.server.api.teams import router as teams_router
+        from rosettastone.server.api.users import router as users_router
+
+        app.include_router(audit_router)
+        app.include_router(ab_testing_router)
+        app.include_router(users_router)
+        app.include_router(teams_router)
+        app.include_router(annotations_router)
+        app.include_router(approvals_router)
 
     async def _check_readiness(app: FastAPI) -> dict:
         """Check all system components and return a readiness dict."""

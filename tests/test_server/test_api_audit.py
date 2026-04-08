@@ -61,53 +61,53 @@ class TestListAuditLog:
             log_audit(session, rt, rid, action)
         session.commit()
 
-    def test_list_all(self, client, engine):
+    def test_list_all(self, multi_user_client, engine):
         """GET /api/v1/audit-log returns all entries."""
         with Session(engine) as s:
             self._seed_entries(s)
 
-        resp = client.get("/api/v1/audit-log")
+        resp = multi_user_client.get("/api/v1/audit-log")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 5
         assert len(data["items"]) == 5
 
-    def test_filter_by_resource_type(self, client, engine):
+    def test_filter_by_resource_type(self, multi_user_client, engine):
         """GET with resource_type filter returns matching entries."""
         with Session(engine) as s:
             self._seed_entries(s)
 
-        resp = client.get("/api/v1/audit-log?resource_type=model")
+        resp = multi_user_client.get("/api/v1/audit-log?resource_type=model")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 1
         assert data["items"][0]["resource_type"] == "model"
 
-    def test_filter_by_action(self, client, engine):
+    def test_filter_by_action(self, multi_user_client, engine):
         """GET with action filter returns matching entries."""
         with Session(engine) as s:
             self._seed_entries(s)
 
-        resp = client.get("/api/v1/audit-log?action=create")
+        resp = multi_user_client.get("/api/v1/audit-log?action=create")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 3
 
-    def test_pagination(self, client, engine):
+    def test_pagination(self, multi_user_client, engine):
         """GET with page/per_page paginates correctly."""
         with Session(engine) as s:
             self._seed_entries(s)
 
-        resp = client.get("/api/v1/audit-log?per_page=2&page=1")
+        resp = multi_user_client.get("/api/v1/audit-log?per_page=2&page=1")
         data = resp.json()
         assert len(data["items"]) == 2
         assert data["total"] == 5
         assert data["page"] == 1
         assert data["per_page"] == 2
 
-    def test_empty_log(self, client):
+    def test_empty_log(self, multi_user_client):
         """GET returns empty list when no entries exist."""
-        resp = client.get("/api/v1/audit-log")
+        resp = multi_user_client.get("/api/v1/audit-log")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 0
@@ -163,16 +163,13 @@ def _auth_header(user_id: int, role: str = "editor") -> dict[str, str]:
 
 
 class TestAuditLogAccessControl:
-    def test_audit_log_accessible_in_single_user_mode(self, engine) -> None:
-        """In single-user mode (no auth required), the audit log endpoint returns 200."""
+    def test_audit_log_not_accessible_in_single_user_mode(self, engine) -> None:
+        """In single-user mode, the audit log endpoint is not registered and returns 404."""
         client = _single_user_client(engine)
 
         resp = client.get("/api/v1/audit-log")
 
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "items" in data
-        assert "total" in data
+        assert resp.status_code == 404
 
     def test_audit_log_any_user_can_read_all_entries(self, engine, monkeypatch) -> None:
         """In multi-user mode, user 2 can read audit entries created by user 1's actions.

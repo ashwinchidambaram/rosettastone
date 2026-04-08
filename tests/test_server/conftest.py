@@ -174,3 +174,30 @@ def client(engine) -> TestClient:
 
     app.dependency_overrides[get_session] = override_session
     return TestClient(app)
+
+
+_MULTI_USER_JWT_SECRET = "test-multi-user-secret-long-enough-for-hmac"
+
+
+@pytest.fixture
+def multi_user_client(engine, monkeypatch) -> TestClient:
+    """Create a test client with ROSETTASTONE_MULTI_USER=true (enterprise features enabled).
+
+    Includes an admin JWT in the default headers so enterprise endpoints are accessible.
+    """
+    from rosettastone.server.auth_utils import create_jwt
+
+    monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
+    monkeypatch.setenv("ROSETTASTONE_JWT_SECRET", _MULTI_USER_JWT_SECRET)
+    monkeypatch.delenv("ROSETTASTONE_API_KEY", raising=False)
+
+    app = create_app()
+
+    def override_session():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_session
+
+    token = create_jwt(user_id=1, role="admin", secret=_MULTI_USER_JWT_SECRET)
+    return TestClient(app, headers={"Authorization": f"Bearer {token}"})
