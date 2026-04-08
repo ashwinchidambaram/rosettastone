@@ -171,8 +171,15 @@ def _make_gepa_callback(migration_id: int, engine: Any = None) -> Callable[[int,
     return on_iteration
 
 
-def _make_progress_writer(migration_id: int, engine: Any) -> Any:
-    """Return a callback that writes stage progress to the DB and emits SSE events."""
+def _make_progress_writer(migration_id: int, engine: Any, migrator: Any = None) -> Any:
+    """Return a callback that writes stage progress to the DB and emits SSE events.
+
+    Args:
+        migration_id: ID of the MigrationRecord to update.
+        engine: SQLAlchemy engine.
+        migrator: Optional Migrator instance. When provided, live cost and warning
+            counts from its PipelineContext are included in the SSE event payload.
+    """
 
     def _write_progress(stage: str, stage_pct: float, overall_pct: float) -> None:
         # Write to DB
@@ -191,16 +198,25 @@ def _make_progress_writer(migration_id: int, engine: Any) -> Any:
         # Emit to SSE clients
         from rosettastone.server.progress import emit_progress
 
-        emit_progress(
-            migration_id,
-            {
-                "type": "progress",
-                "migration_id": migration_id,
-                "current_stage": stage,
-                "stage_progress": stage_pct,
-                "overall_progress": overall_pct,
-            },
-        )
+        event_data: dict[str, Any] = {
+            "type": "progress",
+            "migration_id": migration_id,
+            "current_stage": stage,
+            "stage_progress": stage_pct,
+            "overall_progress": overall_pct,
+        }
+
+        # Include live cost and warning data if PipelineContext is available
+        if migrator is not None:
+            ctx = migrator.context
+            if ctx is not None:
+                try:
+                    event_data["total_cost_usd"] = round(sum(ctx.costs.values()), 4)
+                    event_data["warning_count"] = len(ctx.warnings)
+                except Exception:
+                    pass  # Never let cost/warning enrichment block progress events
+
+        emit_progress(migration_id, event_data)
 
     return _write_progress
 
@@ -251,19 +267,23 @@ def run_migration_background(
         config_dict["output_dir"] = str(output_dir)
         config = MigrationConfig(**config_dict)
 
-        progress_cb = _make_progress_writer(migration_id, engine)
         gepa_cb = _make_gepa_callback(migration_id, engine)
         checkpoint_cb = _make_checkpoint_writer(migration_id, engine)
-        result = Migrator(
+
+        # Create migrator first so progress writer can reference it for live cost/warning data.
+        # Progress callback is wired in after construction via _progress_callback attribute.
+        migrator = Migrator(
             config,
-            progress_callback=progress_cb,
             migration_id=migration_id,
             engine=engine,
             gepa_iteration_callback=gepa_cb,
             checkpoint_callback=checkpoint_cb,
             resume_checkpoint_stage=resume_from,
             resume_checkpoint_data=checkpoint_data,
-        ).run()
+        )
+        migrator._progress_callback = _make_progress_writer(migration_id, engine, migrator=migrator)
+
+        result = migrator.run()
 
         # Latency sampling — measure first 5 prompts against source and target
         latency_data = _sample_latency(result, config)

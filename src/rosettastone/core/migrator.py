@@ -41,6 +41,12 @@ class Migrator:
         self.checkpoint_callback = checkpoint_callback
         self.resume_checkpoint_stage = resume_checkpoint_stage
         self.resume_checkpoint_data = resume_checkpoint_data
+        self._ctx: object | None = None  # Set at the start of run(); readable by progress writers
+
+    @property
+    def context(self) -> object | None:
+        """Access the pipeline context (available after run() starts)."""
+        return self._ctx
 
     def _emit(self, stage: str, stage_pct: float, overall_pct: float) -> None:
         """Invoke progress_callback if set; swallow any exception it raises."""
@@ -181,6 +187,7 @@ class Migrator:
 
         start = time.time()
         ctx = PipelineContext()
+        self._ctx = ctx  # Expose to external consumers (e.g. SSE progress writer)
 
         # Step 0: Pre-flight
         if not self.config.skip_preflight:

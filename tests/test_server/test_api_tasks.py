@@ -393,7 +393,7 @@ class TestRunMigrationBackground:
             per_type_scores={},
         )
 
-        received_callbacks = []
+        created_migrators = []
 
         class FakeMigrator:
             def __init__(
@@ -405,7 +405,9 @@ class TestRunMigrationBackground:
                 gepa_iteration_callback=None,
                 **kwargs,
             ):
-                received_callbacks.append(progress_callback)
+                self._progress_callback = progress_callback
+                self.context = None
+                created_migrators.append(self)
 
             def run(self):
                 return mock_result
@@ -419,8 +421,10 @@ class TestRunMigrationBackground:
                 engine=engine,
             )
 
-        assert len(received_callbacks) == 1
-        assert callable(received_callbacks[0]), "progress_callback must be a callable"
+        assert len(created_migrators) == 1
+        assert callable(created_migrators[0]._progress_callback), (
+            "progress_callback must be a callable (set via _progress_callback after construction)"
+        )
 
     def test_running_status_set_before_migrator(self, engine) -> None:
         """Verify the status transitions through 'running' before completion."""

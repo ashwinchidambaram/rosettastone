@@ -1448,7 +1448,7 @@ async def stream_migration_progress(
 
     async def event_generator():
         # Send catch-up: current state from DB
-        catchup = {
+        catchup: dict = {
             "type": "progress",
             "migration_id": migration_id,
             "status": record.status,
@@ -1456,6 +1456,15 @@ async def stream_migration_progress(
             "stage_progress": record.stage_progress or 0.0,
             "overall_progress": record.overall_progress or 0.0,
         }
+        # Include cost and warning count from the persisted record when available
+        if record.cost_usd is not None and record.cost_usd > 0.0:
+            catchup["total_cost_usd"] = round(record.cost_usd, 4)
+        try:
+            persisted_warnings = json.loads(record.warnings_json or "[]")
+            if persisted_warnings:
+                catchup["warning_count"] = len(persisted_warnings)
+        except (json.JSONDecodeError, TypeError):
+            pass
         yield f"data: {json.dumps(catchup)}\n\n"
 
         # If already terminal, close immediately
