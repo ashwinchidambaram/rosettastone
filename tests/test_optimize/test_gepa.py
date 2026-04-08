@@ -480,7 +480,6 @@ class TestGEPACostTracking:
         The returned metric closure must not mutate any external cost store. It
         only computes a score+feedback pair and returns a dspy.Prediction.
         """
-        import inspect
 
         from rosettastone.optimize.metric import build_migration_metric
 

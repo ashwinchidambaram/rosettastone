@@ -11,7 +11,11 @@ from hypothesis import strategies as st
 
 from rosettastone.config import MigrationConfig
 from rosettastone.core.types import EvalResult, OutputType, PromptPair
-from rosettastone.evaluate.composite import DEFAULT_WIN_THRESHOLDS, METRIC_WEIGHTS, CompositeEvaluator
+from rosettastone.evaluate.composite import (
+    DEFAULT_WIN_THRESHOLDS,
+    METRIC_WEIGHTS,
+    CompositeEvaluator,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers

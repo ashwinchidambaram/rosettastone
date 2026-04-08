@@ -5,7 +5,6 @@ from __future__ import annotations
 from rosettastone.calibration.collector import generate_synthetic_pairs, stratified_sample
 from rosettastone.calibration.types import LabeledPair
 
-
 # ===========================================================================
 # generate_synthetic_pairs tests
 # ===========================================================================

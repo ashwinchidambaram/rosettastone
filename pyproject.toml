@@ -144,6 +144,9 @@ warn_unused_ignores = false
 dev = [
     "alembic>=1.18.4",
     "faker>=40.12.0",
+    "freezegun>=1.4",
+    "hypothesis>=6.100",
     "playwright>=1.58.0",
+    "pytest-recording>=0.13",
     "types-pyyaml>=6.0.12.20250915",
 ]

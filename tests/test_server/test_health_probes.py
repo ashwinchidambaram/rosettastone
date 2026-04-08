@@ -6,6 +6,7 @@ import pytest
 def client():
     """FastAPI test client with lifespan disabled for health tests."""
     from fastapi.testclient import TestClient
+
     from rosettastone.server.app import create_app
 
     app = create_app()

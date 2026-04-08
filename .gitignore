@@ -60,3 +60,4 @@ docs/*
 # Source images (keep assets/ for repo-facing files)
 images/
 .worktrees/
+.hypothesis/

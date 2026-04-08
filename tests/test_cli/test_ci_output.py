@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from rosettastone.cli.ci_output import format_ci_json, format_pr_comment, format_quality_diff
 from tests.factories import migration_result_factory
 
