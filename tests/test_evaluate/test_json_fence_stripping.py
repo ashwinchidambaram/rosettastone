@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from rosettastone.evaluate.json_validator import JSONEvaluator
+from rosettastone.evaluate.json_validator import JSONEvaluator, _strip_fences
 
 
 class TestJSONFenceStripping:
@@ -117,7 +117,7 @@ not valid json at all
 ```"""
         scores = self.evaluator.score(expected, actual)
         assert scores["json_valid"] == 1.0
-        # Same key, different value → key_overlap=1.0, value_score=0.0 → field_match=0.5
+        # Same key, different value -> key_overlap=1.0, value_score=0.0 -> field_match=0.5
         assert scores["json_field_match"] == 0.5
 
     # --- Whitespace handling ---
@@ -143,3 +143,49 @@ not valid json at all
         scores = self.evaluator.score(expected, actual)
         assert scores["json_valid"] == 1.0
         assert scores["json_field_match"] == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Direct _strip_fences() unit tests (thinking-prefix and edge cases)
+# ---------------------------------------------------------------------------
+
+
+class TestStripFencesFunction:
+    """Unit tests for _strip_fences() directly, covering thinking-prefix models."""
+
+    def test_strip_fences_basic_json_fence(self) -> None:
+        """A ```json block is stripped to its bare JSON content."""
+        text = '```json\n{"key": "val"}\n```'
+        result = _strip_fences(text)
+        assert result == '{"key": "val"}'
+
+    def test_strip_fences_no_fence_plain_json(self) -> None:
+        """Plain JSON with no fences is returned unchanged."""
+        text = '{"key": "val"}'
+        result = _strip_fences(text)
+        assert result == '{"key": "val"}'
+
+    def test_strip_fences_thinking_prefix_with_fence(self) -> None:
+        """<think> prefix followed by a JSON fence block: the JSON is extracted."""
+        text = '<think>reasoning here</think>\n\n```json\n{"key": "val"}\n```'
+        result = _strip_fences(text)
+        assert result == '{"key": "val"}'
+
+    def test_strip_fences_thinking_prefix_bare_json(self) -> None:
+        """Text prefix followed by bare JSON object: JSON is extracted from the end."""
+        text = 'Some thinking text\n{"key": "val"}'
+        result = _strip_fences(text)
+        assert result == '{"key": "val"}'
+
+    def test_strip_fences_empty_input(self) -> None:
+        """Empty string input returns empty string."""
+        result = _strip_fences("")
+        assert result == ""
+
+    def test_strip_fences_multiple_fence_blocks(self) -> None:
+        """Input with a text preamble followed by two fence blocks: re.search returns the first."""
+        # The preamble prevents re.match from anchoring at position 0, so case 2 (re.search)
+        # runs and finds the first fence block.
+        text = 'Thinking text\n```json\n{"first": 1}\n```\n\nMore thinking\n```json\n{"second": 2}\n```'
+        result = _strip_fences(text)
+        assert result == '{"first": 1}'

@@ -622,3 +622,135 @@ class TestScoreSemanticFallbackLogging:
                 assert phrase not in msg, (
                     f"Unexpected fallback log '{phrase}' found on happy path: {msg}"
                 )
+
+
+# ---------------------------------------------------------------------------
+# Batch BERTScore index alignment tests
+# ---------------------------------------------------------------------------
+
+
+class TestBatchBERTScoreAlignment:
+    """Verify that the 3-phase batching correctly maps BERTScore results to pairs.
+
+    The evaluate() method:
+    1. Collects LLM completions in parallel (Phase 1).
+    2. Batch-computes BERTScore for free-text pairs only (Phase 2).
+    3. Assembles EvalResults, feeding each free-text pair its own pre-computed score (Phase 3).
+
+    These tests ensure the free_text_indices -> bertscore_map mapping is correct.
+    """
+
+    def setup_method(self) -> None:
+        self.config = make_config()
+        self.evaluator = CompositeEvaluator(self.config)
+
+    @patch("rosettastone.evaluate.composite.litellm.completion")
+    def test_batch_evaluate_assigns_scores_to_correct_pairs(
+        self, mock_completion: MagicMock
+    ) -> None:
+        """5 pairs (3 free-text, 2 JSON): each free-text pair gets its own BERTScore.
+
+        The batch returns 3 distinct scores. The test verifies they are assigned in
+        order to the free-text pairs, not to their JSON neighbours.
+        """
+        # Pairs layout: [short_text, json, short_text, json, short_text]
+        pairs = [
+            make_pair("ST-0 question", "ST-0 answer", OutputType.SHORT_TEXT),
+            make_pair("JS-1 question", '{"k": "v"}', OutputType.JSON),
+            make_pair("ST-2 question", "ST-2 answer", OutputType.SHORT_TEXT),
+            make_pair("JS-3 question", '{"k": "v"}', OutputType.JSON),
+            make_pair("ST-4 question", "ST-4 answer", OutputType.SHORT_TEXT),
+        ]
+
+        # Completions mirror the expected responses (so JSON pairs score perfectly)
+        responses = [
+            "ST-0 answer",       # short_text
+            '{"k": "v"}',        # json
+            "ST-2 answer",       # short_text
+            '{"k": "v"}',        # json
+            "ST-4 answer",       # short_text
+        ]
+        mock_completion.side_effect = [make_litellm_response(r) for r in responses]
+
+        # 3 distinct BERTScores for the 3 free-text pairs (in order)
+        batch_scores_returned = [0.11, 0.55, 0.99]
+
+        with patch(
+            "rosettastone.evaluate.bertscore.batch_compute_bertscore",
+            return_value=batch_scores_returned,
+        ) as mock_batch:
+            results = self.evaluator.evaluate(pairs)
+
+        # BERTScore batch was called once with exactly 3 free-text pairs
+        mock_batch.assert_called_once()
+        call_pairs = mock_batch.call_args[0][0]
+        assert len(call_pairs) == 3
+
+        # Pull out the short_text results (indices 0, 2, 4 in input order)
+        # results ordering follows completion order, so find by prompt
+        st_results = [r for r in results if r.details.get("output_type") == "short_text"]
+        json_results = [r for r in results if r.details.get("output_type") == "json"]
+
+        assert len(st_results) == 3
+        assert len(json_results) == 2
+
+        # Each short_text pair must carry the bertscore_f1 that was pre-computed for it
+        st_scores = sorted(r.scores.get("bertscore_f1", -1.0) for r in st_results)
+        assert st_scores == sorted(batch_scores_returned), (
+            f"BERTScore values were not correctly mapped. Got {st_scores}, "
+            f"expected {sorted(batch_scores_returned)}"
+        )
+
+        # JSON pairs must NOT have a bertscore_f1 key (they use json_validator instead)
+        for r in json_results:
+            assert "bertscore_f1" not in r.scores, (
+                "JSON pair unexpectedly received a bertscore_f1 score"
+            )
+
+    @patch("rosettastone.evaluate.composite.litellm.completion")
+    def test_batch_evaluate_empty_free_text_list(self, mock_completion: MagicMock) -> None:
+        """When all pairs are JSON type, BERTScore batch is never called."""
+        pairs = [
+            make_pair("Q1", '{"a": 1}', OutputType.JSON),
+            make_pair("Q2", '{"b": 2}', OutputType.JSON),
+        ]
+        mock_completion.side_effect = [
+            make_litellm_response('{"a": 1}'),
+            make_litellm_response('{"b": 2}'),
+        ]
+
+        with patch(
+            "rosettastone.evaluate.bertscore.batch_compute_bertscore",
+        ) as mock_batch:
+            results = self.evaluator.evaluate(pairs)
+
+        mock_batch.assert_not_called()
+        assert len(results) == 2
+        # All results should be JSON-scored
+        for r in results:
+            assert r.details["output_type"] == "json"
+            assert "json_valid" in r.scores
+
+    @patch("rosettastone.evaluate.composite.litellm.completion")
+    def test_evaluate_single_pair_matches_batch(self, mock_completion: MagicMock) -> None:
+        """A single short_text pair evaluated via batch uses the batch BERTScore value."""
+        pair = make_pair("Tell me a story.", "Once upon a time.", OutputType.SHORT_TEXT)
+        expected_bert_score = 0.73
+
+        mock_completion.return_value = make_litellm_response("Once upon a time.")
+
+        with patch(
+            "rosettastone.evaluate.bertscore.batch_compute_bertscore",
+            return_value=[expected_bert_score],
+        ):
+            results = self.evaluator.evaluate([pair])
+
+        assert len(results) == 1
+        result = results[0]
+        # The single free-text pair must receive exactly the batch BERTScore value
+        assert "bertscore_f1" in result.scores, (
+            "Expected bertscore_f1 in scores but it was missing"
+        )
+        assert abs(result.scores["bertscore_f1"] - expected_bert_score) < 1e-9, (
+            f"Expected bertscore_f1={expected_bert_score}, got {result.scores['bertscore_f1']}"
+        )
