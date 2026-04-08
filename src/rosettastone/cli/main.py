@@ -230,8 +230,50 @@ def migrate(
                     eta_str = f"{eta_seconds / 3600:.1f}h remaining"
                 progress.update(overall_task, description=f"{label} ({eta_str})")
 
+        from rosettastone.core.migrator import MigrationBlockedError
+        from rosettastone.core.types import CostLimitExceeded
+        from rosettastone.optimize.utils import InstructionExtractionError
+
         migrator = Migrator(config, progress_callback=_cli_progress_callback)
-        result = migrator.run()
+        try:
+            result = migrator.run()
+        except CostLimitExceeded as exc:
+            progress.stop()
+            console.print("\n[red bold]Migration stopped — cost limit exceeded[/red bold]")
+            console.print(f"[red]{exc}[/red]")
+            console.print(
+                "\n[dim]To increase the budget, use --max-cost-usd <amount>. "
+                "To estimate cost first, use --dry-run.[/dim]"
+            )
+            raise typer.Exit(code=1)
+        except MigrationBlockedError as exc:
+            progress.stop()
+            console.print("\n[red bold]Migration blocked by pre-flight checks[/red bold]")
+            console.print(f"[red]{exc}[/red]")
+            console.print(
+                "\n[dim]Fix the issues above, or use --skip-preflight to override "
+                "(not recommended).[/dim]"
+            )
+            raise typer.Exit(code=1)
+        except InstructionExtractionError:
+            progress.stop()
+            console.print(
+                "\n[red bold]Failed to extract optimized instructions from GEPA[/red bold]"
+            )
+            console.print(
+                "\n[dim]This can happen when the optimization didn't converge. "
+                "Try --optimizer mipro as an alternative, or increase iterations "
+                "with --auto medium.[/dim]"
+            )
+            raise typer.Exit(code=1)
+        except Exception as exc:
+            progress.stop()
+            console.print("\n[red bold]Migration failed[/red bold]")
+            console.print(f"[red]{type(exc).__name__}: {exc}[/red]")
+            console.print(
+                "\n[dim]For more details, set ROSETTASTONE_LOG_LEVEL=DEBUG and re-run.[/dim]"
+            )
+            raise typer.Exit(code=1)
 
     # Phase 2: Use Rich display for output
     from rosettastone.cli.display import MigrationDisplay
