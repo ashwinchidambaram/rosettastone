@@ -201,6 +201,9 @@ def _make_progress_writer(migration_id: int, engine: Any, migrator: Any = None) 
         migrator: Optional Migrator instance. When provided, live cost and warning
             counts from its PipelineContext are included in the SSE event payload.
     """
+    import time as _time
+
+    _start = _time.monotonic()
 
     def _write_progress(stage: str, stage_pct: float, overall_pct: float) -> None:
         # Write to DB
@@ -236,6 +239,13 @@ def _make_progress_writer(migration_id: int, engine: Any, migrator: Any = None) 
                     event_data["warning_count"] = len(ctx.warnings)
                 except Exception:
                     pass  # Never let cost/warning enrichment block progress events
+
+        # Add ETA to SSE event using linear extrapolation
+        if overall_pct > 0.05:
+            elapsed = _time.monotonic() - _start
+            estimated_total = elapsed / overall_pct
+            eta_seconds = max(0, estimated_total - elapsed)
+            event_data["eta_seconds"] = round(eta_seconds, 1)
 
         emit_progress(migration_id, event_data)
 

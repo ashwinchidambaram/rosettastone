@@ -183,8 +183,55 @@ def migrate(
         lm_extra_kwargs=parsed_lm_extra_kwargs,
         num_threads=num_threads,
     )
-    migrator = Migrator(config)
-    result = migrator.run()
+
+    import time as _time
+
+    from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn, TimeElapsedColumn
+
+    stage_labels = {
+        "preflight": "Pre-flight checks",
+        "data_load": "Loading data",
+        "pii_scan": "PII scan",
+        "baseline_eval": "Baseline evaluation",
+        "optimize": "Optimizing prompt",
+        "pii_scan_text": "PII scan (text)",
+        "prompt_audit": "Prompt audit",
+        "validation_eval": "Validation evaluation",
+        "recommendation": "Generating recommendation",
+        "report": "Writing report",
+    }
+
+    _start_time = _time.monotonic()
+
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        overall_task = progress.add_task("Starting...", total=100)
+
+        def _cli_progress_callback(stage: str, stage_pct: float, overall_pct: float) -> None:
+            label = stage_labels.get(stage, stage)
+            progress.update(overall_task, completed=overall_pct * 100, description=label)
+
+            # Compute ETA
+            if overall_pct > 0.05:  # Only estimate after 5% to avoid wild early guesses
+                elapsed = _time.monotonic() - _start_time
+                estimated_total = elapsed / overall_pct
+                eta_seconds = max(0, estimated_total - elapsed)
+                if eta_seconds < 60:
+                    eta_str = f"{eta_seconds:.0f}s remaining"
+                elif eta_seconds < 3600:
+                    eta_str = f"{eta_seconds / 60:.0f}m remaining"
+                else:
+                    eta_str = f"{eta_seconds / 3600:.1f}h remaining"
+                progress.update(overall_task, description=f"{label} ({eta_str})")
+
+        migrator = Migrator(config, progress_callback=_cli_progress_callback)
+        result = migrator.run()
 
     # Phase 2: Use Rich display for output
     from rosettastone.cli.display import MigrationDisplay
