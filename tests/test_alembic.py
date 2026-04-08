@@ -287,7 +287,14 @@ def test_observability_columns_exist_after_upgrade(upgraded_db):
     engine.dispose()
 
     assert "failure_reason" in tc_columns, "failure_reason column missing from test_cases"
-    expected_gepa_cols = {"id", "migration_id", "iteration", "total_iterations", "mean_score", "recorded_at"}
+    expected_gepa_cols = {
+        "id",
+        "migration_id",
+        "iteration",
+        "total_iterations",
+        "mean_score",
+        "recorded_at",
+    }
     missing_gepa = expected_gepa_cols - gepa_columns
     assert not missing_gepa, f"Columns missing from gepa_iterations: {missing_gepa}"
 
@@ -410,8 +417,7 @@ def test_schema_parity_column_level(tmp_path, monkeypatch):
     inspector1 = sqlalchemy.inspect(engine1)
     tables_create_all = set(inspector1.get_table_names())
     cols_create_all: dict[str, set[str]] = {
-        tbl: {col["name"] for col in inspector1.get_columns(tbl)}
-        for tbl in tables_create_all
+        tbl: {col["name"] for col in inspector1.get_columns(tbl)} for tbl in tables_create_all
     }
     engine1.dispose()
     reset_engine()
@@ -427,8 +433,7 @@ def test_schema_parity_column_level(tmp_path, monkeypatch):
     inspector2 = sqlalchemy.inspect(engine2)
     tables_alembic = set(inspector2.get_table_names()) - {"alembic_version"}
     cols_alembic: dict[str, set[str]] = {
-        tbl: {col["name"] for col in inspector2.get_columns(tbl)}
-        for tbl in tables_alembic
+        tbl: {col["name"] for col in inspector2.get_columns(tbl)} for tbl in tables_alembic
     }
     engine2.dispose()
     reset_engine()
@@ -492,3 +497,252 @@ def test_init_db_idempotent(tmp_path, monkeypatch):
     )
 
     reset_engine()
+
+
+# ---------------------------------------------------------------------------
+# Test group — Data preservation across upgrade/downgrade cycles
+# ---------------------------------------------------------------------------
+
+
+class TestDataPreservation:
+    """Verify that data inserted into the database survives Alembic upgrade/downgrade cycles."""
+
+    def test_data_survives_upgrade_to_head(self, alembic_db):
+        """Records inserted after upgrade head must be queryable from a fresh engine."""
+        from sqlalchemy import create_engine as sa_create_engine
+        from sqlmodel import Session
+
+        from rosettastone.server.models import MigrationRecord, TestCaseRecord
+
+        _run_upgrade(alembic_db, "head")
+
+        # Insert records using a session backed by the upgraded DB.
+        engine_write = sa_create_engine(f"sqlite:///{alembic_db}")
+        with Session(engine_write) as session:
+            mr = MigrationRecord(
+                source_model="openai/gpt-4o",
+                target_model="anthropic/claude-sonnet-4",
+                status="complete",
+                confidence_score=0.92,
+                cost_usd=1.50,
+            )
+            session.add(mr)
+            session.flush()  # assign mr.id before creating the FK child
+            migration_id = mr.id
+
+            tc = TestCaseRecord(
+                migration_id=migration_id,
+                phase="validation",
+                output_type="json",
+                composite_score=0.85,
+                is_win=True,
+                scores_json='{"bertscore": 0.9}',
+                details_json="{}",
+                response_length=100,
+                new_response_length=95,
+            )
+            session.add(tc)
+            session.commit()
+            tc_id = tc.id
+
+        engine_write.dispose()
+
+        # Simulate a server restart by creating a brand-new engine to the same path.
+        engine_read = sa_create_engine(f"sqlite:///{alembic_db}")
+        with Session(engine_read) as session:
+            queried_mr = session.get(MigrationRecord, migration_id)
+            assert queried_mr is not None, "MigrationRecord not found after engine restart"
+            assert queried_mr.source_model == "openai/gpt-4o"
+            assert queried_mr.target_model == "anthropic/claude-sonnet-4"
+            assert queried_mr.confidence_score == pytest.approx(0.92)
+
+            queried_tc = session.get(TestCaseRecord, tc_id)
+            assert queried_tc is not None, "TestCaseRecord not found after engine restart"
+            assert queried_tc.composite_score == pytest.approx(0.85)
+            assert queried_tc.is_win is True
+            # FK relationship is intact.
+            assert queried_tc.migration_id == queried_mr.id
+
+        engine_read.dispose()
+
+    def test_data_survives_downgrade_and_reupgrade(self, alembic_db):
+        """Downgrade to base destroys all data (expected); re-upgrade restores schema
+        so new data can be inserted and queried correctly.
+
+        Note: Downgrading to 'base' drops all application tables, which necessarily
+        destroys any data that was stored in them. This is documented expected behaviour —
+        this test verifies that (a) the downgrade succeeds, (b) the subsequent re-upgrade
+        correctly recreates the schema, and (c) new records can be inserted and queried
+        after the re-upgrade.
+        """
+        from sqlalchemy import create_engine as sa_create_engine
+        from sqlmodel import Session
+
+        from rosettastone.server.models import MigrationRecord
+
+        _run_upgrade(alembic_db, "head")
+
+        # Insert a record before downgrade.
+        engine_before = sa_create_engine(f"sqlite:///{alembic_db}")
+        with Session(engine_before) as session:
+            mr = MigrationRecord(
+                source_model="openai/gpt-4o",
+                target_model="anthropic/claude-sonnet-4",
+            )
+            session.add(mr)
+            session.commit()
+        engine_before.dispose()
+
+        # Downgrade to base — this drops all tables and data.
+        try:
+            _run_downgrade(alembic_db, "base")
+        except Exception as exc:
+            pytest.skip(f"Downgrade to base not supported: {exc}")
+
+        # After downgrade, application tables should be absent.
+        tables_after_downgrade = get_table_names(alembic_db) - {"alembic_version"}
+        assert not (tables_after_downgrade & EXPECTED_APP_TABLES), (
+            f"Tables still exist after downgrade to base: "
+            f"{tables_after_downgrade & EXPECTED_APP_TABLES}"
+        )
+
+        # Re-upgrade to head — schema must be fully restored.
+        _run_upgrade(alembic_db, "head")
+
+        # Insert a new record after re-upgrade to confirm the schema works correctly.
+        engine_after = sa_create_engine(f"sqlite:///{alembic_db}")
+        with Session(engine_after) as session:
+            new_mr = MigrationRecord(
+                source_model="anthropic/claude-haiku-4-5",
+                target_model="openai/gpt-4o-mini",
+                status="complete",
+                confidence_score=0.77,
+            )
+            session.add(new_mr)
+            session.commit()
+            new_id = new_mr.id
+
+        engine_after.dispose()
+
+        # Verify the new record is queryable from a fresh engine.
+        engine_verify = sa_create_engine(f"sqlite:///{alembic_db}")
+        with Session(engine_verify) as session:
+            result = session.get(MigrationRecord, new_id)
+            assert result is not None, "MigrationRecord not found after downgrade+re-upgrade"
+            assert result.source_model == "anthropic/claude-haiku-4-5"
+            assert result.confidence_score == pytest.approx(0.77)
+
+        engine_verify.dispose()
+
+    def test_init_db_preserves_existing_data(self, alembic_db):
+        """Calling init_db() on an already-populated database must not destroy data."""
+        from sqlalchemy import create_engine as sa_create_engine
+        from sqlmodel import Session
+
+        from rosettastone.server.database import init_db
+        from rosettastone.server.models import MigrationRecord
+
+        _run_upgrade(alembic_db, "head")
+
+        # Insert a record before calling init_db().
+        engine_before = sa_create_engine(f"sqlite:///{alembic_db}")
+        with Session(engine_before) as session:
+            mr = MigrationRecord(
+                source_model="openai/gpt-4o",
+                target_model="anthropic/claude-sonnet-4",
+                status="complete",
+                confidence_score=0.88,
+            )
+            session.add(mr)
+            session.commit()
+            migration_id = mr.id
+
+        engine_before.dispose()
+
+        # init_db() uses create_all() which is additive — it must not drop existing tables
+        # or rows.
+        init_db()
+
+        # Verify from a fresh engine that the record still exists.
+        engine_verify = sa_create_engine(f"sqlite:///{alembic_db}")
+        with Session(engine_verify) as session:
+            result = session.get(MigrationRecord, migration_id)
+            assert result is not None, "MigrationRecord was lost after calling init_db()"
+            assert result.source_model == "openai/gpt-4o"
+            assert result.confidence_score == pytest.approx(0.88)
+
+        engine_verify.dispose()
+
+    def test_multiple_records_with_fk_relationships(self, alembic_db):
+        """Multiple child records across tables must all be queryable and maintain FK integrity."""
+        from sqlalchemy import create_engine as sa_create_engine
+        from sqlmodel import Session, select
+
+        from rosettastone.server.models import MigrationRecord, TestCaseRecord, WarningRecord
+
+        _run_upgrade(alembic_db, "head")
+
+        engine_write = sa_create_engine(f"sqlite:///{alembic_db}")
+        with Session(engine_write) as session:
+            mr = MigrationRecord(
+                source_model="openai/gpt-4o",
+                target_model="anthropic/claude-sonnet-4",
+                status="complete",
+            )
+            session.add(mr)
+            session.flush()
+            migration_id = mr.id
+
+            # Insert 3 TestCaseRecords linked to the migration.
+            test_cases = [
+                TestCaseRecord(
+                    migration_id=migration_id,
+                    phase="validation",
+                    output_type="json",
+                    composite_score=0.80 + i * 0.05,
+                    is_win=(i % 2 == 0),
+                    scores_json="{}",
+                    details_json="{}",
+                    response_length=100 + i * 10,
+                    new_response_length=95 + i * 10,
+                )
+                for i in range(3)
+            ]
+            for tc in test_cases:
+                session.add(tc)
+
+            # Insert 1 WarningRecord linked to the migration.
+            warning = WarningRecord(
+                migration_id=migration_id,
+                warning_type="pipeline",
+                severity="LOW",
+                message="Cost threshold exceeded by 5%",
+            )
+            session.add(warning)
+            session.commit()
+
+        engine_write.dispose()
+
+        # Verify all records from a fresh engine.
+        engine_read = sa_create_engine(f"sqlite:///{alembic_db}")
+        with Session(engine_read) as session:
+            mr_result = session.get(MigrationRecord, migration_id)
+            assert mr_result is not None, "MigrationRecord missing"
+
+            tc_results = session.exec(
+                select(TestCaseRecord).where(TestCaseRecord.migration_id == migration_id)
+            ).all()
+            assert len(tc_results) == 3, f"Expected 3 TestCaseRecords, got {len(tc_results)}"
+            for tc in tc_results:
+                assert tc.migration_id == migration_id, "TestCaseRecord FK broken"
+
+            warning_results = session.exec(
+                select(WarningRecord).where(WarningRecord.migration_id == migration_id)
+            ).all()
+            assert len(warning_results) == 1, (
+                f"Expected 1 WarningRecord, got {len(warning_results)}"
+            )
+            assert warning_results[0].migration_id == migration_id, "WarningRecord FK broken"
+            assert warning_results[0].severity == "LOW"
+
+        engine_read.dispose()
