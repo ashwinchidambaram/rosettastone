@@ -37,6 +37,9 @@ def check_token_budget(config: MigrationConfig) -> tuple[list[str], list[str]]:
         if config.redis_url and adapter_type == AdapterChoice.JSONL:
             adapter_type = AdapterChoice.REDIS
 
+        from rosettastone.ingest.base import DataAdapter
+
+        adapter: DataAdapter
         if adapter_type == AdapterChoice.JSONL:
             from rosettastone.ingest.jsonl import JSONLAdapter
 

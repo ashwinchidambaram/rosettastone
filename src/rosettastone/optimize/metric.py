@@ -36,7 +36,7 @@ class IterationTracker:
         self._iteration = 0
         self._scores: list[float] = []
         self._callback = callback  # (iteration, total_iterations, running_mean_score) -> None
-        self._iteration_history: list[dict] = []
+        self._iteration_history: list[dict[str, Any]] = []
 
     def wrap(self, metric_fn: Any) -> Any:
         """Wrap a DSPy metric function to track iteration progress.
@@ -78,7 +78,7 @@ class IterationTracker:
 
         return wrapped
 
-    def get_history(self) -> list[dict]:
+    def get_history(self) -> list[dict[str, Any]]:
         """Return a shallow copy of the iteration history under lock."""
         with self._lock:
             return list(self._iteration_history)

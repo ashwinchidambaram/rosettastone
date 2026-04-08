@@ -38,7 +38,7 @@ def generate_pdf_report(result: MigrationResult, output_dir: Path) -> Path:
         Path to the generated PDF file.
     """
     try:
-        import weasyprint
+        import weasyprint  # type: ignore[import-not-found]
     except ImportError:
         raise ImportError(
             "weasyprint is required for PDF generation. "

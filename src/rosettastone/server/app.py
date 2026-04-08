@@ -329,7 +329,7 @@ def create_app() -> FastAPI:
         app.include_router(annotations_router)
         app.include_router(approvals_router)
 
-    async def _check_readiness(app: FastAPI) -> dict:
+    async def _check_readiness(app: FastAPI) -> dict[str, Any]:
         """Check all system components and return a readiness dict."""
         global _readiness_cache, _readiness_cache_time
 
@@ -339,7 +339,7 @@ def create_app() -> FastAPI:
 
         import os as _os
 
-        components: dict = {}
+        components: dict[str, Any] = {}
 
         # Database check
         try:
@@ -350,7 +350,7 @@ def create_app() -> FastAPI:
 
             _engine = _get_engine()
             with _Session(_engine) as _sess:
-                _sess.exec(_text("SELECT 1"))
+                _sess.exec(_text("SELECT 1"))  # type: ignore[call-overload]
             components["database"] = {"status": "ok"}
         except Exception as _exc:
             components["database"] = {"status": "unavailable", "error": str(_exc)[:100]}
@@ -396,7 +396,7 @@ def create_app() -> FastAPI:
         return result
 
     @app.get("/api/v1/health")
-    async def health(request: Request) -> dict:
+    async def health(request: Request) -> dict[str, Any]:
         """Basic health check — enriched with component statuses."""
         return await _check_readiness(request.app)
 

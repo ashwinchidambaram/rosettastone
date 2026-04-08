@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 def hash_password(plain: str) -> str:
     """Hash a plaintext password using bcrypt via passlib."""
-    from passlib.context import CryptContext
+    from passlib.context import CryptContext  # type: ignore[import-untyped]
 
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     return str(pwd_context.hash(plain))
@@ -13,7 +13,7 @@ def hash_password(plain: str) -> str:
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Verify a plaintext password against a bcrypt hash."""
-    from passlib.context import CryptContext
+    from passlib.context import CryptContext  # noqa: PLC0415
 
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     return bool(pwd_context.verify(plain, hashed))

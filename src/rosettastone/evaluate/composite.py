@@ -75,7 +75,9 @@ class CompositeEvaluator:
         # Phase 1: collect LLM completions for all pairs in parallel.
         # Each entry is either (PromptPair, response_str) on success
         # or (failure_reason_str, PromptPair) on failure (F6 taxonomy).
-        completions: list[tuple[PromptPair, str] | tuple[str, PromptPair] | None] = [None] * len(test_set)
+        completions: list[tuple[PromptPair, str] | tuple[str, PromptPair] | None] = (
+            [None] * len(test_set)
+        )
         skipped_count = 0
         total_eval_cost = 0.0
 
@@ -150,9 +152,13 @@ class CompositeEvaluator:
 
         if self._ctx is not None and total_eval_cost > 0:
             self._ctx.add_cost("evaluation", total_eval_cost)
-        if self._ctx is not None and (total_eval_prompt_tokens > 0 or total_eval_completion_tokens > 0):
+        if self._ctx is not None and (
+            total_eval_prompt_tokens > 0 or total_eval_completion_tokens > 0
+        ):
             try:
-                self._ctx.add_tokens("evaluation", total_eval_prompt_tokens, total_eval_completion_tokens)
+                self._ctx.add_tokens(
+                    "evaluation", total_eval_prompt_tokens, total_eval_completion_tokens
+                )
             except Exception:
                 pass
 
@@ -204,7 +210,7 @@ class CompositeEvaluator:
                 continue
             # Failure entry: (failure_reason: str, pair: PromptPair)
             if isinstance(entry[0], str):
-                failure_reason, pair = entry  # type: ignore[misc]
+                failure_reason, pair = entry
                 output_type = pair.output_type or detect_output_type(pair.response)
                 eval_result = EvalResult(
                     prompt_pair=pair,

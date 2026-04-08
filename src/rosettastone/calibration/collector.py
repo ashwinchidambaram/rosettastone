@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 import uuid
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -39,7 +40,7 @@ def generate_synthetic_pairs(
         composite = round(composite, 4)
 
         # Build dimensional scores with small random perturbation
-        noise = lambda: round(rng.gauss(0, 0.05), 4)  # noqa: E731
+        noise: Callable[[], float] = lambda: round(rng.gauss(0, 0.05), 4)  # noqa: E731
         scores = DimensionalScores(
             bertscore_f1=max(0.0, min(1.0, composite + noise())),
             embedding_sim=max(0.0, min(1.0, composite + noise())),

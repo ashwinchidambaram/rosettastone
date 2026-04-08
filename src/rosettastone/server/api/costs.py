@@ -228,7 +228,9 @@ def record_spend(user_id: int, actual_cost: float, session: Session) -> None:
     "/api/v1/budgets/me",
     dependencies=[Depends(require_role("viewer", "editor", "admin"))],
 )
-async def get_my_budget(request: Request, session: Session = Depends(get_session)) -> dict:
+async def get_my_budget(
+    request: Request, session: Session = Depends(get_session)
+) -> dict[str, Any]:
     """Get current user's budget status.
 
     Returns:
@@ -256,7 +258,7 @@ async def set_user_budget(
     user_id: int,
     body: BudgetUpdate,
     session: Session = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Admin: set monthly budget limit for a user."""
     budget = get_or_create_budget(user_id, session)
     budget.monthly_limit_usd = body.monthly_limit_usd
