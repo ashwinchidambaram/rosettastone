@@ -620,3 +620,129 @@ def test_no_recursion_into_subdirectories(tmp_path):
         f"Expected only 1 pair (no recursion into subdirectories), got {len(result)}"
     )
     assert result[0].prompt == "Top", f"Expected top-level span prompt, got: {result[0].prompt!r}"
+
+
+# ===========================================================================
+# Task 5.2 — Determinism, missing attributes, empty file, multiple resourceSpans
+# ===========================================================================
+
+
+def test_otel_deterministic_output_regardless_of_span_order(tmp_path):
+    """Two files with identical spans but different order produce identical PromptPairs.
+
+    Output is compared after sorting by prompt content so order-sensitivity doesn't
+    mask real nondeterminism in content.
+    """
+    spans_a = [
+        _gen_ai_span(prompt="Alpha prompt", completion="Alpha answer", trace_id="ta"),
+        _gen_ai_span(prompt="Beta prompt", completion="Beta answer", trace_id="tb"),
+        _gen_ai_span(prompt="Gamma prompt", completion="Gamma answer", trace_id="tc"),
+    ]
+    # Reverse the span order for the second file
+    spans_b = list(reversed(spans_a))
+
+    file_a = tmp_path / "order_a.json"
+    file_b = tmp_path / "order_b.json"
+    _write_json(file_a, _make_otlp(spans_a))
+    _write_json(file_b, _make_otlp(spans_b))
+
+    result_a = OTelAdapter(file_a, _SOURCE_MODEL).load()
+    result_b = OTelAdapter(file_b, _SOURCE_MODEL).load()
+
+    # Normalise both results by sorting on prompt string so ordering differences don't matter
+    def _prompt_str(p: PromptPair) -> str:
+        return p.prompt if isinstance(p.prompt, str) else str(p.prompt)
+
+    sorted_a = sorted(result_a, key=_prompt_str)
+    sorted_b = sorted(result_b, key=_prompt_str)
+
+    assert len(sorted_a) == len(sorted_b), (
+        f"Expected same number of pairs: {len(sorted_a)} vs {len(sorted_b)}"
+    )
+    for i, (pa, pb) in enumerate(zip(sorted_a, sorted_b)):
+        assert pa.prompt == pb.prompt, (
+            f"Pair {i}: prompt mismatch — {pa.prompt!r} vs {pb.prompt!r}"
+        )
+        assert pa.response == pb.response, (
+            f"Pair {i}: response mismatch — {pa.response!r} vs {pb.response!r}"
+        )
+
+
+def test_otel_missing_prompt_attribute_skipped(tmp_path):
+    """A span with gen_ai.completion but no gen_ai.prompt is skipped — no crash, not included."""
+    span_no_prompt = _make_span(
+        name="gen_ai.completion",
+        trace_id="no-prompt",
+        attributes=[
+            _attr("gen_ai.request.model", "gpt-4o"),
+            _attr("gen_ai.completion", "Some completion without a prompt"),
+        ],
+    )
+    valid_span = _gen_ai_span(prompt="A valid prompt", completion="A valid answer", trace_id="ok")
+    otlp_file = tmp_path / "missing_prompt.json"
+    _write_json(otlp_file, _make_otlp([span_no_prompt, valid_span]))
+
+    result = OTelAdapter(otlp_file, _SOURCE_MODEL).load()
+
+    assert len(result) == 1, (
+        f"Expected 1 result (span with missing prompt skipped), got {len(result)}"
+    )
+    assert result[0].prompt == "A valid prompt", (
+        f"Expected only the valid span's prompt, got: {result[0].prompt!r}"
+    )
+
+
+def test_otel_empty_file_returns_empty(tmp_path):
+    """An empty JSON file (not a valid OTLP envelope) is handled gracefully and returns []."""
+    empty_file = tmp_path / "empty.json"
+    # Write an empty JSON object — no resourceSpans key at all
+    empty_file.write_text("{}")
+
+    result = OTelAdapter(empty_file, _SOURCE_MODEL).load()
+
+    assert result == [], f"Expected empty list from empty JSON file, got: {result!r}"
+
+
+def test_otel_multiple_resource_spans(tmp_path):
+    """OTLP JSON with 2 resourceSpans, each containing different spans, collects all prompts."""
+    data = {
+        "resourceSpans": [
+            {
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            _gen_ai_span(
+                                prompt="Resource1 Q1", completion="Resource1 A1", trace_id="r1t1"
+                            ),
+                            _gen_ai_span(
+                                prompt="Resource1 Q2", completion="Resource1 A2", trace_id="r1t2"
+                            ),
+                        ]
+                    }
+                ]
+            },
+            {
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            _gen_ai_span(
+                                prompt="Resource2 Q1", completion="Resource2 A1", trace_id="r2t1"
+                            ),
+                        ]
+                    }
+                ]
+            },
+        ]
+    }
+    otlp_file = tmp_path / "multi_resource.json"
+    _write_json(otlp_file, data)
+
+    result = OTelAdapter(otlp_file, _SOURCE_MODEL).load()
+
+    assert len(result) == 3, (
+        f"Expected 3 pairs from 2 resourceSpans (2+1 spans), got {len(result)}"
+    )
+    prompts = {p.prompt for p in result}
+    assert "Resource1 Q1" in prompts, f"Expected 'Resource1 Q1' in prompts: {prompts!r}"
+    assert "Resource1 Q2" in prompts, f"Expected 'Resource1 Q2' in prompts: {prompts!r}"
+    assert "Resource2 Q1" in prompts, f"Expected 'Resource2 Q1' in prompts: {prompts!r}"

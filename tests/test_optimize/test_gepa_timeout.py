@@ -8,7 +8,8 @@ so tests run in milliseconds without needing to wait for actual wall-clock timeo
 from __future__ import annotations
 
 import concurrent.futures
-from unittest.mock import MagicMock, patch
+import threading
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -707,3 +708,163 @@ class TestMigratorTimeoutHandling:
             migrator = Migrator(config)
             with pytest.raises(TimeoutError, match=r"timed out|no usable intermediate|GEPA"):
                 migrator.run()
+
+
+# ---------------------------------------------------------------------------
+# Task 5.1 — Thread leak stability, intermediate instructions, executor shutdown
+# ---------------------------------------------------------------------------
+
+
+class TestThreadLeakStability:
+    """Thread count should not grow unboundedly across multiple sequential timeout scenarios."""
+
+    def _run_one_timeout(self, tmp_path) -> None:
+        """Run a single timeout scenario with no intermediate result."""
+        config = _make_config(tmp_path, timeout=30)
+        train = _make_pairs(2)
+        val = _make_pairs(1)
+
+        with (
+            patch("rosettastone.optimize.gepa.dspy.LM"),
+            patch("rosettastone.optimize.gepa.dspy.GEPA"),
+            patch("rosettastone.optimize.gepa.dspy.context") as mock_ctx,
+            patch("rosettastone.optimize.gepa.concurrent.futures.ThreadPoolExecutor") as mock_exec,
+        ):
+            mock_ctx.return_value.__enter__ = lambda s: s
+            mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
+            _patch_future_timeout(mock_exec)
+
+            with pytest.raises(TimeoutError):
+                GEPAOptimizer().optimize(train, val, config)
+
+    def test_gepa_timeout_thread_count_stable_after_multiple_timeouts(self, tmp_path) -> None:
+        """Running the timeout scenario 3 times should not cause unbounded thread growth.
+
+        Allows a tolerance of 2 additional threads between iterations (threads may take
+        a moment to clean up). The key property is that the count does not grow linearly.
+        """
+        counts: list[int] = []
+
+        for _ in range(3):
+            self._run_one_timeout(tmp_path)
+            counts.append(threading.active_count())
+
+        # The thread count must not grow by more than 2 between any two consecutive iterations.
+        for i in range(1, len(counts)):
+            growth = counts[i] - counts[i - 1]
+            assert growth <= 2, (
+                f"Thread count grew by {growth} between iterations {i - 1} and {i} "
+                f"(counts: {counts}). Possible thread leak."
+            )
+
+
+class TestTimeoutWithIntermediateInstructions:
+    """When GEPA times out but has captured an intermediate, the exception must carry non-empty
+    instructions."""
+
+    def test_gepa_timeout_with_intermediate_captures_instructions(self, tmp_path) -> None:
+        """GEPATimeoutWithResult.instructions is non-empty when an intermediate was captured."""
+        config = _make_config(tmp_path, timeout=30)
+        train = _make_pairs(2)
+        val = _make_pairs(1)
+
+        captured_instructions = "Instructions captured at iteration 3"
+        captured_metric: list = []
+
+        def fake_extract(prog):
+            return captured_instructions
+
+        def fake_base_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
+            return 0.5
+
+        def fake_gepa_init(**kwargs):
+            captured_metric.append(kwargs.get("metric"))
+            mock_gepa = MagicMock()
+
+            def fake_compile(program, trainset):
+                metric = captured_metric[0]
+                gold = MagicMock()
+                gold.expected_response = "resp"
+                pred = MagicMock()
+                metric(gold, pred)
+                return MagicMock()
+
+            mock_gepa.compile.side_effect = fake_compile
+            return mock_gepa
+
+        with (
+            patch("rosettastone.optimize.gepa.dspy.LM"),
+            patch("rosettastone.optimize.gepa.dspy.GEPA", side_effect=fake_gepa_init),
+            patch("rosettastone.optimize.gepa.dspy.context") as mock_ctx,
+            patch("rosettastone.optimize.gepa.concurrent.futures.ThreadPoolExecutor") as mock_exec,
+            patch(
+                "rosettastone.optimize.gepa.extract_optimized_instructions",
+                side_effect=fake_extract,
+            ),
+            patch(
+                "rosettastone.optimize.gepa.build_migration_metric", return_value=fake_base_metric
+            ),
+        ):
+            mock_ctx.return_value.__enter__ = lambda s: s
+            mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
+
+            mock_executor_instance = MagicMock()
+            mock_executor_instance.__enter__ = MagicMock(return_value=mock_executor_instance)
+            mock_executor_instance.__exit__ = MagicMock(return_value=False)
+
+            def real_submit(fn):
+                fn()  # populate best_intermediate via metric call
+                mock_future = MagicMock()
+                mock_future.result.side_effect = concurrent.futures.TimeoutError()
+                return mock_future
+
+            mock_executor_instance.submit.side_effect = real_submit
+            mock_exec.return_value = mock_executor_instance
+
+            with pytest.raises(GEPATimeoutWithResult) as exc_info:
+                GEPAOptimizer().optimize(train, val, config)
+
+        exc = exc_info.value
+        assert isinstance(exc.instructions, str), (
+            f"Expected instructions to be a str, got: {type(exc.instructions)}"
+        )
+        assert len(exc.instructions) > 0, (
+            "Expected non-empty instructions in GEPATimeoutWithResult"
+        )
+        assert exc.instructions == captured_instructions, (
+            f"Expected '{captured_instructions}', got: {exc.instructions!r}"
+        )
+
+
+class TestExecutorShutdownOnTimeout:
+    """executor.shutdown(wait=False) must be called when a timeout occurs."""
+
+    def test_gepa_timeout_executor_shutdown_called(self, tmp_path) -> None:
+        """On timeout, executor.shutdown(wait=False) must be called to release the executor."""
+        config = _make_config(tmp_path, timeout=30)
+        train = _make_pairs(2)
+        val = _make_pairs(1)
+
+        with (
+            patch("rosettastone.optimize.gepa.dspy.LM"),
+            patch("rosettastone.optimize.gepa.dspy.GEPA"),
+            patch("rosettastone.optimize.gepa.dspy.context") as mock_ctx,
+            patch("rosettastone.optimize.gepa.concurrent.futures.ThreadPoolExecutor") as mock_exec,
+        ):
+            mock_ctx.return_value.__enter__ = lambda s: s
+            mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
+
+            mock_future = MagicMock()
+            mock_future.result.side_effect = concurrent.futures.TimeoutError()
+
+            mock_executor_instance = MagicMock()
+            mock_executor_instance.__enter__ = MagicMock(return_value=mock_executor_instance)
+            mock_executor_instance.__exit__ = MagicMock(return_value=False)
+            mock_executor_instance.submit.return_value = mock_future
+            mock_exec.return_value = mock_executor_instance
+
+            with pytest.raises(TimeoutError):
+                GEPAOptimizer().optimize(train, val, config)
+
+        # shutdown(wait=False) must have been called at least once (on the timeout path)
+        mock_executor_instance.shutdown.assert_called_with(wait=False)
