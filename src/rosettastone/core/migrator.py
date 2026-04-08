@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any
 from rosettastone.utils.logging import get_logger
 
 if TYPE_CHECKING:
+    from sqlalchemy import Engine
+
     from rosettastone.config import MigrationConfig
     from rosettastone.core.types import MigrationResult
 
@@ -27,11 +29,12 @@ class Migrator:
         config: MigrationConfig,
         progress_callback: Callable[[str, float, float], None] | None = None,
         migration_id: int | None = None,
-        engine: object | None = None,
+        engine: Engine | None = None,
         gepa_iteration_callback: Callable[[int, int, float], None] | None = None,
         checkpoint_callback: Callable[[str, str], None] | None = None,
         resume_checkpoint_stage: str | None = None,
         resume_checkpoint_data: str | None = None,
+        eval_pair_callback: Callable[[int, int, float, str], None] | None = None,
     ) -> None:
         self.config = config
         self._progress_callback = progress_callback
@@ -41,6 +44,13 @@ class Migrator:
         self.checkpoint_callback = checkpoint_callback
         self.resume_checkpoint_stage = resume_checkpoint_stage
         self.resume_checkpoint_data = resume_checkpoint_data
+        self._eval_pair_callback = eval_pair_callback
+        self._ctx: object | None = None  # Set at the start of run(); readable by progress writers
+
+    @property
+    def context(self) -> object | None:
+        """Access the pipeline context (available after run() starts)."""
+        return self._ctx
 
     def _emit(self, stage: str, stage_pct: float, overall_pct: float) -> None:
         """Invoke progress_callback if set; swallow any exception it raises."""
@@ -154,7 +164,7 @@ class Migrator:
 
         # Determine which stage to resume from (if any)
         resume_stage = self.resume_checkpoint_stage
-        resume_data: dict = {}
+        resume_data: dict[str, Any] = {}
         if resume_stage and self.resume_checkpoint_data:
             try:
                 resume_data = json.loads(self.resume_checkpoint_data)
@@ -181,6 +191,7 @@ class Migrator:
 
         start = time.time()
         ctx = PipelineContext()
+        self._ctx = ctx  # Expose to external consumers (e.g. SSE progress writer)
 
         # Step 0: Pre-flight
         if not self.config.skip_preflight:
@@ -241,7 +252,9 @@ class Migrator:
             ctx.timing["baseline_eval"] = 0.0
         else:
             t0 = time.time()
-            baseline = evaluate_baseline(test, self.config, ctx=ctx)
+            baseline = evaluate_baseline(
+                test, self.config, ctx=ctx, eval_pair_callback=self._eval_pair_callback
+            )
             ctx.timing["baseline_eval"] = time.time() - t0
             _record_stage("baseline_eval", ctx.timing["baseline_eval"])
             if not _already_done("baseline_eval"):
@@ -263,9 +276,9 @@ class Migrator:
             gepa_cost_accumulator: list[float],
             ctx: Any = None,
             max_cost_usd: float | None = None,
-        ) -> Callable[[dict, object, object, object], None]:
+        ) -> Callable[[dict[str, Any], object, object, object], None]:
             def _gepa_cost_callback(
-                kwargs: dict,
+                kwargs: dict[str, Any],
                 completion_response: object,
                 start_time: object,
                 end_time: object,
@@ -288,7 +301,7 @@ class Migrator:
             return _gepa_cost_callback
 
         # Step 3: Optimize — restore optimized prompt from checkpoint if available
-        _iteration_history: list[dict] = []
+        _iteration_history: list[dict[str, Any]] = []
         if _already_done("optimize"):
             # Try to recover the optimized prompt from checkpoint data
             saved_prompt = resume_data.get("stage_output", {})
@@ -389,7 +402,10 @@ class Migrator:
             ctx.timing["validation_eval"] = 0.0
         else:
             t0 = time.time()
-            validation = evaluate_optimized(test, optimized_prompt, self.config, ctx=ctx)
+            validation = evaluate_optimized(
+                test, optimized_prompt, self.config, ctx=ctx,
+                eval_pair_callback=self._eval_pair_callback,
+            )
             ctx.timing["validation_eval"] = time.time() - t0
             _record_stage("validation_eval", ctx.timing["validation_eval"])
             if not _already_done("validation_eval"):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 
 class DeprecationEntry(NamedTuple):
@@ -77,7 +77,7 @@ def days_until_retirement(entry: DeprecationEntry) -> int:
     return (entry.retirement_date - today).days
 
 
-def check_model_deprecation(model_id: str) -> dict | None:
+def check_model_deprecation(model_id: str) -> dict[str, Any] | None:
     """Check if a model is deprecated. Returns dict with info or None.
 
     Returns:

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}RosettaStone | Audit Log{% endblock %}
+{% block title %}Audit Log{% endblock %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto">
@@ -20,7 +20,7 @@
       <option value="failed" {% if request.query_params.get('action') == 'failed' %}selected{% endif %}>Failed</option>
       <option value="blocked" {% if request.query_params.get('action') == 'blocked' %}selected{% endif %}>Blocked</option>
     </select>
-    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Filter</button>
+    <button type="submit" class="px-4 py-2 bg-[#D4745E] text-white rounded hover:brightness-110 active:scale-95 transition-all">Filter</button>
   </form>
 
   <!-- Table -->

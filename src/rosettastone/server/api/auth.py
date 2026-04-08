@@ -138,7 +138,9 @@ async def login_page(request: Request) -> Response:
         return RedirectResponse(url="/ui/", status_code=302)
     templates = request.app.state.templates
     multi_user = os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
-    return templates.TemplateResponse(request, "login.html", {"multi_user": multi_user})  # type: ignore[no-any-return]
+    auth_enabled = bool(os.environ.get("ROSETTASTONE_API_KEY")) or multi_user
+    ctx = {"multi_user": multi_user, "auth_enabled": auth_enabled}
+    return templates.TemplateResponse(request, "login.html", ctx)  # type: ignore[no-any-return]
 
 
 @router.post("/ui/login")
@@ -151,10 +153,15 @@ async def login_submit(request: Request, api_key: str = Form(...)) -> Response:
         return RedirectResponse(url="/ui/", status_code=302)
 
     if not _verify_key(api_key, expected):
+        multi_user = os.environ.get("ROSETTASTONE_MULTI_USER", "").lower() in ("1", "true", "yes")
         return templates.TemplateResponse(  # type: ignore[no-any-return]
             request,
             "login.html",
-            {"error": "Invalid API key. Please try again."},
+            {
+                "error": "Invalid API key. Please try again.",
+                "multi_user": multi_user,
+                "auth_enabled": True,
+            },
             status_code=401,
         )
 

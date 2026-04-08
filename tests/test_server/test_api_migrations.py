@@ -1022,7 +1022,6 @@ def test_migration_detail_has_total_tokens(client, session, engine):
 
 def test_get_optimization_trace_empty(client, engine):
     """Migration with no iteration history returns correct empty shape."""
-    import json as _json
 
     from sqlmodel import Session as _Session
 

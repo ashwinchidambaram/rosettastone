@@ -126,7 +126,7 @@ class TaskWorker:
             task = sess.exec(
                 select(TaskQueue)
                 .where(TaskQueue.status == "queued")
-                .order_by(TaskQueue.priority.desc(), TaskQueue.created_at.asc())
+                .order_by(TaskQueue.priority.desc(), TaskQueue.created_at.asc())  # type: ignore[attr-defined]
                 .limit(1)
             ).first()
             if task is None:

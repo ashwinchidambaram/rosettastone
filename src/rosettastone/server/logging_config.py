@@ -89,7 +89,7 @@ class JsonFormatter(logging.Formatter):
 
         # Correlation IDs — prefer what was injected via extra=, fall back to
         # the context var so background tasks automatically inherit the value.
-        request_id: str = record.__dict__.get("request_id") or get_request_id()  # type: ignore[assignment]
+        request_id: str | None = record.__dict__.get("request_id") or get_request_id()
         if request_id:
             payload["request_id"] = request_id
 

@@ -175,7 +175,7 @@ def generate_executive_narrative(
         if narrative:
             llm_succeeded = True
             logger.info("Executive narrative: using %s", "LLM")
-            return narrative
+            return str(narrative)
 
         logger.info("Executive narrative: using %s", "template fallback")
         return _template_fallback(result, per_type, safety)

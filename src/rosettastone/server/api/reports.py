@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from sqlmodel import Session, select
 
-from rosettastone.server.api.utils import _get_migration_or_404
+from rosettastone.server.api.utils import _get_migration_with_owner_check
 from rosettastone.server.database import get_session
 from rosettastone.server.models import MigrationRecord, TestCaseRecord
 
@@ -107,10 +107,11 @@ def _reconstruct_migration_result(record: MigrationRecord, session: Session) -> 
 @router.get("/api/v1/migrations/{migration_id}/report/markdown")
 async def get_markdown_report(
     migration_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> Response:
     """Generate and return a markdown migration report."""
-    record = _get_migration_or_404(migration_id, session)
+    record = _get_migration_with_owner_check(migration_id, session, request)
     result = _reconstruct_migration_result(record, session)
 
     # Try to use the existing report generator
@@ -170,10 +171,11 @@ async def get_markdown_report(
 @router.get("/api/v1/migrations/{migration_id}/report/html")
 async def get_html_report(
     migration_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> Response:
     """Return an HTML migration report."""
-    record = _get_migration_or_404(migration_id, session)
+    record = _get_migration_with_owner_check(migration_id, session, request)
     result = _reconstruct_migration_result(record, session)
 
     try:
@@ -202,10 +204,11 @@ async def get_html_report(
 @router.get("/api/v1/migrations/{migration_id}/report/pdf")
 async def get_pdf_report(
     migration_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> Response:
     """Generate and return a PDF migration report."""
-    record = _get_migration_or_404(migration_id, session)
+    record = _get_migration_with_owner_check(migration_id, session, request)
 
     try:
         from rosettastone.report.pdf_generator import generate_pdf_report
@@ -239,10 +242,11 @@ async def get_pdf_report(
 @router.get("/api/v1/migrations/{migration_id}/report/executive")
 async def get_executive_report(
     migration_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> Response:
     """Return an executive narrative report."""
-    record = _get_migration_or_404(migration_id, session)
+    record = _get_migration_with_owner_check(migration_id, session, request)
     result = _reconstruct_migration_result(record, session)
 
     try:
@@ -274,10 +278,11 @@ async def get_executive_report(
 @router.get("/api/v1/migrations/{migration_id}/shadow/config.yaml")
 async def get_shadow_config(
     migration_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> Response:
     """Download a shadow deployment config YAML for a migration."""
-    record = _get_migration_or_404(migration_id, session)
+    record = _get_migration_with_owner_check(migration_id, session, request)
 
     shadow_dict: dict[str, Any] = {
         "source_model": record.source_model,
@@ -311,10 +316,11 @@ async def get_shadow_config(
 async def evaluate_shadow_logs(
     migration_id: int,
     file: UploadFile,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
     """Upload a shadow log JSONL file and score target vs source responses."""
-    record = _get_migration_or_404(migration_id, session)
+    record = _get_migration_with_owner_check(migration_id, session, request)
 
     try:
         from rosettastone.shadow.evaluator import score_shadow_logs

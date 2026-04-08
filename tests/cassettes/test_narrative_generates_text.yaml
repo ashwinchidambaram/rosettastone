@@ -1,0 +1,35 @@
+interactions:
+- request:
+    body: '{"model":"gpt-4o","messages":[{"role":"user","content":"You are a technical
+      writer creating an executive summary of an LLM model migration evaluation."}],"max_tokens":1000,"temperature":0.3}'
+    headers:
+      Content-Type:
+      - application/json
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: '{"id":"chatcmpl-test004","object":"chat.completion","created":1700000003,"model":"gpt-4o-2024-08-06","choices":[{"index":0,"message":{"role":"assistant","content":"Based
+        on the evaluation results, we recommend proceeding with the migration from
+        openai/gpt-4o to anthropic/claude-sonnet-4 with high confidence (85.0%). The
+        target model demonstrated strong behavioral equivalence across all tested prompt
+        types, achieving a composite score improvement of 12.0 percentage points above
+        the baseline.\n\nThe migration performed particularly well on structured output
+        tasks including JSON generation and classification, where the target model
+        matched or exceeded baseline performance in 90% of cases. Short-form text
+        generation also showed strong equivalence, with semantic similarity scores
+        consistently above 0.80. No significant regressions were observed in any output
+        category.\n\nNo safety concerns were identified during the evaluation. All
+        responses remained within acceptable content guidelines, and no anomalous
+        behaviors were detected that would warrant a conditional or no-go recommendation.\n\nAs
+        next steps, we recommend deploying the migration in a shadow traffic configuration
+        for 48 hours to validate performance under real production load. Monitor latency
+        percentiles and cost per token closely during this period, as pricing structures
+        differ between providers. A rollback plan should be in place before full cutover."},"finish_reason":"stop"}],"usage":{"prompt_tokens":200,"completion_tokens":180,"total_tokens":380}}'
+    headers:
+      Content-Type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+version: 1

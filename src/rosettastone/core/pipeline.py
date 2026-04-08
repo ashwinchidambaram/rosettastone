@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from rosettastone.config import MigrationConfig
@@ -176,7 +176,7 @@ def optimize_prompt(
     val: list[PromptPair],
     config: MigrationConfig,
     on_iteration: Callable[[int, int, float], None] | None = None,
-    iteration_history_out: list[dict] | None = None,
+    iteration_history_out: list[dict[str, Any]] | None = None,
 ) -> str:
     from rosettastone.optimize.base import Optimizer
 
@@ -200,11 +200,12 @@ def evaluate_baseline(
     test: list[PromptPair],
     config: MigrationConfig,
     ctx: PipelineContext | None = None,
+    eval_pair_callback: Callable[[int, int, float, str], None] | None = None,
 ) -> list[EvalResult]:
     from rosettastone.evaluate.composite import CompositeEvaluator
 
     evaluator = CompositeEvaluator(config, ctx=ctx)
-    return evaluator.evaluate_multi_run(test)
+    return evaluator.evaluate_multi_run(test, eval_pair_callback=eval_pair_callback)
 
 
 def evaluate_optimized(
@@ -212,11 +213,14 @@ def evaluate_optimized(
     optimized_prompt: str,
     config: MigrationConfig,
     ctx: PipelineContext | None = None,
+    eval_pair_callback: Callable[[int, int, float, str], None] | None = None,
 ) -> list[EvalResult]:
     from rosettastone.evaluate.composite import CompositeEvaluator
 
     evaluator = CompositeEvaluator(config, ctx=ctx)
-    return evaluator.evaluate_multi_run(test, optimized_prompt=optimized_prompt)
+    return evaluator.evaluate_multi_run(
+        test, optimized_prompt=optimized_prompt, eval_pair_callback=eval_pair_callback
+    )
 
 
 def run_pii_scan(pairs: list[PromptPair], ctx: PipelineContext, config: MigrationConfig) -> None:
@@ -305,6 +309,7 @@ def run_pii_scan_text(
     from rosettastone.core.context import SafetySeverity, SafetyWarning
 
     use_presidio = config and config.pii_engine == PIIEngine.PRESIDIO
+    findings: list[tuple[str, str]] | list[tuple[str, str, int]]
     if use_presidio:
         from rosettastone.safety.presidio_engine import scan_text_presidio
 
@@ -420,6 +425,7 @@ def build_result(
         )
         threshold = win_thresholds.get(out_type, DEFAULT_THRESHOLDS.get(out_type, 0.80))
 
+        status: Literal["improved", "stable", "regressed", "at_risk"]
         if delta >= 0.05:
             status = "improved"
         elif delta >= -0.05:

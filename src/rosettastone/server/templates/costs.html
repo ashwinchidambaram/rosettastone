@@ -7,12 +7,26 @@
 <!-- Header Section -->
 <header class="flex items-center justify-between py-12">
     <h1 class="text-[28px] font-semibold text-[#E8DCC4] tracking-tight">Cost overview</h1>
-    <div class="relative group">
-        <button class="bg-[#2a2a2a] hover:bg-[#393939] text-[#E5E2E1] px-5 py-2.5 rounded-lg flex items-center gap-3 transition-all">
-            <span class="text-sm font-medium">This month</span>
+    <div class="relative">
+        <button id="period-btn" data-action="toggle-period-dropdown" class="bg-[#2a2a2a] hover:bg-[#393939] text-[#E5E2E1] px-5 py-2.5 rounded-lg flex items-center gap-3 transition-all">
+            <span id="period-label" class="text-sm font-medium">This month</span>
             <span class="material-symbols-outlined text-sm" aria-hidden="true">expand_more</span>
         </button>
+        <div id="period-dropdown" class="hidden absolute right-0 top-full mt-1 bg-surface-container-high border border-outline-variant/20 rounded-lg shadow-xl z-10 min-w-[150px] py-1">
+            <button onclick="selectPeriod('7d','Last 7 days')" class="w-full text-left flex items-center px-4 py-2.5 text-sm text-on-surface hover:bg-surface-bright transition-colors">Last 7 days</button>
+            <button onclick="selectPeriod('30d','This month')" class="w-full text-left flex items-center px-4 py-2.5 text-sm text-on-surface hover:bg-surface-bright transition-colors">This month</button>
+            <button onclick="selectPeriod('90d','Last 3 months')" class="w-full text-left flex items-center px-4 py-2.5 text-sm text-on-surface hover:bg-surface-bright transition-colors">Last 3 months</button>
+            <button onclick="selectPeriod('365d','This year')" class="w-full text-left flex items-center px-4 py-2.5 text-sm text-on-surface hover:bg-surface-bright transition-colors">This year</button>
+        </div>
     </div>
+    <script nonce="{{ request.state.csp_nonce }}">
+    function selectPeriod(value, label) {
+        var lbl = document.getElementById('period-label');
+        if (lbl) lbl.textContent = label;
+        var dd = document.getElementById('period-dropdown');
+        if (dd) dd.classList.add('hidden');
+    }
+    </script>
 </header>
 
 <!-- KPI Section -->

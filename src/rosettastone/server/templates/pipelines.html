@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}RosettaStone | Pipeline Migrations{% endblock %}
+{% block title %}Pipeline Migrations{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -18,9 +18,9 @@
         <h1 class="font-headline font-semibold text-[28px] text-[#E8DCC4] tracking-tight">Pipeline Migrations</h1>
         <p class="text-on-surface-variant text-sm mt-2 opacity-70">Multi-step LLM pipeline optimization</p>
     </div>
-    <a href="#" class="bg-[#D4745E] text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-[#D4745E]/20">
-        <span class="material-symbols-outlined text-sm" aria-hidden="true">add</span>
-        Create New Pipeline
+    <a href="/api/docs#/pipelines" target="_blank" rel="noopener noreferrer" title="Pipeline configs are submitted via the REST API" class="bg-[#D4745E] text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-[#D4745E]/20">
+        <span class="material-symbols-outlined text-sm" aria-hidden="true">api</span>
+        API Docs
     </a>
 </header>
 

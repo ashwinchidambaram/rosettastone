@@ -534,7 +534,7 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
             TestCaseRecord.migration_id == record.id,
             TestCaseRecord.phase == "baseline",
         )
-        .order_by(TestCaseRecord.id)  # type: ignore[attr-defined]
+        .order_by(TestCaseRecord.id)  # type: ignore[arg-type]
     )
     _val_order_stmt = (
         select(TestCaseRecord)
@@ -542,7 +542,7 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
             TestCaseRecord.migration_id == record.id,
             TestCaseRecord.phase == "validation",
         )
-        .order_by(TestCaseRecord.id)  # type: ignore[attr-defined]
+        .order_by(TestCaseRecord.id)  # type: ignore[arg-type]
     )
     _baseline_tcs = list(session.exec(_baseline_stmt).all())
     _val_tcs_ordered = list(session.exec(_val_order_stmt).all())
@@ -554,9 +554,10 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
         for _idx, _val_tc in enumerate(_val_tcs_ordered):
             _b_raw = _baseline_tcs[_idx].scores_json
             _b_scores = json.loads(_b_raw) if _b_raw else {}
-            _baseline_scores_by_val_id[_val_tc.id] = {
-                k: v for k, v in _b_scores.items() if isinstance(v, (int, float))
-            }
+            if _val_tc.id is not None:
+                _baseline_scores_by_val_id[_val_tc.id] = {
+                    k: v for k, v in _b_scores.items() if isinstance(v, (int, float))
+                }
 
     tc_stmt = (
         select(TestCaseRecord)
@@ -585,7 +586,7 @@ def _migration_to_template_dict(record: MigrationRecord, session: Session) -> di
             reg["expected"] = "Content not stored"
             reg["got"] = "Content not stored"
         val_scores = json.loads(tc.scores_json) if tc.scores_json else {}
-        baseline_scores = _baseline_scores_by_val_id.get(tc.id, {})
+        baseline_scores = _baseline_scores_by_val_id.get(tc.id or 0, {})
         # Compute per-metric deltas; only include those with abs(delta) > 0.05
         metric_deltas: dict[str, float] = {}
         for m, v_score in val_scores.items():
@@ -1089,18 +1090,18 @@ async def get_migration_regressions(
         select(TestCaseRecord)
         .where(TestCaseRecord.migration_id == migration_id)
         .where(TestCaseRecord.phase == "baseline")
-        .order_by(TestCaseRecord.id)  # type: ignore[attr-defined]
+        .order_by(TestCaseRecord.id)  # type: ignore[arg-type]
     )
     validation_stmt = (
         select(TestCaseRecord)
         .where(TestCaseRecord.migration_id == migration_id)
         .where(TestCaseRecord.phase == "validation")
-        .order_by(TestCaseRecord.id)  # type: ignore[attr-defined]
+        .order_by(TestCaseRecord.id)  # type: ignore[arg-type]
     )
     baseline_tcs = list(session.exec(baseline_stmt).all())
     validation_tcs = list(session.exec(validation_stmt).all())
 
-    prompt_regressions = []
+    prompt_regressions: list[dict[str, Any]] = []
     for idx, (base_tc, val_tc) in enumerate(zip(baseline_tcs, validation_tcs)):
         b_score = base_tc.composite_score
         v_score = val_tc.composite_score
@@ -1158,7 +1159,7 @@ async def get_optimization_trace(
     migration_id: int,
     request: Request,
     session: Session = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Return the GEPA score trajectory for a migration."""
     record = _get_migration_or_404(migration_id, session)
     check_resource_owner(record.owner_id, request)
@@ -1181,7 +1182,7 @@ async def optimization_trace_fragment(
     record = _get_migration_or_404(migration_id, session)
     history = json.loads(record.optimization_score_history_json or "[]")
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "fragments/optimization_trace.html",
         {
@@ -1251,7 +1252,7 @@ def _build_diagnostics(record: MigrationRecord, session: Session) -> MigrationDi
             select(TestCaseRecord)
             .where(TestCaseRecord.migration_id == record.id)
             .where(TestCaseRecord.phase == "validation")
-            .order_by(TestCaseRecord.id)
+            .order_by(TestCaseRecord.id)  # type: ignore[arg-type]
         ).all()
     )
     metric_accumulator: dict[str, list[float]] = {}
@@ -1284,7 +1285,7 @@ def _build_diagnostics(record: MigrationRecord, session: Session) -> MigrationDi
         if abs(delta) <= 0.05:
             border_cases.append(
                 BorderCase(
-                    test_case_id=tc.id,
+                    test_case_id=tc.id or 0,
                     output_type=tc.output_type or "unknown",
                     composite_score=tc.composite_score,
                     threshold=threshold,
@@ -1300,7 +1301,7 @@ def _build_diagnostics(record: MigrationRecord, session: Session) -> MigrationDi
             select(TestCaseRecord)
             .where(TestCaseRecord.migration_id == record.id)
             .where(TestCaseRecord.phase == "baseline")
-            .order_by(TestCaseRecord.id)
+            .order_by(TestCaseRecord.id)  # type: ignore[arg-type]
         ).all()
     )
     improved_count = stable_count = regressed_count = at_risk_count = 0
@@ -1420,7 +1421,7 @@ async def diagnostics_fragment(
         return HTMLResponse("<p class='text-sm text-on-surface-variant p-4'>Not available yet.</p>")
     diag = _build_diagnostics(record, session)
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "fragments/diagnostics_panel.html",
         {"request": request, "diag": diag},
@@ -1429,13 +1430,13 @@ async def diagnostics_fragment(
 
 @router.get(
     "/api/v1/migrations/{migration_id}/stream",
-    response_class=None,  # streaming response
+    response_class=None,  # type: ignore[arg-type]  # streaming response
 )
 async def stream_migration_progress(
     migration_id: int,
     request: Request,
     session: Session = Depends(get_session),
-):
+) -> Any:
     """SSE endpoint for real-time migration progress.
 
     Connects the client to the progress hub. On connect, sends current
@@ -1446,9 +1447,9 @@ async def stream_migration_progress(
 
     record = _get_migration_or_404(migration_id, session)
 
-    async def event_generator():
+    async def event_generator() -> Any:
         # Send catch-up: current state from DB
-        catchup = {
+        catchup: dict[str, Any] = {
             "type": "progress",
             "migration_id": migration_id,
             "status": record.status,
@@ -1456,6 +1457,15 @@ async def stream_migration_progress(
             "stage_progress": record.stage_progress or 0.0,
             "overall_progress": record.overall_progress or 0.0,
         }
+        # Include cost and warning count from the persisted record when available
+        if record.cost_usd is not None and record.cost_usd > 0.0:
+            catchup["total_cost_usd"] = round(record.cost_usd, 4)
+        try:
+            persisted_warnings = json.loads(record.warnings_json or "[]")
+            if persisted_warnings:
+                catchup["warning_count"] = len(persisted_warnings)
+        except (json.JSONDecodeError, TypeError):
+            pass
         yield f"data: {json.dumps(catchup)}\n\n"
 
         # If already terminal, close immediately
@@ -1997,7 +2007,7 @@ async def eval_grid_fragment(
     stmt = (
         select(TestCaseRecord)
         .where(TestCaseRecord.migration_id == migration_id)
-        .order_by(TestCaseRecord.id.asc())  # type: ignore[attr-defined]
+        .order_by(TestCaseRecord.id.asc())  # type: ignore[union-attr]
         .limit(100)
     )
     test_cases = list(session.exec(stmt).all())
@@ -2196,7 +2206,7 @@ async def executive_summary_fragment(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/ui/migrations/{migration_id}/resume", response_class=None)
+@router.post("/ui/migrations/{migration_id}/resume", response_class=None)  # type: ignore[arg-type]
 async def ui_resume_migration(
     migration_id: int,
     request: Request,

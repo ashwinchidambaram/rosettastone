@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from rosettastone.core.types import OutputType, PromptPair
 from rosettastone.safety.pii_scanner import PIIWarning, scan_pairs, scan_text
 
@@ -519,4 +521,163 @@ class TestScanPairsSeverityLevels:
         assert len(result) > 0, "Expected warnings"
         assert result[0].severity == "LOW", (
             f"Expected LOW severity for IPv4, got {result[0].severity}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Adversarial tests — Unicode evasion and edge-case inputs
+# ---------------------------------------------------------------------------
+
+
+class TestPIIScannerAdversarial:
+    """Adversarial tests documenting scanner behaviour under Unicode evasion.
+
+    Standard inputs must be detected; evasion inputs are expected to slip
+    through the regex-based scanner (marked xfail where the scanner misses them).
+    The xfail markers document known limitations without breaking CI.
+    """
+
+    def test_standard_ssn_detected(self):
+        """Standard SSN format '123-45-6789' must be detected."""
+        findings = scan_text("123-45-6789")
+        assert any(pii_type == "ssn" for pii_type, *_ in findings), (
+            "Expected SSN '123-45-6789' to be detected"
+        )
+
+    def test_standard_email_detected(self):
+        """Standard email 'john.doe@example.com' must be detected."""
+        findings = scan_text("john.doe@example.com")
+        assert any(pii_type == "email" for pii_type, *_ in findings), (
+            "Expected email 'john.doe@example.com' to be detected"
+        )
+
+    def test_standard_credit_card_detected(self):
+        """Standard credit card '4111-1111-1111-1111' must be detected."""
+        findings = scan_text("4111-1111-1111-1111")
+        assert any(pii_type == "credit_card" for pii_type, *_ in findings), (
+            "Expected credit card '4111-1111-1111-1111' to be detected"
+        )
+
+    def test_standard_phone_detected(self):
+        """Standard phone '(555) 123-4567' must be detected."""
+        findings = scan_text("(555) 123-4567")
+        assert any(pii_type == "us_phone" for pii_type, *_ in findings), (
+            "Expected phone '(555) 123-4567' to be detected"
+        )
+
+    def test_clean_text_no_false_positives(self):
+        """Normal prose has no PII detected."""
+        findings = scan_text("The quick brown fox jumps over the lazy dog.")
+        assert findings == [], (
+            f"Expected no PII in clean prose, got {findings}"
+        )
+
+    @pytest.mark.xfail(
+        reason=(
+            "regex scanner limitation: zero-width space (U+200B) inserted between digits "
+            "breaks \\d{3} — the scanner misses SSN evasion via zero-width chars"
+        )
+    )
+    def test_ssn_with_zero_width_chars_not_detected(self):
+        """SSN with a zero-width space (U+200B) between digits evades the regex.
+
+        The pattern \\b\\d{3}-\\d{2}-\\d{4}\\b requires three consecutive ASCII
+        digits before the first hyphen.  A zero-width space inserted between
+        the first and second digit breaks that run, so the scanner misses the
+        value.  This is a known limitation; the test is marked xfail to
+        document it without blocking CI.
+        """
+        ssn_with_zwsp = "123\u200b-45-6789"  # zero-width space between '3' and '-'
+        findings = scan_text(ssn_with_zwsp)
+        # If the scanner ever gains Unicode-aware detection this should pass.
+        assert any(pii_type == "ssn" for pii_type, *_ in findings), (
+            "Expected scanner to detect SSN despite zero-width space evasion"
+        )
+
+    def test_email_with_cyrillic_a_not_detected(self):
+        """Email where a Latin 'a' is replaced with Cyrillic 'а' (U+0430) partially evades.
+
+        The email regex character class [a-zA-Z0-9._%+-] accepts only ASCII chars.
+        A Cyrillic homoglyph (U+0430) in the local-part terminates the greedy match
+        early, so the scanner does NOT match the full 'useraT@example.com' string.
+        However, the scanner still fires because the ASCII fragment 't@example.com'
+        after the Cyrillic character satisfies the pattern independently.
+
+        This documents the evasion technique: the detected address is a truncated
+        false-positive fragment ('t@example.com'), not the true full address.
+        An attacker can therefore evade username-level matching while still
+        triggering a scanner hit on a meaningless stub.
+        """
+        # 'а' here is Cyrillic U+0430, visually identical to Latin 'a'
+        cyrillic_email = "user\u0430t@example.com"
+        findings = scan_text(cyrillic_email)
+        # The scanner detects a partial match — 't@example.com' — not the full address.
+        # This is the documented partial-evasion behaviour.
+        assert any(pii_type == "email" for pii_type, *_ in findings), (
+            "Expected scanner to fire on the ASCII stub after the Cyrillic char "
+            "(partial match 't@example.com' — not the full address 'useraT@example.com')"
+        )
+
+    def test_credit_card_space_padded_behavior(self):
+        """Credit card with double spaces between groups is NOT detected by the scanner.
+
+        The credit-card regex uses [-\\s]? — a single optional whitespace.
+        Double spaces ('  ') require two whitespace characters between groups,
+        so the pattern fails to match.  This test documents that known gap
+        without asserting detection.
+        """
+        double_space_cc = "4111  1111  1111  1111"
+        findings = scan_text(double_space_cc)
+        cc_findings = [pii_type for pii_type, *_ in findings if pii_type == "credit_card"]
+        # Document: double-space padded cards are currently NOT detected.
+        # If the regex is later updated to handle \\s+ this assertion should
+        # be flipped to assert detection.
+        assert len(cc_findings) == 0, (
+            "Double-space padded credit card is expected to evade the current regex "
+            f"([-\\s]? matches at most one whitespace); got {cc_findings}"
+        )
+
+    @pytest.mark.xfail(
+        reason=(
+            "regex scanner limitation: fullwidth parentheses （U+FF08）（U+FF09） are not "
+            "matched by \\( and \\) in the phone pattern"
+        )
+    )
+    def test_phone_with_fullwidth_parens_not_detected(self):
+        """Phone number using fullwidth parentheses （） evades the ASCII-only regex.
+
+        The phone pattern uses literal \\( and \\) which only match the ASCII
+        parentheses U+0028 / U+0029.  Fullwidth variants U+FF08 / U+FF09 are
+        visually similar but distinct code points that the regex does not cover.
+        """
+        fullwidth_phone = "\uff08555\uff09 123-4567"  # （555） 123-4567
+        findings = scan_text(fullwidth_phone)
+        assert any(pii_type == "us_phone" for pii_type, *_ in findings), (
+            "Expected scanner to detect phone despite fullwidth parentheses evasion"
+        )
+
+    def test_scan_pairs_accumulates_across_prompt_and_response(self):
+        """scan_pairs accumulates PII findings from both prompt and response fields.
+
+        When the same PII type appears in both the prompt and the response of a
+        single pair, the occurrence_count on the resulting PIIWarning must reflect
+        the combined total (prompt occurrences + response occurrences).
+        """
+        pair = PromptPair(
+            prompt="My SSN is 123-45-6789.",
+            response="Confirmed: SSN 123-45-6789 on file.",
+            source_model="openai/gpt-4o",
+        )
+        warnings = scan_pairs([pair])
+
+        ssn_warnings = [w for w in warnings if w.pii_type == "ssn"]
+        assert len(ssn_warnings) == 1, (
+            f"Expected exactly one SSN PIIWarning (merged per pair), got {ssn_warnings}"
+        )
+        warning = ssn_warnings[0]
+        assert warning.pair_index == 0, f"Expected pair_index=0, got {warning.pair_index}"
+        # One occurrence in prompt + one in response = 2 total
+        assert warning.occurrence_count == 2, (
+            f"Expected occurrence_count=2 (one in prompt, one in response), "
+            f"got {warning.occurrence_count}"
         )

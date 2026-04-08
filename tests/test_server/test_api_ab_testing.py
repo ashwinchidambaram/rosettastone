@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from unittest.mock import MagicMock, patch
 
-from sqlmodel import Session
+from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, SQLModel, create_engine, select
 
 import rosettastone.server.api.ab_testing as ab_testing_module
-from rosettastone.server.ab_runner import _determine_winner
+from rosettastone.server.ab_runner import _commit_results, _determine_winner
 from rosettastone.server.api.versioning import create_version
-from rosettastone.server.models import ABTestResult
+from rosettastone.server.models import ABTest, ABTestResult, MigrationRecord, MigrationVersion
 
 
 class TestCreateABTest:
-    def test_create(self, client, engine, sample_migration):
+    def test_create(self, multi_user_client, engine, sample_migration):
         """POST /api/v1/ab-tests creates a test."""
         # Create two versions first
         with Session(engine) as s:
@@ -24,7 +26,7 @@ class TestCreateABTest:
             s.refresh(v1)
             s.refresh(v2)
 
-        resp = client.post(
+        resp = multi_user_client.post(
             "/api/v1/ab-tests",
             json={
                 "migration_id": sample_migration.id,
@@ -39,9 +41,9 @@ class TestCreateABTest:
         assert data["name"] == "Test AB"
         assert data["status"] == "draft"
 
-    def test_create_missing_migration(self, client):
+    def test_create_missing_migration(self, multi_user_client):
         """POST with non-existent migration returns 404."""
-        resp = client.post(
+        resp = multi_user_client.post(
             "/api/v1/ab-tests",
             json={
                 "migration_id": 999,
@@ -51,14 +53,14 @@ class TestCreateABTest:
         )
         assert resp.status_code == 404
 
-    def test_create_missing_version(self, client, engine, sample_migration):
+    def test_create_missing_version(self, multi_user_client, engine, sample_migration):
         """POST with non-existent version returns 404."""
         with Session(engine) as s:
             v1 = create_version(sample_migration.id, s)
             s.commit()
             s.refresh(v1)
 
-        resp = client.post(
+        resp = multi_user_client.post(
             "/api/v1/ab-tests",
             json={
                 "migration_id": sample_migration.id,
@@ -70,15 +72,15 @@ class TestCreateABTest:
 
 
 class TestListABTests:
-    def test_empty_list(self, client):
+    def test_empty_list(self, multi_user_client):
         """GET /api/v1/ab-tests returns empty list."""
-        resp = client.get("/api/v1/ab-tests")
+        resp = multi_user_client.get("/api/v1/ab-tests")
         assert resp.status_code == 200
         data = resp.json()
         assert data["items"] == []
         assert data["total"] == 0
 
-    def test_list_with_data(self, client, engine, sample_migration):
+    def test_list_with_data(self, multi_user_client, engine, sample_migration):
         """GET returns created tests."""
         with Session(engine) as s:
             v1 = create_version(sample_migration.id, s)
@@ -87,7 +89,7 @@ class TestListABTests:
             s.refresh(v1)
             s.refresh(v2)
 
-        client.post(
+        multi_user_client.post(
             "/api/v1/ab-tests",
             json={
                 "migration_id": sample_migration.id,
@@ -96,13 +98,13 @@ class TestListABTests:
             },
         )
 
-        resp = client.get("/api/v1/ab-tests")
+        resp = multi_user_client.get("/api/v1/ab-tests")
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
 
 
 class TestABTestLifecycle:
-    def _create_test(self, client, engine, sample_migration):
+    def _create_test(self, multi_user_client, engine, sample_migration):
         """Helper: create versions and an A/B test."""
         with Session(engine) as s:
             v1 = create_version(sample_migration.id, s)
@@ -111,7 +113,7 @@ class TestABTestLifecycle:
             s.refresh(v1)
             s.refresh(v2)
 
-        resp = client.post(
+        resp = multi_user_client.post(
             "/api/v1/ab-tests",
             json={
                 "migration_id": sample_migration.id,
@@ -122,70 +124,70 @@ class TestABTestLifecycle:
         )
         return resp.json()["id"]
 
-    def test_start(self, client, engine, sample_migration):
+    def test_start(self, multi_user_client, engine, sample_migration):
         """POST /start transitions from draft to running."""
-        test_id = self._create_test(client, engine, sample_migration)
+        test_id = self._create_test(multi_user_client, engine, sample_migration)
 
-        resp = client.post(f"/api/v1/ab-tests/{test_id}/start")
+        resp = multi_user_client.post(f"/api/v1/ab-tests/{test_id}/start")
         assert resp.status_code == 200
         assert resp.json()["status"] == "running"
 
-    def test_start_wrong_status(self, client, engine, sample_migration):
+    def test_start_wrong_status(self, multi_user_client, engine, sample_migration):
         """POST /start on a non-draft test returns 400."""
-        test_id = self._create_test(client, engine, sample_migration)
-        client.post(f"/api/v1/ab-tests/{test_id}/start")
+        test_id = self._create_test(multi_user_client, engine, sample_migration)
+        multi_user_client.post(f"/api/v1/ab-tests/{test_id}/start")
 
-        resp = client.post(f"/api/v1/ab-tests/{test_id}/start")
+        resp = multi_user_client.post(f"/api/v1/ab-tests/{test_id}/start")
         assert resp.status_code == 400
 
-    def test_conclude(self, client, engine, sample_migration):
+    def test_conclude(self, multi_user_client, engine, sample_migration):
         """POST /conclude transitions running test to concluded."""
-        test_id = self._create_test(client, engine, sample_migration)
-        client.post(f"/api/v1/ab-tests/{test_id}/start")
+        test_id = self._create_test(multi_user_client, engine, sample_migration)
+        multi_user_client.post(f"/api/v1/ab-tests/{test_id}/start")
 
-        resp = client.post(f"/api/v1/ab-tests/{test_id}/conclude")
+        resp = multi_user_client.post(f"/api/v1/ab-tests/{test_id}/conclude")
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "concluded"
         assert data["winner"] is not None
 
-    def test_conclude_wrong_status(self, client, engine, sample_migration):
+    def test_conclude_wrong_status(self, multi_user_client, engine, sample_migration):
         """POST /conclude on a draft test returns 400."""
-        test_id = self._create_test(client, engine, sample_migration)
+        test_id = self._create_test(multi_user_client, engine, sample_migration)
 
-        resp = client.post(f"/api/v1/ab-tests/{test_id}/conclude")
+        resp = multi_user_client.post(f"/api/v1/ab-tests/{test_id}/conclude")
         assert resp.status_code == 400
 
-    def test_metrics_empty(self, client, engine, sample_migration):
+    def test_metrics_empty(self, multi_user_client, engine, sample_migration):
         """GET /metrics returns zeros when no results exist."""
-        test_id = self._create_test(client, engine, sample_migration)
+        test_id = self._create_test(multi_user_client, engine, sample_migration)
 
-        resp = client.get(f"/api/v1/ab-tests/{test_id}/metrics")
+        resp = multi_user_client.get(f"/api/v1/ab-tests/{test_id}/metrics")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total_results"] == 0
         assert data["wins_a"] == 0
 
-    def test_get_detail(self, client, engine, sample_migration):
+    def test_get_detail(self, multi_user_client, engine, sample_migration):
         """GET /ab-tests/{id} returns detail."""
-        test_id = self._create_test(client, engine, sample_migration)
+        test_id = self._create_test(multi_user_client, engine, sample_migration)
 
-        resp = client.get(f"/api/v1/ab-tests/{test_id}")
+        resp = multi_user_client.get(f"/api/v1/ab-tests/{test_id}")
         assert resp.status_code == 200
         data = resp.json()
         assert data["id"] == test_id
         assert data["name"] == "Lifecycle test"
 
-    def test_get_404(self, client):
+    def test_get_404(self, multi_user_client):
         """GET non-existent test returns 404."""
-        resp = client.get("/api/v1/ab-tests/999")
+        resp = multi_user_client.get("/api/v1/ab-tests/999")
         assert resp.status_code == 404
 
 
 class TestMetricsCache:
     """Tests for the in-memory metrics cache on GET /metrics."""
 
-    def _setup_ab_test(self, client, engine, sample_migration):
+    def _setup_ab_test(self, multi_user_client, engine, sample_migration):
         """Helper: create versions + AB test, return ab_test_id."""
         with Session(engine) as s:
             v1 = create_version(sample_migration.id, s)
@@ -194,7 +196,7 @@ class TestMetricsCache:
             s.refresh(v1)
             s.refresh(v2)
 
-        resp = client.post(
+        resp = multi_user_client.post(
             "/api/v1/ab-tests",
             json={
                 "migration_id": sample_migration.id,
@@ -229,17 +231,17 @@ class TestMetricsCache:
 
     # ------------------------------------------------------------------
 
-    def test_metrics_cache_hit_for_concluded_test(self, client, engine, sample_migration):
+    def test_metrics_cache_hit_for_concluded_test(self, multi_user_client, engine, sample_migration):
         """Second GET /metrics for a concluded test returns the cached value without re-querying DB."""
-        ab_test_id = self._setup_ab_test(client, engine, sample_migration)
+        ab_test_id = self._setup_ab_test(multi_user_client, engine, sample_migration)
         self._clear_cache(ab_test_id)
 
         # Start and conclude
-        client.post(f"/api/v1/ab-tests/{ab_test_id}/start")
-        client.post(f"/api/v1/ab-tests/{ab_test_id}/conclude")
+        multi_user_client.post(f"/api/v1/ab-tests/{ab_test_id}/start")
+        multi_user_client.post(f"/api/v1/ab-tests/{ab_test_id}/conclude")
 
         # First request — populates cache
-        resp1 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+        resp1 = multi_user_client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
         assert resp1.status_code == 200
 
         # Verify entry is now in cache with status "concluded"
@@ -259,20 +261,20 @@ class TestMetricsCache:
             return original_exec(self, stmt, *args, **kwargs)
 
         with patch.object(Session, "exec", counting_exec):
-            resp2 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+            resp2 = multi_user_client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
 
         assert resp2.status_code == 200
         # Only the session.get(ABTest, ...) call should go through -- no ABTestResult query
         assert call_count["n"] == 0, f"Expected 0 exec calls on cache hit, got {call_count['n']}"
         assert resp2.json()["total_results"] == resp1.json()["total_results"]
 
-    def test_metrics_cache_miss_for_draft_test(self, client, engine, sample_migration):
+    def test_metrics_cache_miss_for_draft_test(self, multi_user_client, engine, sample_migration):
         """Draft tests are never cached -- each GET hits the DB."""
-        ab_test_id = self._setup_ab_test(client, engine, sample_migration)
+        ab_test_id = self._setup_ab_test(multi_user_client, engine, sample_migration)
         self._clear_cache(ab_test_id)
 
         # First call
-        resp1 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+        resp1 = multi_user_client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
         assert resp1.status_code == 200
 
         # Cache must NOT contain this draft entry
@@ -281,22 +283,22 @@ class TestMetricsCache:
         assert entry is None, "Draft test metrics should not be cached"
 
         # Second call should also return valid (zero) metrics
-        resp2 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+        resp2 = multi_user_client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
         assert resp2.status_code == 200
         assert resp2.json()["total_results"] == 0
 
-    def test_metrics_cache_invalidated_on_conclude(self, client, engine, sample_migration):
+    def test_metrics_cache_invalidated_on_conclude(self, multi_user_client, engine, sample_migration):
         """After POST /conclude, the cached running-test entry is evicted and next GET is fresh."""
-        ab_test_id = self._setup_ab_test(client, engine, sample_migration)
+        ab_test_id = self._setup_ab_test(multi_user_client, engine, sample_migration)
         self._clear_cache(ab_test_id)
 
-        client.post(f"/api/v1/ab-tests/{ab_test_id}/start")
+        multi_user_client.post(f"/api/v1/ab-tests/{ab_test_id}/start")
 
         # Seed a result so metrics are non-trivial
         self._add_result(engine, ab_test_id, winner="a")
 
         # First GET while running -- populates cache with status="running"
-        resp_running = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+        resp_running = multi_user_client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
         assert resp_running.status_code == 200
 
         with ab_testing_module._metrics_cache_lock:
@@ -305,7 +307,7 @@ class TestMetricsCache:
         assert entry_before[2] == "running"
 
         # Conclude -- should evict the cache entry
-        conclude_resp = client.post(f"/api/v1/ab-tests/{ab_test_id}/conclude")
+        conclude_resp = multi_user_client.post(f"/api/v1/ab-tests/{ab_test_id}/conclude")
         assert conclude_resp.status_code == 200
 
         with ab_testing_module._metrics_cache_lock:
@@ -313,7 +315,7 @@ class TestMetricsCache:
         assert entry_after_conclude is None, "Cache entry should be evicted by POST /conclude"
 
         # Next GET should recompute and re-cache with status="concluded"
-        resp_concluded = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+        resp_concluded = multi_user_client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
         assert resp_concluded.status_code == 200
 
         with ab_testing_module._metrics_cache_lock:
@@ -321,12 +323,12 @@ class TestMetricsCache:
         assert entry_final is not None
         assert entry_final[2] == "concluded"
 
-    def test_metrics_running_test_cache_ttl(self, client, engine, sample_migration):
+    def test_metrics_running_test_cache_ttl(self, multi_user_client, engine, sample_migration):
         """Running-test cache entry expires after 5 s; patching monotonic simulates the TTL."""
-        ab_test_id = self._setup_ab_test(client, engine, sample_migration)
+        ab_test_id = self._setup_ab_test(multi_user_client, engine, sample_migration)
         self._clear_cache(ab_test_id)
 
-        client.post(f"/api/v1/ab-tests/{ab_test_id}/start")
+        multi_user_client.post(f"/api/v1/ab-tests/{ab_test_id}/start")
 
         base_time = 1000.0
 
@@ -334,12 +336,12 @@ class TestMetricsCache:
             mock_time.monotonic.return_value = base_time
 
             # First GET -- cache miss, populates cache at t=1000
-            resp1 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+            resp1 = multi_user_client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
             assert resp1.status_code == 200
 
             # Within TTL (t=1004) -- cache hit
             mock_time.monotonic.return_value = base_time + 4.0
-            resp2 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+            resp2 = multi_user_client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
             assert resp2.status_code == 200
 
             with ab_testing_module._metrics_cache_lock:
@@ -350,7 +352,7 @@ class TestMetricsCache:
 
             # Past TTL (t=1006) -- cache miss, cache refreshed
             mock_time.monotonic.return_value = base_time + 6.0
-            resp3 = client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
+            resp3 = multi_user_client.get(f"/api/v1/ab-tests/{ab_test_id}/metrics")
             assert resp3.status_code == 200
 
             with ab_testing_module._metrics_cache_lock:
@@ -448,3 +450,159 @@ class TestWinnerDetermination:
         assert _determine_winner(sig_insig, wins_a=10, wins_b=1) == "inconclusive", (
             "Non-significant result should always yield 'inconclusive'"
         )
+
+
+# ---------------------------------------------------------------------------
+# _commit_results unit tests
+# ---------------------------------------------------------------------------
+
+
+def _make_test_engine():
+    """Create a fresh in-memory SQLite engine with all tables."""
+    eng = create_engine(
+        "sqlite://",
+        echo=False,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    SQLModel.metadata.create_all(eng)
+    return eng
+
+
+def _seed_ab_test(eng) -> int:
+    """Insert the minimum rows (migration -> version -> ab_test) and return ab_test.id."""
+    with Session(eng) as s:
+        migration = MigrationRecord(
+            source_model="openai/gpt-4o",
+            target_model="anthropic/claude-sonnet-4",
+            status="complete",
+        )
+        s.add(migration)
+        s.flush()
+
+        v1 = MigrationVersion(
+            migration_id=migration.id,
+            version_number=1,
+            snapshot_json="{}",
+        )
+        v2 = MigrationVersion(
+            migration_id=migration.id,
+            version_number=2,
+            snapshot_json="{}",
+        )
+        s.add(v1)
+        s.add(v2)
+        s.flush()
+
+        ab_test = ABTest(
+            migration_id=migration.id,
+            version_a_id=v1.id,
+            version_b_id=v2.id,
+            name="test",
+            status="running",
+        )
+        s.add(ab_test)
+        s.commit()
+        s.refresh(ab_test)
+        return ab_test.id
+
+
+class TestCommitResults:
+    """Unit tests for _commit_results() in ab_runner."""
+
+    def test_commit_results_happy_path(self):
+        """Committed results are persisted and retrievable from the DB."""
+        eng = _make_test_engine()
+        ab_test_id = _seed_ab_test(eng)
+
+        results = [
+            ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version="a",
+                score_a=0.9,
+                score_b=0.7,
+                winner="a",
+            ),
+            ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version="b",
+                score_a=0.6,
+                score_b=0.8,
+                winner="b",
+            ),
+            ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version="a",
+                score_a=0.75,
+                score_b=0.75,
+                winner="tie",
+            ),
+        ]
+
+        _commit_results(results, eng)
+
+        with Session(eng) as s:
+            rows = list(
+                s.exec(
+                    select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)
+                ).all()
+            )
+        assert len(rows) == 3
+        winners = {r.winner for r in rows}
+        assert winners == {"a", "b", "tie"}
+
+    def test_commit_results_returns_count(self):
+        """_commit_results returns the number of results successfully committed."""
+        eng = _make_test_engine()
+        ab_test_id = _seed_ab_test(eng)
+
+        results = [
+            ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version="a",
+                score_a=0.8,
+                score_b=0.6,
+                winner="a",
+            ),
+            ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version="b",
+                score_a=0.5,
+                score_b=0.9,
+                winner="b",
+            ),
+        ]
+
+        count = _commit_results(results, eng)
+        assert count == 2
+
+    def test_commit_results_partial_failure_logs(self, caplog):
+        """On batch commit failure, _commit_results logs a warning and falls back."""
+        eng = _make_test_engine()
+        ab_test_id = _seed_ab_test(eng)
+
+        results = [
+            ABTestResult(
+                ab_test_id=ab_test_id,
+                assigned_version="a",
+                score_a=0.8,
+                score_b=0.6,
+                winner="a",
+            ),
+        ]
+
+        original_commit = Session.commit
+        call_count = {"n": 0}
+
+        def patched_commit(self):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise RuntimeError("Simulated batch commit failure")
+            original_commit(self)
+
+        with caplog.at_level(logging.WARNING, logger="rosettastone.server.ab_runner"):
+            with patch.object(Session, "commit", patched_commit):
+                _commit_results(results, eng)
+
+        warning_text = caplog.text
+        assert "Batch commit failed" in warning_text or "falling back" in warning_text

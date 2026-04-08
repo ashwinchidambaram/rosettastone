@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from rosettastone.core.types import PromptPair
-from rosettastone.safety.prompt_auditor import AuditFinding, audit_prompt
+from rosettastone.safety.prompt_auditor import MAX_TEXT_LENGTH, AuditFinding, audit_prompt
 
 # ---------------------------------------------------------------------------
 # Tests for audit_prompt basic functionality
@@ -426,3 +426,108 @@ class TestAuditPromptAuditFindingDataclass:
             is_boilerplate=True,
         )
         assert finding.is_boilerplate is True, "Expected is_boilerplate=True"
+
+
+# ---------------------------------------------------------------------------
+# Edge-case / false-confidence tests
+# ---------------------------------------------------------------------------
+
+
+class TestAuditPromptEdgeCasesExtended:
+    """Additional edge-case tests covering crash-safety and truncation behaviour."""
+
+    def test_audit_empty_prompt(self):
+        """audit_prompt does not crash when the optimized prompt is an empty string."""
+        pairs = [
+            PromptPair(
+                prompt="Q",
+                response="Some response with enough content for a test",
+                source_model="openai/gpt-4o",
+            ),
+        ]
+        # Must not raise; an empty optimized prompt can never contain training substrings.
+        result = audit_prompt("", pairs)
+        assert isinstance(result, list), f"Expected list, got {type(result)}"
+        assert result == [], f"Expected no findings for empty optimized prompt, got {result}"
+
+    def test_audit_empty_response(self):
+        """audit_prompt does not crash when a training pair has an empty response."""
+        pairs = [
+            PromptPair(
+                prompt="Q",
+                response="",
+                source_model="openai/gpt-4o",
+            ),
+        ]
+        # An empty response produces no substrings, so no findings should be generated.
+        result = audit_prompt("Some optimized prompt text", pairs)
+        assert isinstance(result, list), f"Expected list, got {type(result)}"
+
+    def test_audit_short_text_no_warning(self):
+        """Short unique text that is absent from training data triggers no findings.
+
+        The optimized prompt must share a substring of >= MIN_SUBSTRING_LENGTH (30 chars)
+        with training data for a finding to be raised.  Completely disjoint text
+        must produce zero findings.
+        """
+        pairs = [
+            PromptPair(
+                prompt="Q",
+                response="The capital of France is Paris and the Eiffel Tower stands there",
+                source_model="openai/gpt-4o",
+            ),
+        ]
+        # Optimized prompt has no overlap with the training response.
+        optimized = "Completely different text about Antarctica and penguins"
+        result = audit_prompt(optimized, pairs)
+        assert result == [], (
+            f"Expected no findings when optimized prompt shares no substrings with training data, "
+            f"got {result}"
+        )
+
+    def test_audit_truncation_behavior(self):
+        """Training responses longer than MAX_TEXT_LENGTH are truncated before scanning.
+
+        Content beyond character position MAX_TEXT_LENGTH (500) must NOT be indexed
+        as potential substrings.  Even if the optimized prompt contains verbatim text
+        from the tail of a long training response, that tail text should not produce
+        a finding because it was never scanned.
+        """
+        # Build a training response that is clearly longer than MAX_TEXT_LENGTH.
+        prefix = "A" * MAX_TEXT_LENGTH  # exactly 500 chars — this portion is scanned
+        # This unique tail is beyond the truncation boundary and must NOT be indexed.
+        tail = "ZZZ unique tail content that should never be found in audit results ZZZ"
+        long_response = prefix + tail
+        assert len(long_response) > MAX_TEXT_LENGTH, "Sanity: response must exceed MAX_TEXT_LENGTH"
+
+        pairs = [
+            PromptPair(
+                prompt="Q",
+                response=long_response,
+                source_model="openai/gpt-4o",
+            ),
+        ]
+        # Optimized prompt includes only text from the truncated tail — should yield no finding.
+        result = audit_prompt(tail, pairs)
+        assert result == [], (
+            f"Expected no findings for text beyond char {MAX_TEXT_LENGTH} (truncation boundary), "
+            f"got {result}"
+        )
+
+    def test_audit_multilingual_no_crash(self):
+        """audit_prompt does not crash on non-ASCII text including CJK characters and emoji."""
+        cjk_response = (
+            "日本語のテキストです。これはテストのためのサンプルテキストです。"
+            "中文文本示例用于测试目的。한국어 텍스트 예시입니다."
+        )
+        pairs = [
+            PromptPair(
+                prompt="Q",
+                response=cjk_response + " 🎉🚀🔥",
+                source_model="openai/gpt-4o",
+            ),
+        ]
+        optimized = "Some English optimized prompt text 🎉"
+        # Must not raise; multilingual content should be handled safely.
+        result = audit_prompt(optimized, pairs)
+        assert isinstance(result, list), f"Expected list, got {type(result)}"

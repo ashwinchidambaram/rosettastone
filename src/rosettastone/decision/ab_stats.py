@@ -80,7 +80,7 @@ def chi_squared_test(
         return 0.0, 1.0, False
 
     try:
-        from scipy.stats import chi2_contingency
+        from scipy.stats import chi2_contingency  # type: ignore[import-untyped]
 
         chi2, p, _, _ = chi2_contingency(observed, correction=True)
         return float(chi2), float(p), p < 0.05

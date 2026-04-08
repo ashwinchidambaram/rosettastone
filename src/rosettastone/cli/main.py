@@ -183,8 +183,97 @@ def migrate(
         lm_extra_kwargs=parsed_lm_extra_kwargs,
         num_threads=num_threads,
     )
-    migrator = Migrator(config)
-    result = migrator.run()
+
+    import time as _time
+
+    from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn, TimeElapsedColumn
+
+    stage_labels = {
+        "preflight": "Pre-flight checks",
+        "data_load": "Loading data",
+        "pii_scan": "PII scan",
+        "baseline_eval": "Baseline evaluation",
+        "optimize": "Optimizing prompt",
+        "pii_scan_text": "PII scan (text)",
+        "prompt_audit": "Prompt audit",
+        "validation_eval": "Validation evaluation",
+        "recommendation": "Generating recommendation",
+        "report": "Writing report",
+    }
+
+    _start_time = _time.monotonic()
+
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        overall_task = progress.add_task("Starting...", total=100)
+
+        def _cli_progress_callback(stage: str, stage_pct: float, overall_pct: float) -> None:
+            label = stage_labels.get(stage, stage)
+            progress.update(overall_task, completed=overall_pct * 100, description=label)
+
+            # Compute ETA
+            if overall_pct > 0.05:  # Only estimate after 5% to avoid wild early guesses
+                elapsed = _time.monotonic() - _start_time
+                estimated_total = elapsed / overall_pct
+                eta_seconds = max(0, estimated_total - elapsed)
+                if eta_seconds < 60:
+                    eta_str = f"{eta_seconds:.0f}s remaining"
+                elif eta_seconds < 3600:
+                    eta_str = f"{eta_seconds / 60:.0f}m remaining"
+                else:
+                    eta_str = f"{eta_seconds / 3600:.1f}h remaining"
+                progress.update(overall_task, description=f"{label} ({eta_str})")
+
+        from rosettastone.core.migrator import MigrationBlockedError
+        from rosettastone.core.types import CostLimitExceeded
+        from rosettastone.optimize.utils import InstructionExtractionError
+
+        migrator = Migrator(config, progress_callback=_cli_progress_callback)
+        try:
+            result = migrator.run()
+        except CostLimitExceeded as exc:
+            progress.stop()
+            console.print("\n[red bold]Migration stopped — cost limit exceeded[/red bold]")
+            console.print(f"[red]{exc}[/red]")
+            console.print(
+                "\n[dim]To increase the budget, use --max-cost-usd <amount>. "
+                "To estimate cost first, use --dry-run.[/dim]"
+            )
+            raise typer.Exit(code=1)
+        except MigrationBlockedError as exc:
+            progress.stop()
+            console.print("\n[red bold]Migration blocked by pre-flight checks[/red bold]")
+            console.print(f"[red]{exc}[/red]")
+            console.print(
+                "\n[dim]Fix the issues above, or use --skip-preflight to override "
+                "(not recommended).[/dim]"
+            )
+            raise typer.Exit(code=1)
+        except InstructionExtractionError:
+            progress.stop()
+            console.print(
+                "\n[red bold]Failed to extract optimized instructions from GEPA[/red bold]"
+            )
+            console.print(
+                "\n[dim]This can happen when the optimization didn't converge. "
+                "Try --optimizer mipro as an alternative, or increase iterations "
+                "with --auto medium.[/dim]"
+            )
+            raise typer.Exit(code=1)
+        except Exception as exc:
+            progress.stop()
+            console.print("\n[red bold]Migration failed[/red bold]")
+            console.print(f"[red]{type(exc).__name__}: {exc}[/red]")
+            console.print(
+                "\n[dim]For more details, set ROSETTASTONE_LOG_LEVEL=DEBUG and re-run.[/dim]"
+            )
+            raise typer.Exit(code=1)
 
     # Phase 2: Use Rich display for output
     from rosettastone.cli.display import MigrationDisplay

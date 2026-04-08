@@ -488,3 +488,229 @@ class TestSmoke:
         display = MigrationDisplay(console=con)
         display.show_recommendation(recommendation, f"Reasoning for {recommendation}.")
         assert f"Reasoning for {recommendation}." in buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# show_timing_table
+# ---------------------------------------------------------------------------
+
+
+class TestShowTimingTable:
+    def test_show_timing_table_renders_stages(self):
+        """Stage names appear in the rendered table output."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_timing_table({"preflight": 2.5, "optimize": 45.0, "evaluate": 12.3})
+        output = buf.getvalue()
+        assert "preflight" in output
+        assert "optimize" in output
+        assert "evaluate" in output
+
+    def test_show_timing_table_renders_duration_values(self):
+        """Duration seconds appear formatted in the output."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_timing_table({"ingest": 3.7})
+        output = buf.getvalue()
+        assert "3.7s" in output
+
+    def test_show_timing_table_empty_no_output(self):
+        """Empty dict produces no output at all."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_timing_table({})
+        assert buf.getvalue() == ""
+
+    def test_show_timing_table_sorted_descending(self):
+        """Stages are sorted by duration descending (longest first)."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_timing_table({"fast": 1.0, "slow": 100.0, "mid": 10.0})
+        output = buf.getvalue()
+        pos_slow = output.index("slow")
+        pos_mid = output.index("mid")
+        pos_fast = output.index("fast")
+        assert pos_slow < pos_mid < pos_fast
+
+    def test_show_timing_table_renders_percentage_shares(self):
+        """Percentage share of each stage appears in output."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_timing_table({"only": 10.0})
+        output = buf.getvalue()
+        assert "100%" in output
+
+    def test_show_timing_table_title_present(self):
+        """Table title 'Stage Timing' appears in the output."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_timing_table({"step": 5.0})
+        assert "Stage Timing" in buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# show_prompt_evolution
+# ---------------------------------------------------------------------------
+
+
+class TestShowPromptEvolution:
+    def test_show_prompt_evolution_shows_scores(self):
+        """Baseline and confidence scores (as percentages) appear in output."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_prompt_evolution(
+            optimized_prompt="You are a helpful assistant.",
+            baseline_score=0.72,
+            confidence_score=0.91,
+            improvement=0.19,
+        )
+        output = buf.getvalue()
+        assert "72%" in output
+        assert "91%" in output
+
+    def test_show_prompt_evolution_shows_improvement_delta(self):
+        """Improvement delta (with sign) appears in output."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_prompt_evolution(
+            optimized_prompt="You are a helpful assistant.",
+            baseline_score=0.70,
+            confidence_score=0.85,
+            improvement=0.15,
+        )
+        output = buf.getvalue()
+        assert "+15%" in output
+
+    def test_show_prompt_evolution_truncates_long_prompt(self):
+        """Prompts longer than 400 chars are truncated with '...'."""
+        long_prompt = "A" * 500
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_prompt_evolution(
+            optimized_prompt=long_prompt,
+            baseline_score=0.70,
+            confidence_score=0.85,
+            improvement=0.15,
+        )
+        output = buf.getvalue()
+        assert "..." in output
+        # Full 500-char string should NOT be in output
+        assert long_prompt not in output
+
+    def test_show_prompt_evolution_short_prompt_not_truncated(self):
+        """Prompts at or under 400 chars are NOT truncated."""
+        short_prompt = "Be concise."
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_prompt_evolution(
+            optimized_prompt=short_prompt,
+            baseline_score=0.70,
+            confidence_score=0.85,
+            improvement=0.15,
+        )
+        output = buf.getvalue()
+        assert short_prompt in output
+
+    def test_show_prompt_evolution_renders_panel_title(self):
+        """Panel title 'GEPA-Optimized System Instruction' appears."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_prompt_evolution(
+            optimized_prompt="System prompt here.",
+            baseline_score=0.70,
+            confidence_score=0.85,
+            improvement=0.15,
+        )
+        assert "GEPA-Optimized" in buf.getvalue()
+
+    def test_show_prompt_evolution_with_sample_comparisons(self):
+        """When sample_comparisons provided, comparison table is rendered."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        comparisons = [
+            {
+                "index": 0,
+                "output_type": "short_text",
+                "baseline_score": 0.70,
+                "optimized_score": 0.90,
+                "delta": 0.20,
+                "is_win_before": False,
+                "is_win_after": True,
+            }
+        ]
+        display.show_prompt_evolution(
+            optimized_prompt="System prompt.",
+            baseline_score=0.70,
+            confidence_score=0.90,
+            improvement=0.20,
+            sample_comparisons=comparisons,
+        )
+        output = buf.getvalue()
+        assert "short_text" in output
+
+    def test_show_prompt_evolution_no_sample_comparisons(self):
+        """When sample_comparisons is None, no table is rendered (no crash)."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_prompt_evolution(
+            optimized_prompt="System prompt.",
+            baseline_score=0.70,
+            confidence_score=0.85,
+            improvement=0.15,
+            sample_comparisons=None,
+        )
+        # Should produce some output (at least the panel) without error
+        assert len(buf.getvalue()) > 0
+
+
+# ---------------------------------------------------------------------------
+# show_variance_warning
+# ---------------------------------------------------------------------------
+
+
+class TestShowVarianceWarning:
+    def test_show_variance_warning_renders_count(self):
+        """Non-zero count appears in the panel output."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_variance_warning(5)
+        output = buf.getvalue()
+        assert "5" in output
+
+    def test_show_variance_warning_renders_panel_title(self):
+        """Panel title 'Evaluation Reliability Warning' appears."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_variance_warning(3)
+        assert "Evaluation Reliability Warning" in buf.getvalue()
+
+    def test_show_variance_warning_zero_no_output(self):
+        """Count of 0 produces no output."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_variance_warning(0)
+        assert buf.getvalue() == ""
+
+    def test_show_variance_warning_negative_no_output(self):
+        """Negative count also produces no output."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_variance_warning(-1)
+        assert buf.getvalue() == ""
+
+    def test_show_variance_warning_singular_pair(self):
+        """Count of 1 uses singular 'pair' (no 's')."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_variance_warning(1)
+        output = buf.getvalue()
+        # "1 test pair showed" — no trailing 's'
+        assert "test pair " in output or "test pair\n" in output or "1 test pair" in output
+
+    def test_show_variance_warning_plural_pairs(self):
+        """Count > 1 uses plural 'pairs'."""
+        con, buf = _console()
+        display = MigrationDisplay(console=con)
+        display.show_variance_warning(4)
+        output = buf.getvalue()
+        assert "pairs" in output

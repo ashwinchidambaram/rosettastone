@@ -5,7 +5,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import dspy
 
@@ -40,7 +40,7 @@ class GEPAOptimizer(Optimizer):
         val_set: list[PromptPair],
         config: MigrationConfig,
         on_iteration: Callable[[int, int, float], None] | None = None,
-        iteration_history_out: list[dict] | None = None,
+        iteration_history_out: list[dict[str, Any]] | None = None,
     ) -> str:
         # Configure LMs — merge any provider-specific extra kwargs from config
         extra_kwargs: dict[str, object] = (
@@ -87,7 +87,9 @@ class GEPAOptimizer(Optimizer):
         else:
             base_metric = metric
 
-        def _iteration_capturing_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
+        def _iteration_capturing_metric(
+            gold: Any, pred: Any, trace: Any = None, pred_name: Any = None, pred_trace: Any = None
+        ) -> Any:
             """Wraps the base metric and captures program state after each call."""
             result = base_metric(gold, pred, trace, pred_name, pred_trace)
             # After each metric call, try to snapshot the current program state.

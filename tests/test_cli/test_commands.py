@@ -456,3 +456,94 @@ def test_migrate_gepa_timeout_seconds_omitted():
         assert result.exit_code == 0, result.output
         config = mock_cls.call_args[0][0]
         assert config.gepa_timeout_seconds is None
+
+
+# ---------------------------------------------------------------------------
+# batch command smoke tests
+# ---------------------------------------------------------------------------
+
+
+def test_batch_command_help():
+    """batch --help returns exit code 0 and shows command description."""
+    result = runner.invoke(app, ["batch", "--help"])
+    assert result.exit_code == 0
+    assert "manifest" in result.output.lower() or "batch" in result.output.lower()
+
+
+def test_batch_command_missing_manifest():
+    """batch without required --manifest arg exits with a non-zero code."""
+    result = runner.invoke(app, ["batch"])
+    assert result.exit_code != 0
+
+
+def test_batch_command_registered():
+    """batch command is registered on the Typer app."""
+    result = runner.invoke(app, ["batch", "--help"])
+    assert result.exit_code == 0
+    assert "Run multiple migrations" in result.output or "manifest" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# ci-report command smoke tests
+# ---------------------------------------------------------------------------
+
+
+def test_ci_report_command_help():
+    """ci-report --help returns exit code 0."""
+    result = runner.invoke(app, ["ci-report", "--help"])
+    assert result.exit_code == 0
+
+
+def test_ci_report_command_registered():
+    """ci-report command is registered on the Typer app."""
+    result = runner.invoke(app, ["ci-report", "--help"])
+    assert result.exit_code == 0
+    assert "CI" in result.output or "migration result" in result.output.lower()
+
+
+def test_ci_report_missing_result_arg():
+    """ci-report without required --result arg exits with a non-zero code."""
+    result = runner.invoke(app, ["ci-report"])
+    assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------------------
+# score-shadow command smoke tests
+# ---------------------------------------------------------------------------
+
+
+def test_score_shadow_command_help():
+    """score-shadow --help returns exit code 0."""
+    result = runner.invoke(app, ["score-shadow", "--help"])
+    assert result.exit_code == 0
+
+
+def test_score_shadow_command_registered():
+    """score-shadow command is registered on the Typer app."""
+    result = runner.invoke(app, ["score-shadow", "--help"])
+    assert result.exit_code == 0
+    assert "shadow" in result.output.lower() or "Score shadow" in result.output
+
+
+def test_score_shadow_missing_required_args():
+    """score-shadow without --from and --to exits with a non-zero code."""
+    result = runner.invoke(app, ["score-shadow"])
+    assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------------------
+# calibrate command smoke tests
+# ---------------------------------------------------------------------------
+
+
+def test_calibrate_command_help():
+    """calibrate --help returns exit code 0."""
+    result = runner.invoke(app, ["calibrate", "--help"])
+    assert result.exit_code == 0
+
+
+def test_calibrate_command_registered():
+    """calibrate command is registered on the Typer app."""
+    result = runner.invoke(app, ["calibrate", "--help"])
+    assert result.exit_code == 0
+    assert "calibrat" in result.output.lower()

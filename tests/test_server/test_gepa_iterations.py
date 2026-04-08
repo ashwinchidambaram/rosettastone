@@ -34,12 +34,6 @@ def engine():
 
 
 @pytest.fixture
-def session(engine):
-    with Session(engine) as s:
-        yield s
-
-
-@pytest.fixture
 def sample_migration(session: Session) -> MigrationRecord:
     m = MigrationRecord(
         source_model="openai/gpt-4o",

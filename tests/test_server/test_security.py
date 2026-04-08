@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 from fastapi.testclient import TestClient
 
-from rosettastone.server.app import create_app
+from rosettastone.server.app import _JWT_SECRET_DEFAULT, create_app
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -284,3 +286,150 @@ class TestCORSAlwaysRegistered:
             headers={"Origin": "https://trusted.example.com"},
         )
         assert resp.headers.get("access-control-allow-origin") == "https://trusted.example.com"
+
+
+# ---------------------------------------------------------------------------
+# Task 1.2: JWT default secret transition tests
+# ---------------------------------------------------------------------------
+
+
+class TestJWTDefaultSecretTransition:
+    def test_default_jwt_secret_raises_in_multi_user_mode(self, monkeypatch) -> None:
+        """Multi-user mode with the default dev JWT secret must raise RuntimeError at startup.
+
+        This documents that the server refuses to start when the operator has not
+        configured a real secret — preventing silent use of a well-known dev value.
+        """
+        monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
+        monkeypatch.delenv("ROSETTASTONE_JWT_SECRET", raising=False)
+
+        from rosettastone.server.app import _check_jwt_secret
+
+        with pytest.raises(RuntimeError, match="insecure default"):
+            _check_jwt_secret()
+
+    def test_short_jwt_secret_warns(self, monkeypatch, caplog) -> None:
+        """A JWT secret shorter than 32 bytes must emit a warning log in multi-user mode."""
+        short_secret = "tooshort"  # 8 bytes < 32
+        monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
+        monkeypatch.setenv("ROSETTASTONE_JWT_SECRET", short_secret)
+
+        from rosettastone.server.app import _check_jwt_secret
+
+        with caplog.at_level(logging.WARNING, logger="rosettastone.server"):
+            _check_jwt_secret()  # must not raise
+
+        assert any(
+            "minimum recommended length" in record.message or "32 bytes" in record.message
+            for record in caplog.records
+        ), f"Expected a warning about short JWT secret. Got: {[r.message for r in caplog.records]}"
+
+    def test_single_user_mode_allows_default_secret(self, monkeypatch) -> None:
+        """Single-user mode must succeed even when no JWT secret is configured.
+
+        The default secret is only forbidden in multi-user deployments.
+        """
+        monkeypatch.delenv("ROSETTASTONE_MULTI_USER", raising=False)
+        monkeypatch.delenv("ROSETTASTONE_JWT_SECRET", raising=False)
+
+        from rosettastone.server.app import _check_jwt_secret
+
+        _check_jwt_secret()  # must not raise
+
+        # App creation must also succeed
+        app = create_app()
+        assert app is not None
+
+    def test_jwt_with_default_secret_is_valid_token(self) -> None:
+        """Tokens signed with the default dev secret are cryptographically valid.
+
+        This test documents the risk: any token signed with _JWT_SECRET_DEFAULT
+        would be accepted by a misconfigured server. The secret is publicly known
+        from the source code, so any attacker could forge admin tokens.
+        """
+        from rosettastone.server.auth_utils import create_jwt, decode_jwt
+
+        token = create_jwt(user_id=1, role="admin", secret=_JWT_SECRET_DEFAULT)
+        payload = decode_jwt(token, _JWT_SECRET_DEFAULT)
+
+        assert payload["sub"] == "1"
+        assert payload["role"] == "admin"
+        # Token is valid — this proves that exposing the default secret
+        # means any actor can forge authenticated requests.
+
+
+# ---------------------------------------------------------------------------
+# Task 1.3: CORS origin validation tests
+# ---------------------------------------------------------------------------
+
+
+class TestCORSOriginValidation:
+    def test_cors_no_env_rejects_cross_origin(self, monkeypatch) -> None:
+        """Without ROSETTASTONE_CORS_ORIGINS set, cross-origin requests must not receive
+        Access-Control-Allow-Origin. Same-origin semantics apply by default."""
+        monkeypatch.delenv("ROSETTASTONE_CORS_ORIGINS", raising=False)
+        client = _make_client(monkeypatch, {})
+
+        resp = client.get(
+            "/api/v1/health",
+            headers={"Origin": "https://attacker.example.com"},
+        )
+
+        assert resp.status_code == 200
+        assert "access-control-allow-origin" not in resp.headers
+
+    def test_cors_specific_origin_allowed(self, monkeypatch) -> None:
+        """An origin listed in ROSETTASTONE_CORS_ORIGINS must receive the ACAO header."""
+        monkeypatch.setenv("ROSETTASTONE_CORS_ORIGINS", "https://app.example.com")
+        client = _make_client(monkeypatch, {})
+
+        resp = client.get(
+            "/api/v1/health",
+            headers={"Origin": "https://app.example.com"},
+        )
+
+        assert resp.status_code == 200
+        assert resp.headers.get("access-control-allow-origin") == "https://app.example.com"
+
+    def test_cors_unlisted_origin_rejected(self, monkeypatch) -> None:
+        """An origin NOT in the allowlist must not receive an ACAO header.
+
+        Starlette's CORSMiddleware either omits the header or reflects a different
+        value — in both cases the browser will block the cross-origin read.
+        """
+        monkeypatch.setenv("ROSETTASTONE_CORS_ORIGINS", "https://app.example.com")
+        client = _make_client(monkeypatch, {})
+
+        resp = client.get(
+            "/api/v1/health",
+            headers={"Origin": "https://evil.example.com"},
+        )
+
+        acao = resp.headers.get("access-control-allow-origin", "")
+        assert acao != "https://evil.example.com", (
+            "Unlisted origin must not be reflected in Access-Control-Allow-Origin"
+        )
+
+    def test_cors_preflight_options(self, monkeypatch) -> None:
+        """An OPTIONS preflight from an allowed origin must return the expected CORS headers
+        including Access-Control-Allow-Methods with the configured methods."""
+        monkeypatch.setenv("ROSETTASTONE_CORS_ORIGINS", "https://app.example.com")
+        client = _make_client(monkeypatch, {})
+
+        resp = client.options(
+            "/api/v1/health",
+            headers={
+                "Origin": "https://app.example.com",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "Authorization",
+            },
+        )
+
+        # Preflight should complete (200 or 204)
+        assert resp.status_code in (200, 204)
+        allow_methods = resp.headers.get("access-control-allow-methods", "")
+        assert allow_methods, "Access-Control-Allow-Methods must be present in preflight response"
+        # The app configures GET, POST, PUT, DELETE, PATCH
+        assert "GET" in allow_methods or "POST" in allow_methods, (
+            f"Expected HTTP methods in Access-Control-Allow-Methods, got: {allow_methods}"
+        )

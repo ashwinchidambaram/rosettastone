@@ -6,9 +6,16 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
 from rosettastone.config import MigrationConfig
 from rosettastone.core.types import EvalResult, OutputType, PromptPair
-from rosettastone.evaluate.composite import DEFAULT_WIN_THRESHOLDS, CompositeEvaluator
+from rosettastone.evaluate.composite import (
+    DEFAULT_WIN_THRESHOLDS,
+    METRIC_WEIGHTS,
+    CompositeEvaluator,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -486,3 +493,307 @@ class TestCompositeEvaluatorEvaluate:
         assert results[0].failure_reason == "no_response"
         assert results[0].composite_score == 0.0
         assert results[0].is_win is False
+
+
+# ---------------------------------------------------------------------------
+# _score_semantic fallback chain logging tests
+# ---------------------------------------------------------------------------
+
+
+def _clear_semantic_module_cache() -> None:
+    """Remove cached bertscore / embedding modules so imports re-run inside _score_semantic."""
+    for key in list(sys.modules.keys()):
+        if (
+            "rosettastone.evaluate.bertscore" in key
+            or "rosettastone.evaluate.embedding" in key
+        ):
+            del sys.modules[key]
+
+
+def _attach_capturing_handler(logger_name: str) -> tuple:
+    """Attach an INFO+ capturing handler directly to the named logger.
+
+    Returns (logger, handler, original_level). The caller must call
+    _detach_capturing_handler() after the test body.
+    """
+    import logging as _logging
+
+    captured: list[str] = []
+
+    class _CapturingHandler(_logging.Handler):
+        def emit(self, record: _logging.LogRecord) -> None:
+            if record.levelno >= _logging.INFO:
+                captured.append(self.format(record))
+
+    the_logger = _logging.getLogger(logger_name)
+    original_level = the_logger.level
+    handler = _CapturingHandler()
+    the_logger.addHandler(handler)
+    the_logger.setLevel(_logging.DEBUG)  # ensure INFO records are handled
+    return the_logger, handler, original_level, captured
+
+
+def _detach_capturing_handler(the_logger, handler, original_level: int) -> None:
+    the_logger.removeHandler(handler)
+    the_logger.setLevel(original_level)
+
+
+class TestScoreSemanticFallbackLogging:
+    """Verify that _score_semantic logs at each fallback tier.
+
+    The composite logger uses get_logger() which sets propagate=False and adds
+    its own StreamHandler. pytest's caplog fixture only intercepts loggers that
+    propagate to root, so we attach a handler directly to the named logger.
+    """
+
+    LOGGER_NAME = "rosettastone.evaluate.composite"
+
+    def setup_method(self) -> None:
+        self.evaluator = CompositeEvaluator(make_config())
+
+    def test_score_semantic_logs_bertscore_fallback_to_embedding(self) -> None:
+        """When BERTScore raises ImportError and Embedding succeeds, the fallback log appears."""
+        fake_embedding_evaluator = MagicMock()
+        fake_embedding_evaluator.score.return_value = {"embedding_sim": 0.85}
+        fake_embedding_cls = MagicMock(return_value=fake_embedding_evaluator)
+
+        # Clear cache BEFORE patch.dict so patch.dict's None value sticks
+        _clear_semantic_module_cache()
+
+        the_logger, handler, orig_level, captured = _attach_capturing_handler(self.LOGGER_NAME)
+        try:
+            # Setting the bertscore module to None causes ImportError on import
+            with patch.dict("sys.modules", {"rosettastone.evaluate.bertscore": None}):
+                with patch(
+                    "rosettastone.evaluate.embedding.EmbeddingEvaluator",
+                    fake_embedding_cls,
+                ):
+                    self.evaluator._score_semantic("hello", "hello")
+        finally:
+            _detach_capturing_handler(the_logger, handler, orig_level)
+
+        all_output = "\n".join(captured)
+        assert "BERTScore unavailable" in all_output or "EmbeddingEvaluator" in all_output, (
+            f"Expected fallback log message, got: {all_output!r}"
+        )
+
+    def test_score_semantic_logs_full_fallback_to_exact_match(self) -> None:
+        """When both BERTScore and Embedding raise ImportError, the ExactMatch fallback log appears."""
+        # Clear cache BEFORE patch.dict so None values stick
+        _clear_semantic_module_cache()
+
+        the_logger, handler, orig_level, captured = _attach_capturing_handler(self.LOGGER_NAME)
+        try:
+            with patch.dict(
+                "sys.modules",
+                {
+                    "rosettastone.evaluate.bertscore": None,
+                    "rosettastone.evaluate.embedding": None,
+                },
+            ):
+                result = self.evaluator._score_semantic("hello world", "hello world")
+        finally:
+            _detach_capturing_handler(the_logger, handler, orig_level)
+
+        assert len(result) > 0
+        all_output = "\n".join(captured)
+        assert "EmbeddingEvaluator unavailable" in all_output or "ExactMatchEvaluator" in all_output, (
+            f"Expected ExactMatch fallback log, got: {all_output!r}"
+        )
+
+    def test_score_semantic_no_fallback_log_on_happy_path(self) -> None:
+        """When BERTScore is available and works, no fallback INFO log messages appear."""
+        fake_bert_evaluator = MagicMock()
+        fake_bert_evaluator.score.return_value = {"bertscore_f1": 0.92}
+        fake_bert_cls = MagicMock(return_value=fake_bert_evaluator)
+
+        the_logger, handler, orig_level, captured = _attach_capturing_handler(self.LOGGER_NAME)
+        try:
+            # BERTScoreEvaluator is mocked to succeed — no ImportError, no fallback
+            with patch(
+                "rosettastone.evaluate.bertscore.BERTScoreEvaluator",
+                fake_bert_cls,
+            ):
+                _clear_semantic_module_cache()
+                self.evaluator._score_semantic("hello", "hello")
+        finally:
+            _detach_capturing_handler(the_logger, handler, orig_level)
+
+        fallback_phrases = [
+            "BERTScore unavailable",
+            "EmbeddingEvaluator unavailable",
+            "falling back",
+        ]
+        for phrase in fallback_phrases:
+            for msg in captured:
+                assert phrase not in msg, (
+                    f"Unexpected fallback log '{phrase}' found on happy path: {msg}"
+                )
+
+
+# ---------------------------------------------------------------------------
+# Batch BERTScore index alignment tests
+# ---------------------------------------------------------------------------
+
+
+class TestBatchBERTScoreAlignment:
+    """Verify that the 3-phase batching correctly maps BERTScore results to pairs.
+
+    The evaluate() method:
+    1. Collects LLM completions in parallel (Phase 1).
+    2. Batch-computes BERTScore for free-text pairs only (Phase 2).
+    3. Assembles EvalResults, feeding each free-text pair its own pre-computed score (Phase 3).
+
+    These tests ensure the free_text_indices -> bertscore_map mapping is correct.
+    """
+
+    def setup_method(self) -> None:
+        self.config = make_config()
+        self.evaluator = CompositeEvaluator(self.config)
+
+    @patch("rosettastone.evaluate.composite.litellm.completion")
+    def test_batch_evaluate_assigns_scores_to_correct_pairs(
+        self, mock_completion: MagicMock
+    ) -> None:
+        """5 pairs (3 free-text, 2 JSON): each free-text pair gets its own BERTScore.
+
+        The batch returns 3 distinct scores. The test verifies they are assigned in
+        order to the free-text pairs, not to their JSON neighbours.
+        """
+        # Pairs layout: [short_text, json, short_text, json, short_text]
+        pairs = [
+            make_pair("ST-0 question", "ST-0 answer", OutputType.SHORT_TEXT),
+            make_pair("JS-1 question", '{"k": "v"}', OutputType.JSON),
+            make_pair("ST-2 question", "ST-2 answer", OutputType.SHORT_TEXT),
+            make_pair("JS-3 question", '{"k": "v"}', OutputType.JSON),
+            make_pair("ST-4 question", "ST-4 answer", OutputType.SHORT_TEXT),
+        ]
+
+        # Completions mirror the expected responses (so JSON pairs score perfectly)
+        responses = [
+            "ST-0 answer",       # short_text
+            '{"k": "v"}',        # json
+            "ST-2 answer",       # short_text
+            '{"k": "v"}',        # json
+            "ST-4 answer",       # short_text
+        ]
+        mock_completion.side_effect = [make_litellm_response(r) for r in responses]
+
+        # 3 distinct BERTScores for the 3 free-text pairs (in order)
+        batch_scores_returned = [0.11, 0.55, 0.99]
+
+        with patch(
+            "rosettastone.evaluate.bertscore.batch_compute_bertscore",
+            return_value=batch_scores_returned,
+        ) as mock_batch:
+            results = self.evaluator.evaluate(pairs)
+
+        # BERTScore batch was called once with exactly 3 free-text pairs
+        mock_batch.assert_called_once()
+        call_pairs = mock_batch.call_args[0][0]
+        assert len(call_pairs) == 3
+
+        # Pull out the short_text results (indices 0, 2, 4 in input order)
+        # results ordering follows completion order, so find by prompt
+        st_results = [r for r in results if r.details.get("output_type") == "short_text"]
+        json_results = [r for r in results if r.details.get("output_type") == "json"]
+
+        assert len(st_results) == 3
+        assert len(json_results) == 2
+
+        # Each short_text pair must carry the bertscore_f1 that was pre-computed for it
+        st_scores = sorted(r.scores.get("bertscore_f1", -1.0) for r in st_results)
+        assert st_scores == sorted(batch_scores_returned), (
+            f"BERTScore values were not correctly mapped. Got {st_scores}, "
+            f"expected {sorted(batch_scores_returned)}"
+        )
+
+        # JSON pairs must NOT have a bertscore_f1 key (they use json_validator instead)
+        for r in json_results:
+            assert "bertscore_f1" not in r.scores, (
+                "JSON pair unexpectedly received a bertscore_f1 score"
+            )
+
+    @patch("rosettastone.evaluate.composite.litellm.completion")
+    def test_batch_evaluate_empty_free_text_list(self, mock_completion: MagicMock) -> None:
+        """When all pairs are JSON type, BERTScore batch is never called."""
+        pairs = [
+            make_pair("Q1", '{"a": 1}', OutputType.JSON),
+            make_pair("Q2", '{"b": 2}', OutputType.JSON),
+        ]
+        mock_completion.side_effect = [
+            make_litellm_response('{"a": 1}'),
+            make_litellm_response('{"b": 2}'),
+        ]
+
+        with patch(
+            "rosettastone.evaluate.bertscore.batch_compute_bertscore",
+        ) as mock_batch:
+            results = self.evaluator.evaluate(pairs)
+
+        mock_batch.assert_not_called()
+        assert len(results) == 2
+        # All results should be JSON-scored
+        for r in results:
+            assert r.details["output_type"] == "json"
+            assert "json_valid" in r.scores
+
+    @patch("rosettastone.evaluate.composite.litellm.completion")
+    def test_evaluate_single_pair_matches_batch(self, mock_completion: MagicMock) -> None:
+        """A single short_text pair evaluated via batch uses the batch BERTScore value."""
+        pair = make_pair("Tell me a story.", "Once upon a time.", OutputType.SHORT_TEXT)
+        expected_bert_score = 0.73
+
+        mock_completion.return_value = make_litellm_response("Once upon a time.")
+
+        with patch(
+            "rosettastone.evaluate.bertscore.batch_compute_bertscore",
+            return_value=[expected_bert_score],
+        ):
+            results = self.evaluator.evaluate([pair])
+
+        assert len(results) == 1
+        result = results[0]
+        # The single free-text pair must receive exactly the batch BERTScore value
+        assert "bertscore_f1" in result.scores, (
+            "Expected bertscore_f1 in scores but it was missing"
+        )
+        assert abs(result.scores["bertscore_f1"] - expected_bert_score) < 1e-9, (
+            f"Expected bertscore_f1={expected_bert_score}, got {result.scores['bertscore_f1']}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Property-based tests
+# ---------------------------------------------------------------------------
+
+# Build a strategy that generates score dicts using the known metric keys so
+# that weight lookup hits real entries in METRIC_WEIGHTS (edge-case: unknown
+# keys get weight 1.0 by default — also valid to test).
+_ALL_METRIC_KEYS = list(METRIC_WEIGHTS.keys()) + ["embedding_sim", "string_similarity"]
+
+
+def _st_score_dict():
+    """Strategy: non-empty dict of metric_name -> float in [0.0, 1.0]."""
+    return st.dictionaries(
+        keys=st.sampled_from(_ALL_METRIC_KEYS),
+        values=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
+        min_size=1,
+    )
+
+
+@given(
+    scores=_st_score_dict(),
+    output_type=st.sampled_from(list(OutputType)),
+)
+@settings(max_examples=100)
+def test_composite_score_bounded_property(
+    scores: dict[str, float], output_type: OutputType
+) -> None:
+    """Composite score is always in [0.0, 1.0] for any valid score dict and output type."""
+    evaluator = CompositeEvaluator(make_config())
+    result = evaluator._composite_score(scores, output_type)
+    assert 0.0 <= result <= 1.0, (
+        f"_composite_score returned {result!r} (out of [0,1]) "
+        f"for scores={scores!r}, output_type={output_type!r}"
+    )

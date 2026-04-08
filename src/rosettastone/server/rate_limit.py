@@ -7,6 +7,8 @@ import threading
 import time
 from collections import defaultdict
 
+from starlette.requests import Request
+
 # Default: 10 submissions per hour
 _DEFAULT_LIMIT = 10
 _DEFAULT_WINDOW_SECONDS = 3600
@@ -25,7 +27,7 @@ _windows: dict[tuple[str, str], list[float]] = defaultdict(list)
 _lock = threading.Lock()
 
 
-def _get_key(request) -> str:
+def _get_key(request: Request) -> str:
     """Return a stable key for the current requester.
 
     Multi-user mode: use user_id. Single-user: use client IP.
@@ -47,7 +49,7 @@ def _get_key(request) -> str:
     return f"ip:{client.host if client else 'unknown'}"
 
 
-def check_rate_limit(request, endpoint: str = "submit") -> tuple[bool, int]:
+def check_rate_limit(request: Request, endpoint: str = "submit") -> tuple[bool, int]:
     """Check if the request should be rate-limited.
 
     Returns (is_limited: bool, retry_after_seconds: int).

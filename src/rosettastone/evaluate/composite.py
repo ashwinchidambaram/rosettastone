@@ -70,11 +70,14 @@ class CompositeEvaluator:
         self,
         test_set: list[PromptPair],
         optimized_prompt: str | None = None,
+        eval_pair_callback: Callable[[int, int, float, str], None] | None = None,
     ) -> list[EvalResult]:
         # Phase 1: collect LLM completions for all pairs in parallel.
         # Each entry is either (PromptPair, response_str) on success
         # or (failure_reason_str, PromptPair) on failure (F6 taxonomy).
-        completions: list[tuple[PromptPair, str] | tuple[str, PromptPair] | None] = [None] * len(test_set)
+        completions: list[tuple[PromptPair, str] | tuple[str, PromptPair] | None] = (
+            [None] * len(test_set)
+        )
         skipped_count = 0
         total_eval_cost = 0.0
 
@@ -149,9 +152,13 @@ class CompositeEvaluator:
 
         if self._ctx is not None and total_eval_cost > 0:
             self._ctx.add_cost("evaluation", total_eval_cost)
-        if self._ctx is not None and (total_eval_prompt_tokens > 0 or total_eval_completion_tokens > 0):
+        if self._ctx is not None and (
+            total_eval_prompt_tokens > 0 or total_eval_completion_tokens > 0
+        ):
             try:
-                self._ctx.add_tokens("evaluation", total_eval_prompt_tokens, total_eval_completion_tokens)
+                self._ctx.add_tokens(
+                    "evaluation", total_eval_prompt_tokens, total_eval_completion_tokens
+                )
             except Exception:
                 pass
 
@@ -203,26 +210,35 @@ class CompositeEvaluator:
                 continue
             # Failure entry: (failure_reason: str, pair: PromptPair)
             if isinstance(entry[0], str):
-                failure_reason, pair = entry  # type: ignore[misc]
+                failure_reason, pair = entry
                 output_type = pair.output_type or detect_output_type(pair.response)
-                results.append(
-                    EvalResult(
-                        prompt_pair=pair,
-                        new_response="",
-                        scores={},
-                        composite_score=0.0,
-                        is_win=False,
-                        details={
-                            "output_type": output_type.value,
-                            "evaluators_used": [],
-                            "threshold": self._get_threshold(output_type),
-                            "skipped": True,
-                        },
-                        failure_reason=failure_reason,
-                    )
+                eval_result = EvalResult(
+                    prompt_pair=pair,
+                    new_response="",
+                    scores={},
+                    composite_score=0.0,
+                    is_win=False,
+                    details={
+                        "output_type": output_type.value,
+                        "evaluators_used": [],
+                        "threshold": self._get_threshold(output_type),
+                        "skipped": True,
+                    },
+                    failure_reason=failure_reason,
                 )
+                results.append(eval_result)
                 if self.on_progress:
                     self.on_progress(idx + 1, len(test_set))
+                if eval_pair_callback is not None:
+                    try:
+                        eval_pair_callback(
+                            len(results) - 1,
+                            len(test_set),
+                            eval_result.composite_score,
+                            eval_result.details.get("output_type") or "unknown",
+                        )
+                    except Exception:
+                        pass  # Never let callback errors disrupt evaluation
                 continue
             pair, new_response = entry
             output_type = pair.output_type or detect_output_type(pair.response)
@@ -242,24 +258,33 @@ class CompositeEvaluator:
             if output_type == OutputType.JSON and scores.get("json_valid", 1.0) == 0.0:
                 json_failure = "json_gate_failed"
 
-            results.append(
-                EvalResult(
-                    prompt_pair=pair,
-                    new_response=new_response,
-                    scores=scores,
-                    composite_score=composite,
-                    is_win=composite >= threshold,
-                    details={
-                        "output_type": output_type.value,
-                        "evaluators_used": list(scores.keys()),
-                        "threshold": threshold,
-                    },
-                    failure_reason=json_failure,
-                )
+            eval_result = EvalResult(
+                prompt_pair=pair,
+                new_response=new_response,
+                scores=scores,
+                composite_score=composite,
+                is_win=composite >= threshold,
+                details={
+                    "output_type": output_type.value,
+                    "evaluators_used": list(scores.keys()),
+                    "threshold": threshold,
+                },
+                failure_reason=json_failure,
             )
+            results.append(eval_result)
 
             if self.on_progress:
                 self.on_progress(idx + 1, len(test_set))
+            if eval_pair_callback is not None:
+                try:
+                    eval_pair_callback(
+                        len(results) - 1,
+                        len(test_set),
+                        eval_result.composite_score,
+                        eval_result.details.get("output_type") or "unknown",
+                    )
+                except Exception:
+                    pass  # Never let callback errors disrupt evaluation
 
         return results
 
@@ -267,20 +292,30 @@ class CompositeEvaluator:
         self,
         test_set: list[PromptPair],
         optimized_prompt: str | None = None,
+        eval_pair_callback: Callable[[int, int, float, str], None] | None = None,
     ) -> list[EvalResult]:
         """Run evaluate() N times and aggregate results by prompt_pair identity.
 
         Preserves 3-phase BERTScore batching by calling the full evaluate() per run.
         Uses object identity (id()) to align results across runs, so pairs skipped in
         different runs do not corrupt the aggregation.
+
+        The eval_pair_callback is only fired on the first run to avoid N×pairs events.
         """
         n_runs = self.config.eval_runs
         if n_runs <= 1:
-            return self.evaluate(test_set, optimized_prompt=optimized_prompt)
+            return self.evaluate(
+                test_set, optimized_prompt=optimized_prompt,
+                eval_pair_callback=eval_pair_callback,
+            )
 
         run_results: list[list[EvalResult]] = []
-        for _ in range(n_runs):
-            run_results.append(self.evaluate(test_set, optimized_prompt=optimized_prompt))
+        for run_idx in range(n_runs):
+            # Only pass the callback on the first run to avoid N×pairs events
+            _cb = eval_pair_callback if run_idx == 0 else None
+            run_results.append(
+                self.evaluate(test_set, optimized_prompt=optimized_prompt, eval_pair_callback=_cb)
+            )
 
         # Build index: map prompt_pair object id → test_set position
         pair_to_idx: dict[int, int] = {id(pair): i for i, pair in enumerate(test_set)}
@@ -449,17 +484,23 @@ class CompositeEvaluator:
         try:
             from rosettastone.evaluate.bertscore import BERTScoreEvaluator
 
-            return BERTScoreEvaluator(config=self.config).score(expected, actual)
+            result = BERTScoreEvaluator(config=self.config).score(expected, actual)
+            logger.debug("Semantic scoring: using BERTScore")
+            return result
         except ImportError:
             if local_only:
                 logger.warning(
                     "BERTScore not available in local_only mode; falling back to string similarity"
                 )
+            logger.info("BERTScore unavailable, falling back to EmbeddingEvaluator")
             try:
                 from rosettastone.evaluate.embedding import EmbeddingEvaluator
 
-                return EmbeddingEvaluator(config=self.config).score(expected, actual)
+                result = EmbeddingEvaluator(config=self.config).score(expected, actual)
+                logger.debug("Semantic scoring: using EmbeddingEvaluator")
+                return result
             except ImportError:
+                logger.info("EmbeddingEvaluator unavailable, falling back to ExactMatchEvaluator")
                 return ExactMatchEvaluator(config=self.config).score(expected, actual)
 
     def _composite_score(self, scores: dict[str, float], output_type: OutputType) -> float:

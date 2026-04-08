@@ -21,20 +21,25 @@
                     <span class="font-['JetBrains_Mono'] text-sm tracking-widest uppercase opacity-80">System Priority: Omega</span>
                 </div>
                 <h1 class="text-5xl md:text-7xl font-black tracking-tighter leading-none text-on-surface">
-                    {{ alerts|length }} Critical Alerts.<br/>
+                    {% if alerts|length > 0 %}
+                    {{ alerts|length }} Critical Alert{{ 's' if alerts|length != 1 else '' }}.<br/>
                     <span class="text-[#D85650]">ACTION REQUIRED.</span>
+                    {% else %}
+                    System looks healthy.<br/>
+                    <span class="text-[#8B9D83]">No critical alerts.</span>
+                    {% endif %}
                 </h1>
                 <p class="text-on-surface-variant max-w-xl text-lg">
                     RosettaStone migration protocols have detected model deprecations, price changes, and new model availability. Review and take action.
                 </p>
             </div>
             <div class="flex flex-col gap-4">
-                <button class="bg-gradient-to-br from-[#D4745E] to-[#D67660] text-on-primary px-10 py-5 rounded-lg font-bold text-lg hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-primary/20">
+                <a href="/ui/migrations/new" class="bg-gradient-to-br from-[#D4745E] to-[#D67660] text-on-primary px-10 py-5 rounded-lg font-bold text-lg hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-primary/20 text-center">
                     Start Batch Migration
-                </button>
-                <button class="ghost-border px-10 py-5 rounded-lg font-bold text-on-surface hover:bg-surface-container-high transition-colors">
+                </a>
+                <a href="/ui/audit-log" class="ghost-border px-10 py-5 rounded-lg font-bold text-on-surface hover:bg-surface-container-high transition-colors text-center">
                     View Drift Logs
-                </button>
+                </a>
             </div>
         </div>
     </div>
@@ -48,7 +53,7 @@
                 <h2 class="text-3xl font-black tracking-tight text-on-surface">Active Intelligence Reports</h2>
                 <p class="text-on-surface-variant mt-2 font-['JetBrains_Mono'] text-xs">Real-time heuristic monitoring for RosettaStone core</p>
             </div>
-            <button class="text-[#D4745E] font-bold text-sm hover:underline">Export Report Data</button>
+            <a href="/api/v1/alerts" target="_blank" class="text-[#D4745E] font-bold text-sm hover:underline">Export Report Data</a>
         </div>
         <div class="grid grid-cols-1 gap-4">
             {% for alert in alerts %}
@@ -96,7 +101,7 @@
         <div class="space-y-6">
             <label class="flex items-start gap-4 p-4 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group">
                 <div class="pt-1">
-                    <input checked class="w-5 h-5 rounded border-outline bg-surface-container-high text-[#D4745E] focus:ring-[#D4745E]" type="checkbox"/>
+                    <input name="notify_critical" checked class="w-5 h-5 rounded border-outline bg-surface-container-high text-[#D4745E] focus:ring-[#D4745E]" type="checkbox"/>
                 </div>
                 <div>
                     <span class="block font-bold text-on-surface">Email: Critical System Alerts</span>
@@ -105,7 +110,7 @@
             </label>
             <label class="flex items-start gap-4 p-4 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group">
                 <div class="pt-1">
-                    <input class="w-5 h-5 rounded border-outline bg-surface-container-high text-[#D4745E] focus:ring-[#D4745E]" type="checkbox"/>
+                    <input name="notify_cost" class="w-5 h-5 rounded border-outline bg-surface-container-high text-[#D4745E] focus:ring-[#D4745E]" type="checkbox"/>
                 </div>
                 <div>
                     <span class="block font-bold text-on-surface">Email: Cost &amp; Efficiency Reports</span>
@@ -114,7 +119,7 @@
             </label>
             <label class="flex items-start gap-4 p-4 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group">
                 <div class="pt-1">
-                    <input checked class="w-5 h-5 rounded border-outline bg-surface-container-high text-[#D4745E] focus:ring-[#D4745E]" type="checkbox"/>
+                    <input name="notify_drift" checked class="w-5 h-5 rounded border-outline bg-surface-container-high text-[#D4745E] focus:ring-[#D4745E]" type="checkbox"/>
                 </div>
                 <div>
                     <span class="block font-bold text-on-surface">Push: Model Performance Drift</span>
@@ -123,10 +128,30 @@
             </label>
         </div>
         <div class="mt-12 flex justify-end">
-            <button class="bg-surface-container-highest px-8 py-3 rounded-lg font-bold text-on-surface hover:bg-surface-bright transition-colors">
+            <button onclick="saveAlertPrefs(this)" class="bg-surface-container-highest px-8 py-3 rounded-lg font-bold text-on-surface hover:bg-surface-bright transition-colors">
                 Save Preferences
             </button>
         </div>
+        <script nonce="{{ request.state.csp_nonce }}">
+        function saveAlertPrefs(btn) {
+            var prefs = {};
+            document.querySelectorAll('[name^="notify_"]').forEach(function(cb) { prefs[cb.name] = cb.checked; });
+            try { localStorage.setItem('rosettastone-alert-prefs', JSON.stringify(prefs)); } catch(e) {}
+            var orig = btn.textContent;
+            btn.textContent = 'Saved!';
+            btn.disabled = true;
+            setTimeout(function() { btn.textContent = orig; btn.disabled = false; }, 2000);
+        }
+        (function() {
+            try {
+                var saved = JSON.parse(localStorage.getItem('rosettastone-alert-prefs') || '{}');
+                Object.keys(saved).forEach(function(k) {
+                    var el = document.querySelector('[name="' + k + '"]');
+                    if (el) el.checked = saved[k];
+                });
+            } catch(e) {}
+        })();
+        </script>
     </div>
 </section>
 

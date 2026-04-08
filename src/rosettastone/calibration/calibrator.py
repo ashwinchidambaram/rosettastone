@@ -97,7 +97,7 @@ class ThresholdCalibrator:
         import logging
 
         try:
-            import krippendorff
+            import krippendorff  # type: ignore[import-untyped]
         except ImportError as exc:
             raise ImportError(
                 "krippendorff is required for reliability computation. "

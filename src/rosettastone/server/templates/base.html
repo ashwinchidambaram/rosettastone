@@ -80,6 +80,7 @@
         },
     }
 </script>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg"/>
 <link rel="stylesheet" href="/static/css/components.css"/>
 {% if request.state.csrf_token %}<meta name="csrf-token" content="{{ request.state.csrf_token }}">{% endif %}
 {% block head_extra %}{% endblock %}
@@ -106,6 +107,7 @@
             <a class="{% if active_nav == 'pipelines' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/pipelines">Pipelines</a>
             <a class="{% if active_nav == 'users' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/users">Users</a>
             <a class="{% if active_nav == 'teams' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/teams">Teams</a>
+            <a class="{% if active_nav == 'annotations' %}text-[#D4745E] border-b-2 border-[#D4745E] pb-1{% else %}text-[#E5E2E1]/60 hover:text-[#E5E2E1] transition-colors{% endif %} text-sm font-medium" href="/ui/annotations">Annotations</a>
         </div>
     </div>
     <div class="flex items-center gap-4">
@@ -123,11 +125,22 @@
         <button data-action="toggle-theme" class="p-2 text-[#BDBDBD] hover:bg-stone-800/50 rounded-lg transition-all active:scale-95" aria-label="Toggle dark/light theme">
             <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
         </button>
-        <button class="p-2 text-[#BDBDBD] hover:bg-stone-800/50 rounded-lg transition-all active:scale-95" aria-label="Settings">
+        <button data-action="settings-link" class="p-2 text-[#BDBDBD] hover:bg-stone-800/50 rounded-lg transition-all active:scale-95" aria-label="Settings">
             <span class="material-symbols-outlined" aria-hidden="true">settings</span>
         </button>
-        <div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant/30 flex items-center justify-center">
-            <span class="material-symbols-outlined text-on-surface-variant text-sm" aria-hidden="true">account_circle</span>
+        <div class="relative">
+            <button data-action="toggle-account-menu" class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant/30 flex items-center justify-center hover:border-[#D4745E]/50 transition-colors" aria-label="Account menu" aria-expanded="false" aria-haspopup="true">
+                <span class="material-symbols-outlined text-on-surface-variant text-sm" aria-hidden="true">account_circle</span>
+            </button>
+            <div id="account-dropdown" class="hidden absolute right-0 top-full mt-2 w-40 bg-surface-container-high border border-outline-variant/20 rounded-lg shadow-xl z-[200] py-1" role="menu">
+                <form method="post" action="/ui/logout">
+                    {% if request.state.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}">{% endif %}
+                    <button type="submit" class="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-on-surface hover:bg-surface-bright transition-colors" role="menuitem">
+                        <span class="material-symbols-outlined text-[16px] text-on-surface-variant" aria-hidden="true">logout</span>
+                        Sign out
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 </nav>
@@ -179,6 +192,10 @@
         <a href="/ui/teams" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'teams' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
             <span class="material-symbols-outlined text-lg" aria-hidden="true">people</span>
             Teams
+        </a>
+        <a href="/ui/annotations" class="mobile-nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium {% if active_nav == 'annotations' %}bg-[#D4745E]/10 text-[#D4745E]{% else %}text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface{% endif %} transition-colors">
+            <span class="material-symbols-outlined text-lg" aria-hidden="true">rate_review</span>
+            Annotations
         </a>
     </nav>
 </div>

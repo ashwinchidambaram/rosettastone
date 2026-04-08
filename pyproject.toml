@@ -126,6 +126,7 @@ markers = [
     "e2e: end-to-end tests requiring real APIs and Redis (deselect with '-m not e2e')",
     "ollama: tests requiring a local Ollama instance (deselect with '-m not ollama')",
     "ray: tests requiring a Ray cluster (deselect with '-m not ray')",
+    "vcr: tests that replay recorded HTTP cassettes (deselect with '-m not vcr')",
 ]
 
 [tool.mypy]
@@ -144,6 +145,9 @@ warn_unused_ignores = false
 dev = [
     "alembic>=1.18.4",
     "faker>=40.12.0",
+    "freezegun>=1.4",
+    "hypothesis>=6.100",
     "playwright>=1.58.0",
+    "pytest-recording>=0.13",
     "types-pyyaml>=6.0.12.20250915",
 ]

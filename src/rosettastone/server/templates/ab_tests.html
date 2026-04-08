@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}RosettaStone | A/B Tests{% endblock %}
+{% block title %}A/B Tests{% endblock %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto">
@@ -36,7 +36,14 @@
         </tr>
         {% endfor %}
         {% if not ab_tests %}
-        <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No A/B tests yet.</td></tr>
+        <tr>
+          <td colspan="5" class="px-4 py-12 text-center">
+            <p class="text-gray-500 mb-4">No A/B tests yet.</p>
+            <a href="/api/docs#/ab-testing" target="_blank" rel="noopener noreferrer" class="inline-block px-4 py-2 bg-[#D4745E]/10 text-[#D4745E] border border-[#D4745E]/30 rounded-lg text-sm font-medium hover:bg-[#D4745E]/20 transition-all">
+              Create via API →
+            </a>
+          </td>
+        </tr>
         {% endif %}
       </tbody>
     </table>
