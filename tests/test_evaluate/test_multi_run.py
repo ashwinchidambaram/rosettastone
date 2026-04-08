@@ -47,7 +47,9 @@ class TestSingleRun:
 
         with patch.object(evaluator, "evaluate", return_value=[_make_eval(0.9)]) as mock_eval:
             results = evaluator.evaluate_multi_run([pair])
-            mock_eval.assert_called_once_with([pair], optimized_prompt=None)
+            mock_eval.assert_called_once_with(
+                [pair], optimized_prompt=None, eval_pair_callback=None
+            )
 
         assert len(results) == 1
         # Single run: run_scores should be empty (not populated)
@@ -69,7 +71,7 @@ class TestMultiRun:
 
         call_count = 0
 
-        def fake_evaluate(test_set, optimized_prompt=None):
+        def fake_evaluate(test_set, optimized_prompt=None, eval_pair_callback=None):
             nonlocal call_count
             # Return result with the original pair object so id() alignment works
             result = _make_eval(run_scores[call_count], pair=pair)
@@ -97,7 +99,7 @@ class TestMultiRun:
         call_count = 0
         pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
 
-        def fake_eval(test_set, optimized_prompt=None):
+        def fake_eval(test_set, optimized_prompt=None, eval_pair_callback=None):
             nonlocal call_count
             r = _make_eval(scores[call_count], pair=pair)
             call_count += 1
@@ -120,7 +122,7 @@ class TestMultiRun:
         call_count = 0
         pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
 
-        def fake_eval(test_set, optimized_prompt=None):
+        def fake_eval(test_set, optimized_prompt=None, eval_pair_callback=None):
             nonlocal call_count
             r = _make_eval(scores[call_count], pair=pair)
             call_count += 1
@@ -143,7 +145,7 @@ class TestMultiRun:
         call_count = 0
         pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
 
-        def fake_eval(test_set, optimized_prompt=None):
+        def fake_eval(test_set, optimized_prompt=None, eval_pair_callback=None):
             nonlocal call_count
             r = _make_eval(scores[call_count], pair=pair)
             call_count += 1
@@ -169,7 +171,7 @@ class TestVarianceFlagging:
         call_count = 0
         pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
 
-        def fake_eval(test_set, optimized_prompt=None):
+        def fake_eval(test_set, optimized_prompt=None, eval_pair_callback=None):
             nonlocal call_count
             r = _make_eval(scores[call_count], pair=pair)
             call_count += 1
@@ -193,7 +195,7 @@ class TestVarianceFlagging:
         call_count = 0
         pair = PromptPair(prompt="q", response="a", source_model="openai/gpt-4o")
 
-        def fake_eval(test_set, optimized_prompt=None):
+        def fake_eval(test_set, optimized_prompt=None, eval_pair_callback=None):
             nonlocal call_count
             r = _make_eval(scores[call_count], pair=pair)
             call_count += 1
@@ -234,7 +236,7 @@ class TestRunAlignment:
         run_1 = [_eval(pair_a, 0.6), _eval(pair_b, 0.7)]
         call_count = 0
 
-        def fake_eval(test_set, optimized_prompt=None):
+        def fake_eval(test_set, optimized_prompt=None, eval_pair_callback=None):
             nonlocal call_count
             result = [run_0, run_1][call_count]
             call_count += 1

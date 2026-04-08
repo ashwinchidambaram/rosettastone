@@ -200,11 +200,12 @@ def evaluate_baseline(
     test: list[PromptPair],
     config: MigrationConfig,
     ctx: PipelineContext | None = None,
+    eval_pair_callback: Callable[[int, int, float, str], None] | None = None,
 ) -> list[EvalResult]:
     from rosettastone.evaluate.composite import CompositeEvaluator
 
     evaluator = CompositeEvaluator(config, ctx=ctx)
-    return evaluator.evaluate_multi_run(test)
+    return evaluator.evaluate_multi_run(test, eval_pair_callback=eval_pair_callback)
 
 
 def evaluate_optimized(
@@ -212,11 +213,14 @@ def evaluate_optimized(
     optimized_prompt: str,
     config: MigrationConfig,
     ctx: PipelineContext | None = None,
+    eval_pair_callback: Callable[[int, int, float, str], None] | None = None,
 ) -> list[EvalResult]:
     from rosettastone.evaluate.composite import CompositeEvaluator
 
     evaluator = CompositeEvaluator(config, ctx=ctx)
-    return evaluator.evaluate_multi_run(test, optimized_prompt=optimized_prompt)
+    return evaluator.evaluate_multi_run(
+        test, optimized_prompt=optimized_prompt, eval_pair_callback=eval_pair_callback
+    )
 
 
 def run_pii_scan(pairs: list[PromptPair], ctx: PipelineContext, config: MigrationConfig) -> None:

@@ -32,6 +32,7 @@ class Migrator:
         checkpoint_callback: Callable[[str, str], None] | None = None,
         resume_checkpoint_stage: str | None = None,
         resume_checkpoint_data: str | None = None,
+        eval_pair_callback: Callable[[int, int, float, str], None] | None = None,
     ) -> None:
         self.config = config
         self._progress_callback = progress_callback
@@ -41,6 +42,7 @@ class Migrator:
         self.checkpoint_callback = checkpoint_callback
         self.resume_checkpoint_stage = resume_checkpoint_stage
         self.resume_checkpoint_data = resume_checkpoint_data
+        self._eval_pair_callback = eval_pair_callback
         self._ctx: object | None = None  # Set at the start of run(); readable by progress writers
 
     @property
@@ -248,7 +250,9 @@ class Migrator:
             ctx.timing["baseline_eval"] = 0.0
         else:
             t0 = time.time()
-            baseline = evaluate_baseline(test, self.config, ctx=ctx)
+            baseline = evaluate_baseline(
+                test, self.config, ctx=ctx, eval_pair_callback=self._eval_pair_callback
+            )
             ctx.timing["baseline_eval"] = time.time() - t0
             _record_stage("baseline_eval", ctx.timing["baseline_eval"])
             if not _already_done("baseline_eval"):
@@ -396,7 +400,10 @@ class Migrator:
             ctx.timing["validation_eval"] = 0.0
         else:
             t0 = time.time()
-            validation = evaluate_optimized(test, optimized_prompt, self.config, ctx=ctx)
+            validation = evaluate_optimized(
+                test, optimized_prompt, self.config, ctx=ctx,
+                eval_pair_callback=self._eval_pair_callback,
+            )
             ctx.timing["validation_eval"] = time.time() - t0
             _record_stage("validation_eval", ctx.timing["validation_eval"])
             if not _already_done("validation_eval"):

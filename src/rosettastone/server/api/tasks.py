@@ -171,6 +171,27 @@ def _make_gepa_callback(migration_id: int, engine: Any = None) -> Callable[[int,
     return on_iteration
 
 
+def _make_eval_pair_callback(migration_id: int, engine: Any) -> Any:
+    """Return a callback that emits SSE eval_pair events after each evaluated pair."""
+
+    def on_eval_pair(pair_idx: int, total: int, score: float, output_type: str) -> None:
+        from rosettastone.server.progress import emit_progress
+
+        emit_progress(
+            migration_id,
+            {
+                "type": "eval_pair",
+                "migration_id": migration_id,
+                "pair_index": pair_idx,
+                "total_pairs": total,
+                "composite_score": round(score, 4),
+                "output_type": output_type,
+            },
+        )
+
+    return on_eval_pair
+
+
 def _make_progress_writer(migration_id: int, engine: Any, migrator: Any = None) -> Any:
     """Return a callback that writes stage progress to the DB and emits SSE events.
 
@@ -269,6 +290,7 @@ def run_migration_background(
 
         gepa_cb = _make_gepa_callback(migration_id, engine)
         checkpoint_cb = _make_checkpoint_writer(migration_id, engine)
+        eval_pair_cb = _make_eval_pair_callback(migration_id, engine)
 
         # Create migrator first so progress writer can reference it for live cost/warning data.
         # Progress callback is wired in after construction via _progress_callback attribute.
@@ -280,6 +302,7 @@ def run_migration_background(
             checkpoint_callback=checkpoint_cb,
             resume_checkpoint_stage=resume_from,
             resume_checkpoint_data=checkpoint_data,
+            eval_pair_callback=eval_pair_cb,
         )
         migrator._progress_callback = _make_progress_writer(migration_id, engine, migrator=migrator)
 
