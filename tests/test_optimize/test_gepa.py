@@ -428,3 +428,87 @@ class TestGEPAOptimizerOptimize:
         assert reflection_kwargs.get("api_base") == "http://localhost", (
             f"Reflection LM should still receive api_base, got: {reflection_kwargs}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Cost tracking tests (Task 6.1)
+# ---------------------------------------------------------------------------
+#
+# GEPAOptimizer and build_migration_metric do NOT currently integrate with a
+# PipelineContext or any add_cost / cost-accumulation mechanism. These tests
+# document that absence explicitly so future implementors know the contract
+# they need to satisfy (and so the test suite fails loudly if cost tracking
+# is accidentally introduced as a side-effect).
+# ---------------------------------------------------------------------------
+
+
+class TestGEPACostTracking:
+    """Document that cost tracking via PipelineContext is not yet implemented."""
+
+    def test_gepa_optimize_completes_without_cost_tracking(self, tmp_path) -> None:
+        """optimize() completes successfully even though no cost context exists.
+
+        If PipelineContext / add_cost is later wired in, a separate test class
+        should cover it. This test documents the current (no-cost-tracking) state.
+        """
+        config = _make_config(tmp_path)
+        train = _make_pairs(2)
+        val = _make_pairs(1)
+
+        mock_compiled = MagicMock()
+        mock_compiled.predict.signature.instructions = "Instructions without cost tracking"
+
+        with (
+            patch("rosettastone.optimize.gepa.dspy.LM"),
+            patch("rosettastone.optimize.gepa.dspy.GEPA") as mock_gepa_cls,
+            patch("rosettastone.optimize.gepa.dspy.context") as mock_ctx,
+        ):
+            mock_ctx.return_value.__enter__ = lambda s: s
+            mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
+            mock_gepa_cls.return_value.compile.return_value = mock_compiled
+
+            result = GEPAOptimizer().optimize(train, val, config)
+
+        # Should complete and return a string — no exceptions about missing cost context
+        assert isinstance(result, str), (
+            f"optimize() must return str; cost-tracking absence must not raise, got: {type(result)}"
+        )
+
+    def test_metric_does_not_track_costs_internally(self, tmp_path) -> None:
+        """build_migration_metric() returns a pure function with no side-effect cost accumulation.
+
+        The returned metric closure must not mutate any external cost store. It
+        only computes a score+feedback pair and returns a dspy.Prediction.
+        """
+        import inspect
+
+        from rosettastone.optimize.metric import build_migration_metric
+
+        config = _make_config(tmp_path)
+        metric_fn = build_migration_metric(config)
+
+        # Metric must be a callable
+        assert callable(metric_fn), "build_migration_metric must return a callable"
+
+        # The metric's source closure should not reference any cost-accumulation names.
+        # We check __code__.co_freevars and co_varnames for obvious cost identifiers.
+        cost_identifiers = {"add_cost", "pipeline_context", "cost_tracker", "cost_accumulator"}
+        if hasattr(metric_fn, "__code__"):
+            all_names = set(metric_fn.__code__.co_freevars) | set(metric_fn.__code__.co_varnames)
+            intersect = cost_identifiers & {n.lower() for n in all_names}
+            assert not intersect, (
+                f"Metric closure unexpectedly references cost-tracking names: {intersect}. "
+                "If cost tracking has been added, update test_gepa_optimize_with_cost_context too."
+            )
+
+    def test_gepa_optimizer_has_no_pipeline_context_attribute(self) -> None:
+        """GEPAOptimizer does not expose a pipeline_context attribute — cost tracking not wired.
+
+        This test will fail intentionally once PipelineContext is integrated,
+        prompting the developer to add test_gepa_optimize_with_cost_context.
+        """
+        optimizer = GEPAOptimizer()
+        assert not hasattr(optimizer, "pipeline_context"), (
+            "GEPAOptimizer now has a pipeline_context attribute — "
+            "add test_gepa_optimize_with_cost_context to cover add_cost() calls."
+        )

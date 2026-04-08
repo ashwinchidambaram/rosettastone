@@ -746,3 +746,155 @@ def test_otel_multiple_resource_spans(tmp_path):
     assert "Resource1 Q1" in prompts, f"Expected 'Resource1 Q1' in prompts: {prompts!r}"
     assert "Resource1 Q2" in prompts, f"Expected 'Resource1 Q2' in prompts: {prompts!r}"
     assert "Resource2 Q1" in prompts, f"Expected 'Resource2 Q1' in prompts: {prompts!r}"
+
+
+# ===========================================================================
+# Task 6.2 — OTel extraction edge cases
+# ===========================================================================
+
+
+def test_otel_span_with_only_events_extracts_prompt(tmp_path):
+    """Span with gen_ai events (no inline attributes) still extracts prompt and response.
+
+    The adapter resolves prompt/completion from events when the inline span
+    attributes gen_ai.prompt / gen_ai.completion are absent.
+    """
+    # Build a span with a gen_ai.request.model attribute (so it's detected as gen_ai)
+    # but no inline gen_ai.prompt / gen_ai.completion — those live in events only.
+    span = _make_span(
+        name="chat gpt-4o",
+        trace_id="events-only-trace",
+        attributes=[
+            _attr("gen_ai.request.model", "gpt-4o"),
+        ],
+        events=[
+            {
+                "name": "gen_ai.content.prompt",
+                "attributes": [_attr("gen_ai.prompt", "Events-only prompt")],
+            },
+            {
+                "name": "gen_ai.content.completion",
+                "attributes": [_attr("gen_ai.completion", "Events-only response")],
+            },
+        ],
+    )
+    otlp_file = tmp_path / "events_only.json"
+    _write_json(otlp_file, _make_otlp([span]))
+
+    result = OTelAdapter(otlp_file, _SOURCE_MODEL).load()
+
+    assert len(result) == 1, (
+        f"Expected 1 pair from event-only span, got {len(result)}"
+    )
+    assert result[0].prompt == "Events-only prompt", (
+        f"Expected prompt extracted from event, got: {result[0].prompt!r}"
+    )
+    assert result[0].response == "Events-only response", (
+        f"Expected response extracted from event, got: {result[0].response!r}"
+    )
+
+
+def test_otel_large_attribute_value(tmp_path):
+    """Span with a very long attribute value (10KB+) is handled without error.
+
+    Large attribute values must not cause memory issues, truncation errors,
+    or unexpected exceptions during parsing.
+    """
+    large_prompt = "A" * 12_000   # 12 KB string — well above any reasonable attribute limit
+    large_completion = "B" * 10_500  # 10.5 KB response
+
+    span = _gen_ai_span(prompt=large_prompt, completion=large_completion)
+    otlp_file = tmp_path / "large_attrs.json"
+    _write_json(otlp_file, _make_otlp([span]))
+
+    # Must not raise — loading large strings should be transparent
+    result = OTelAdapter(otlp_file, _SOURCE_MODEL).load()
+
+    assert len(result) == 1, f"Expected 1 pair with large attributes, got {len(result)}"
+    assert result[0].prompt == large_prompt, (
+        f"Large prompt was not preserved intact (length {len(result[0].prompt)} "
+        f"vs expected {len(large_prompt)})"
+    )
+    assert result[0].response == large_completion, (
+        f"Large response was not preserved intact (length {len(result[0].response)} "
+        f"vs expected {len(large_completion)})"
+    )
+
+
+def test_otel_non_genai_span_skipped(tmp_path):
+    """Span without gen_ai attributes or events is silently skipped and not counted.
+
+    Non-gen_ai spans (HTTP, DB, etc.) must not appear in the loaded PromptPairs.
+    The adapter returns only the valid gen_ai spans from the same file.
+    """
+    non_genai_span = _make_span(
+        name="http.client.request",
+        trace_id="http-trace",
+        attributes=[
+            _attr("http.method", "POST"),
+            _attr("http.url", "https://api.openai.com/v1/chat/completions"),
+            _attr("http.status_code", "200"),
+        ],
+    )
+    valid_span = _gen_ai_span(
+        prompt="Valid gen_ai prompt",
+        completion="Valid gen_ai response",
+        trace_id="genai-trace",
+    )
+    otlp_file = tmp_path / "mixed_spans.json"
+    _write_json(otlp_file, _make_otlp([non_genai_span, valid_span]))
+
+    result = OTelAdapter(otlp_file, _SOURCE_MODEL).load()
+
+    assert len(result) == 1, (
+        f"Expected 1 pair (non-gen_ai span skipped), got {len(result)}"
+    )
+    assert result[0].prompt == "Valid gen_ai prompt", (
+        f"Expected only the gen_ai span's prompt, got: {result[0].prompt!r}"
+    )
+
+
+def test_otel_directory_mode_reads_all_files(tmp_path):
+    """OTelAdapter pointed at a directory reads all .json files in it.
+
+    Each file contributes its own PromptPairs; subdirectories are not traversed.
+    Non-.json files are ignored.
+    """
+    # Write three valid OTLP files with distinct prompts
+    _write_json(
+        tmp_path / "trace_alpha.json",
+        _make_otlp([_gen_ai_span(prompt="Alpha prompt", completion="Alpha answer", trace_id="a")]),
+    )
+    _write_json(
+        tmp_path / "trace_beta.json",
+        _make_otlp([_gen_ai_span(prompt="Beta prompt", completion="Beta answer", trace_id="b")]),
+    )
+    _write_json(
+        tmp_path / "trace_gamma.json",
+        _make_otlp([_gen_ai_span(prompt="Gamma prompt", completion="Gamma answer", trace_id="c")]),
+    )
+
+    # Add a non-.json file that must be ignored
+    (tmp_path / "notes.txt").write_text("Not a trace file")
+
+    # Add a subdirectory with a .json file — must NOT be loaded (non-recursive)
+    subdir = tmp_path / "sub"
+    subdir.mkdir()
+    _write_json(
+        subdir / "nested.json",
+        _make_otlp([_gen_ai_span(prompt="Nested prompt", completion="Nested answer")]),
+    )
+
+    result = OTelAdapter(tmp_path, _SOURCE_MODEL).load()
+
+    assert len(result) == 3, (
+        f"Expected 3 pairs from 3 top-level .json files "
+        f"(txt ignored, subdir not traversed), got {len(result)}"
+    )
+    prompts = {p.prompt for p in result}
+    assert "Alpha prompt" in prompts, f"Expected Alpha prompt in results: {prompts!r}"
+    assert "Beta prompt" in prompts, f"Expected Beta prompt in results: {prompts!r}"
+    assert "Gamma prompt" in prompts, f"Expected Gamma prompt in results: {prompts!r}"
+    assert "Nested prompt" not in prompts, (
+        f"Nested prompt from subdirectory must NOT be loaded: {prompts!r}"
+    )
