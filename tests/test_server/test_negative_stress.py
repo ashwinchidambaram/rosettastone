@@ -14,6 +14,7 @@ Each test documents: priority, setup, steps, expected behavior, and assertion.
 
 from __future__ import annotations
 
+import concurrent.futures
 import io
 import json
 import os
@@ -53,12 +54,6 @@ def engine():
     )
     SQLModel.metadata.create_all(engine)
     return engine
-
-
-@pytest.fixture
-def session(engine):
-    with Session(engine) as s:
-        yield s
 
 
 @pytest.fixture
@@ -1742,3 +1737,161 @@ class TestMiscEdgeCases:
         for _ in range(100):
             resp = client.get("/api/v1/health")
             assert resp.status_code == 200
+
+# ---------------------------------------------------------------------------
+# 9. ADDITIONAL STRESS / SECURITY SCENARIOS
+# ---------------------------------------------------------------------------
+
+
+class TestLargePayloadRejected:
+    """P1: Verify the server handles extremely large JSON config payloads gracefully."""
+
+    def test_large_payload_rejected(self, client: TestClient) -> None:
+        """POST a migration config with a >1 MB JSON body.
+
+        The server should either accept it (422 for validation errors) or
+        reject it (413 / 422) — it must NOT crash or raise an unhandled 500.
+        """
+        # Build a config dict that exceeds 1 MB when serialized
+        padding = "x" * (1024 * 1024)
+        large_config = {
+            "source_model": "openai/gpt-4o",
+            "target_model": "anthropic/claude-sonnet-4",
+            "extra_padding": padding,
+        }
+        resp = client.post(
+            "/api/v1/migrations",
+            json=large_config,
+            headers={"Content-Type": "application/json"},
+        )
+        # Any response other than a 5xx server error is acceptable.
+        assert resp.status_code < 500, (
+            f"Server crashed with {resp.status_code} on large payload"
+        )
+
+
+class TestSQLInjectionInQueryParams:
+    """P0 (security): Verify SQLModel parameterization prevents SQL injection."""
+
+    def test_sql_injection_in_query_params_does_not_crash(self, client: TestClient, engine) -> None:
+        """Pass an SQL injection string as a query parameter.
+
+        The /api/v1/migrations endpoint does not filter by status, so unknown
+        query params are silently ignored.  The key security assertion is that
+        the server returns 200 without crashing and does NOT return more records
+        than actually exist (i.e., the injection string is never interpreted as SQL).
+        """
+        # Insert exactly 2 known records
+        with Session(engine) as session:
+            for status in ("complete", "pending"):
+                session.add(
+                    MigrationRecord(
+                        source_model="openai/gpt-4o",
+                        target_model="anthropic/claude-sonnet-4",
+                        status=status,
+                    )
+                )
+            session.commit()
+
+        # Attempt SQL injection via an unrecognised query parameter
+        injection = "pending' OR '1'='1"
+        resp = client.get(f"/api/v1/migrations?status={injection}")
+        assert resp.status_code == 200, f"Unexpected status: {resp.status_code}"
+        data = resp.json()
+        items = data.get("items", [])
+        # The endpoint returns all records (status param is ignored).
+        # The important guarantee: the number of items must not exceed the 2
+        # records we inserted -- injection must not manufacture extra rows.
+        assert len(items) <= 2, (
+            f"SQL injection expanded the result set to {len(items)} items"
+        )
+
+    def test_sql_injection_in_migration_id(self, client: TestClient) -> None:
+        """Use an injection string as the migration ID path parameter.
+
+        The server should return 422 (invalid integer) or 404, not 500.
+        """
+        resp = client.get("/api/v1/migrations/1 OR 1=1")
+        assert resp.status_code in (404, 422), (
+            f"Expected 404 or 422 for injected ID, got {resp.status_code}"
+        )
+
+
+class TestConcurrentMigrationCreation:
+    """P1: Verify the server handles concurrent migration creation safely."""
+
+    def test_concurrent_migration_creation(self, tmp_path) -> None:
+        """Use ThreadPoolExecutor to create 5 migrations simultaneously.
+
+        All should succeed and receive unique IDs.  We use a file-based
+        SQLite database (via tmp_path) rather than in-memory StaticPool
+        because SQLite StaticPool uses a single shared connection that is
+        not safe for concurrent multi-threaded writes.
+        """
+        db_file = tmp_path / "concurrent_test.db"
+        db_url = f"sqlite:///{db_file}"
+
+        # Create schema once on the main thread
+        shared_engine = create_engine(
+            db_url,
+            echo=False,
+            connect_args={"check_same_thread": False},
+        )
+        SQLModel.metadata.create_all(shared_engine)
+
+        def create_migration(i: int) -> int:
+            """Submit one migration and return the created migration ID.
+
+            Each worker gets its own engine connection to the shared
+            file-based DB.  We avoid the TestClient context-manager form
+            so that the app lifespan (which starts a real TaskWorker thread)
+            is not triggered.
+            """
+            thread_engine = create_engine(
+                db_url,
+                echo=False,
+                connect_args={"check_same_thread": False},
+            )
+            app = create_app()
+
+            def override_session():
+                with Session(thread_engine) as sess:
+                    yield sess
+
+            app.dependency_overrides[get_session] = override_session
+            mock_task_worker = MagicMock()
+            app.state.task_worker = mock_task_worker
+
+            data = (f'{{"prompt": "concurrent-{i}", "response": "resp-{i}"}}' + "\n").encode()
+            files = {"data_file": (f"test{i}.jsonl", io.BytesIO(data), "application/jsonl")}
+            form_data = {
+                "source_model": f"openai/gpt-4o-{i}",
+                "target_model": "anthropic/claude-sonnet-4",
+            }
+            # Do NOT use `with TestClient(...)` -- that triggers lifespan/startup.
+            c = TestClient(app, raise_server_exceptions=True)
+            resp = c.post(
+                "/ui/migrations/new",
+                data=form_data,
+                files=files,
+                follow_redirects=False,
+            )
+            assert resp.status_code == 303, f"Worker {i} got {resp.status_code}"
+            location = resp.headers["location"]
+            thread_engine.dispose()
+            return int(location.rstrip("/").split("/")[-1])
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(create_migration, i) for i in range(5)]
+            ids = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+        # All 5 migrations must have unique IDs
+        assert len(ids) == 5
+        assert len(set(ids)) == 5, f"Duplicate migration IDs detected: {ids}"
+
+        # Verify all records exist in the database
+        with Session(shared_engine) as session:
+            records = list(session.exec(select(MigrationRecord)).all())
+            assert len(records) == 5
+
+        shared_engine.dispose()

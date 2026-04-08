@@ -33,12 +33,6 @@ def engine():
 
 
 @pytest.fixture
-def session(engine):
-    with Session(engine) as s:
-        yield s
-
-
-@pytest.fixture
 def client(engine):
     """Test client with in-memory DB and mocked executor."""
     app = create_app()
