@@ -126,6 +126,7 @@ markers = [
     "e2e: end-to-end tests requiring real APIs and Redis (deselect with '-m not e2e')",
     "ollama: tests requiring a local Ollama instance (deselect with '-m not ollama')",
     "ray: tests requiring a Ray cluster (deselect with '-m not ray')",
+    "vcr: tests that replay recorded HTTP cassettes (deselect with '-m not vcr')",
 ]
 
 [tool.mypy]

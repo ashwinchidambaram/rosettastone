@@ -1,0 +1,46 @@
+interactions:
+- request:
+    body: '{"model":"gpt-4o","messages":[{"role":"system","content":"You are an expert
+      evaluator assessing whether two LLM responses are behaviorally equivalent. Respond
+      with only a single integer from 1 to 5."},{"role":"user","content":"Expected:
+      Paris is the capital of France.\nResponse: The capital of France is Paris.\n\nRate
+      the behavioral equivalence of the Response to the Expected output on a 1-5 scale:
+      1=completely different, 2=same topic but wrong approach, 3=similar intent different
+      execution, 4=mostly equivalent with minor differences, 5=functionally equivalent"}],"temperature":0,"max_tokens":16}'
+    headers:
+      Content-Type:
+      - application/json
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: '{"id":"chatcmpl-test001","object":"chat.completion","created":1700000000,"model":"gpt-4o-2024-08-06","choices":[{"index":0,"message":{"role":"assistant","content":"4"},"finish_reason":"stop"}],"usage":{"prompt_tokens":120,"completion_tokens":1,"total_tokens":121}}'
+    headers:
+      Content-Type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"model":"gpt-4o","messages":[{"role":"system","content":"You are an expert
+      evaluator assessing whether two LLM responses are behaviorally equivalent. Respond
+      with only a single integer from 1 to 5."},{"role":"user","content":"Response:
+      The capital of France is Paris.\nExpected: Paris is the capital of France.\n\nRate
+      the behavioral equivalence of the Response to the Expected output on a 1-5 scale:
+      1=completely different, 2=same topic but wrong approach, 3=similar intent different
+      execution, 4=mostly equivalent with minor differences, 5=functionally equivalent"}],"temperature":0,"max_tokens":16}'
+    headers:
+      Content-Type:
+      - application/json
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: '{"id":"chatcmpl-test002","object":"chat.completion","created":1700000001,"model":"gpt-4o-2024-08-06","choices":[{"index":0,"message":{"role":"assistant","content":"4"},"finish_reason":"stop"}],"usage":{"prompt_tokens":120,"completion_tokens":1,"total_tokens":121}}'
+    headers:
+      Content-Type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+version: 1

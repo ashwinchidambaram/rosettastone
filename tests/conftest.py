@@ -1,4 +1,4 @@
-"""Shared fixtures: sample prompt pairs, mock LLM responses."""
+"""Shared fixtures: sample prompt pairs, mock LLM responses, VCR config."""
 
 from __future__ import annotations
 
@@ -51,3 +51,15 @@ def sample_jsonl_file(sample_pairs: list[PromptPair]) -> Path:
             }
             f.write(json.dumps(line) + "\n")
         return Path(f.name)
+
+
+@pytest.fixture(scope="module")
+def vcr_config():
+    """Configure VCR cassette recording/replay for pytest-recording."""
+    return {
+        "filter_headers": ["authorization", "x-api-key", "api-key"],
+        "record_mode": "none",
+        "cassette_library_dir": str(Path(__file__).parent / "cassettes"),
+        # Ignore litellm's remote cost-map fetch and any other non-API calls
+        "ignore_hosts": ["raw.githubusercontent.com"],
+    }
