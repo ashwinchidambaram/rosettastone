@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+import time as _time
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 try:
     from fastapi import FastAPI, Request
@@ -28,6 +30,11 @@ logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+# Module-level readiness cache — avoids hitting DB/Redis on every Kubernetes health probe.
+_readiness_cache: dict[str, Any] | None = None
+_readiness_cache_time: float = 0.0
+_READINESS_TTL: float = 5.0
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -324,6 +331,12 @@ def create_app() -> FastAPI:
 
     async def _check_readiness(app: FastAPI) -> dict:
         """Check all system components and return a readiness dict."""
+        global _readiness_cache, _readiness_cache_time
+
+        now = _time.monotonic()
+        if _readiness_cache is not None and (now - _readiness_cache_time) < _READINESS_TTL:
+            return _readiness_cache
+
         import os as _os
 
         components: dict = {}
@@ -377,7 +390,10 @@ def create_app() -> FastAPI:
         else:
             overall = "ok"
 
-        return {"status": overall, "components": components}
+        result: dict[str, Any] = {"status": overall, "components": components}
+        _readiness_cache = result
+        _readiness_cache_time = now
+        return result
 
     @app.get("/api/v1/health")
     async def health(request: Request) -> dict:
