@@ -1,4 +1,5 @@
 """Property-based tests for splitter deduplication and splitting."""
+
 from __future__ import annotations
 
 from hypothesis import given, settings

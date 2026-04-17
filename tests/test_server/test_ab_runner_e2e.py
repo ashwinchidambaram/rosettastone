@@ -125,9 +125,7 @@ class TestSimulationModeCreatesResults:
 
         with Session(engine) as s:
             results = list(
-                s.exec(
-                    select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)
-                ).all()
+                s.exec(select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)).all()
             )
             test_cases = list(
                 s.exec(
@@ -201,9 +199,7 @@ class TestSimulationModeDeterministicAssignment:
 
         with Session(engine) as s:
             results = list(
-                s.exec(
-                    select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)
-                ).all()
+                s.exec(select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)).all()
             )
 
         for r in results:
@@ -227,9 +223,7 @@ class TestSimulationModeScoresMatchCached:
 
         with Session(engine) as s:
             results = list(
-                s.exec(
-                    select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)
-                ).all()
+                s.exec(select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)).all()
             )
             # Build a lookup of test_case_id -> composite_score
             test_cases = {
@@ -314,12 +308,8 @@ class TestSimulationWithEmptyTestCases:
             s.add(mr)
             s.flush()
 
-            v1 = MigrationVersion(
-                migration_id=mr.id, version_number=1, snapshot_json="{}"
-            )
-            v2 = MigrationVersion(
-                migration_id=mr.id, version_number=2, snapshot_json="{}"
-            )
+            v1 = MigrationVersion(migration_id=mr.id, version_number=1, snapshot_json="{}")
+            v2 = MigrationVersion(migration_id=mr.id, version_number=2, snapshot_json="{}")
             s.add(v1)
             s.add(v2)
             s.flush()
@@ -343,9 +333,7 @@ class TestSimulationWithEmptyTestCases:
         with Session(engine) as s:
             result_count = len(
                 list(
-                    s.exec(
-                        select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)
-                    ).all()
+                    s.exec(select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)).all()
                 )
             )
 
@@ -382,12 +370,8 @@ class TestSimulationBatchCommits:
                 )
                 s.add(tc)
 
-            v1 = MigrationVersion(
-                migration_id=mr.id, version_number=1, snapshot_json="{}"
-            )
-            v2 = MigrationVersion(
-                migration_id=mr.id, version_number=2, snapshot_json="{}"
-            )
+            v1 = MigrationVersion(migration_id=mr.id, version_number=1, snapshot_json="{}")
+            v2 = MigrationVersion(migration_id=mr.id, version_number=2, snapshot_json="{}")
             s.add(v1)
             s.add(v2)
             s.flush()
@@ -409,9 +393,7 @@ class TestSimulationBatchCommits:
 
         with Session(engine) as s:
             results = list(
-                s.exec(
-                    select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)
-                ).all()
+                s.exec(select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)).all()
             )
 
         assert len(results) == num_cases, (
@@ -435,9 +417,7 @@ class TestFailedAbTestMarkedInconclusive:
 
             # Create real versions so the migration exists, but AB test points at
             # non-existent version IDs (9999, 9998) to trigger _mark_failed.
-            v1 = MigrationVersion(
-                migration_id=mr.id, version_number=1, snapshot_json="{}"
-            )
+            v1 = MigrationVersion(migration_id=mr.id, version_number=1, snapshot_json="{}")
             s.add(v1)
             s.flush()
 

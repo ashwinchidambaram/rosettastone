@@ -518,9 +518,7 @@ class TestSkipPreflight:
         eval_results = _make_eval_results(test_set)
 
         with (
-            patch(
-                f"{_PIPELINE}.run_preflight", return_value=preflight_report
-            ) as mock_preflight,
+            patch(f"{_PIPELINE}.run_preflight", return_value=preflight_report) as mock_preflight,
             patch(f"{_PIPELINE}.load_and_split_data", return_value=(train, val, test_set)),
             patch(f"{_PIPELINE}.evaluate_baseline", return_value=eval_results),
             patch(f"{_PIPELINE}.optimize_prompt", return_value="optimized"),

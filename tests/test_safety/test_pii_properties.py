@@ -1,4 +1,5 @@
 """Property-based tests for PII scanner robustness."""
+
 from __future__ import annotations
 
 from hypothesis import given, settings

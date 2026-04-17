@@ -21,9 +21,7 @@ def _presidio_available() -> bool:
         return False
 
 
-pytestmark = pytest.mark.skipif(
-    not _presidio_available(), reason="presidio packages not installed"
-)
+pytestmark = pytest.mark.skipif(not _presidio_available(), reason="presidio packages not installed")
 
 
 # ---------------------------------------------------------------------------
@@ -50,9 +48,7 @@ def test_real_presidio_detects_phone():
     findings = scan_text_presidio("Call me at (555) 123-4567")
 
     entity_types = {pii_type for pii_type, _ in findings}
-    assert "PHONE_NUMBER" in entity_types, (
-        f"Expected PHONE_NUMBER in findings, got: {entity_types}"
-    )
+    assert "PHONE_NUMBER" in entity_types, f"Expected PHONE_NUMBER in findings, got: {entity_types}"
 
 
 def test_real_presidio_detects_ssn():

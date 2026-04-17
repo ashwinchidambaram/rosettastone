@@ -828,9 +828,7 @@ class TestTimeoutWithIntermediateInstructions:
         assert isinstance(exc.instructions, str), (
             f"Expected instructions to be a str, got: {type(exc.instructions)}"
         )
-        assert len(exc.instructions) > 0, (
-            "Expected non-empty instructions in GEPATimeoutWithResult"
-        )
+        assert len(exc.instructions) > 0, "Expected non-empty instructions in GEPATimeoutWithResult"
         assert exc.instructions == captured_instructions, (
             f"Expected '{captured_instructions}', got: {exc.instructions!r}"
         )

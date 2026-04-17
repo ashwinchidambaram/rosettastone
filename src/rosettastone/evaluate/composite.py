@@ -75,8 +75,8 @@ class CompositeEvaluator:
         # Phase 1: collect LLM completions for all pairs in parallel.
         # Each entry is either (PromptPair, response_str) on success
         # or (failure_reason_str, PromptPair) on failure (F6 taxonomy).
-        completions: list[tuple[PromptPair, str] | tuple[str, PromptPair] | None] = (
-            [None] * len(test_set)
+        completions: list[tuple[PromptPair, str] | tuple[str, PromptPair] | None] = [None] * len(
+            test_set
         )
         skipped_count = 0
         total_eval_cost = 0.0
@@ -305,7 +305,8 @@ class CompositeEvaluator:
         n_runs = self.config.eval_runs
         if n_runs <= 1:
             return self.evaluate(
-                test_set, optimized_prompt=optimized_prompt,
+                test_set,
+                optimized_prompt=optimized_prompt,
                 eval_pair_callback=eval_pair_callback,
             )
 
@@ -459,9 +460,7 @@ class CompositeEvaluator:
                 try:
                     from rosettastone.server.metrics import record_evaluator_duration
 
-                    record_evaluator_duration(
-                        "llm_judge", output_type.value, _time.time() - _t
-                    )
+                    record_evaluator_duration("llm_judge", output_type.value, _time.time() - _t)
                 except Exception:
                     pass
             except ImportError:

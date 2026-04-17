@@ -231,8 +231,7 @@ class TestAuditLogAccessControl:
         # When a non-admin tries to filter by another user's id, both conditions
         # must match (current user AND requested user), so we get 0 results
         assert data2["total"] == 0, (
-            "Non-admin user 10 should not see user 20's entries, "
-            "even when filtering by user_id=20"
+            "Non-admin user 10 should not see user 20's entries, even when filtering by user_id=20"
         )
 
         # Admin user 1 can filter by any user_id

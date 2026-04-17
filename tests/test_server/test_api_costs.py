@@ -14,7 +14,17 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlmodel import Session, select  # noqa: E402
 
 from rosettastone.server.api.costs import _compute_costs, _generate_opportunities  # noqa: E402
-from rosettastone.server.models import MigrationRecord, UserBudget  # noqa: E402
+from rosettastone.server.models import MigrationRecord, User, UserBudget  # noqa: E402
+
+
+def _ensure_user(session: Session, user_id: int) -> User:
+    """Create a User record so FK constraints are satisfied on Postgres."""
+    user = User(id=user_id, username=f"testuser{user_id}")
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -403,6 +413,7 @@ class TestBudgetTracking:
         """get_or_create_budget creates a new budget if missing."""
         from rosettastone.server.api.costs import get_or_create_budget
 
+        _ensure_user(session, 1)
         budget = get_or_create_budget(1, session)
         assert budget.user_id == 1
         assert budget.monthly_limit_usd == 0.0  # 0.0 means unlimited
@@ -412,12 +423,14 @@ class TestBudgetTracking:
         """check_budget is a no-op when no limit is set."""
         from rosettastone.server.api.costs import check_budget
 
+        _ensure_user(session, 1)
         check_budget(1, 999.0, session)  # Should not raise
 
     def test_check_budget_within_limit_passes(self, session: Session) -> None:
         """check_budget passes when spend + estimate <= limit."""
         from rosettastone.server.api.costs import check_budget
 
+        _ensure_user(session, 2)
         month = datetime.now(tz=UTC).strftime("%Y-%m")
         budget = UserBudget(
             user_id=2,
@@ -434,6 +447,7 @@ class TestBudgetTracking:
         """check_budget raises 402 when spend + estimate > limit."""
         from rosettastone.server.api.costs import check_budget
 
+        _ensure_user(session, 3)
         month = datetime.now(tz=UTC).strftime("%Y-%m")
         budget = UserBudget(
             user_id=3,
@@ -452,6 +466,7 @@ class TestBudgetTracking:
         """record_spend adds cost to current_month_spend_usd."""
         from rosettastone.server.api.costs import get_or_create_budget, record_spend
 
+        _ensure_user(session, 4)
         get_or_create_budget(4, session)
         record_spend(4, 3.0, session)
 
@@ -463,6 +478,7 @@ class TestBudgetTracking:
         """get_or_create_budget resets spend when budget_month differs from current month."""
         from rosettastone.server.api.costs import get_or_create_budget
 
+        _ensure_user(session, 5)
         budget = UserBudget(
             user_id=5,
             monthly_limit_usd=10.0,

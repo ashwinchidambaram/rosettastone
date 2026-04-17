@@ -67,11 +67,13 @@ class IterationTracker:
                     tracker._iteration += 1
                     mean = sum(tracker._scores) / len(tracker._scores)
                     fire_callback = (tracker._iteration, tracker._total_iterations, mean)
-                    tracker._iteration_history.append({
-                        "iteration_num": tracker._iteration,
-                        "mean_score": round(mean, 4),
-                        "timestamp_iso": _dt.now(UTC).isoformat(),
-                    })
+                    tracker._iteration_history.append(
+                        {
+                            "iteration_num": tracker._iteration,
+                            "mean_score": round(mean, 4),
+                            "timestamp_iso": _dt.now(UTC).isoformat(),
+                        }
+                    )
             if fire_callback is not None:
                 tracker._callback(*fire_callback)
             return result

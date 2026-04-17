@@ -568,9 +568,7 @@ class TestPIIScannerAdversarial:
     def test_clean_text_no_false_positives(self):
         """Normal prose has no PII detected."""
         findings = scan_text("The quick brown fox jumps over the lazy dog.")
-        assert findings == [], (
-            f"Expected no PII in clean prose, got {findings}"
-        )
+        assert findings == [], f"Expected no PII in clean prose, got {findings}"
 
     @pytest.mark.xfail(
         reason=(

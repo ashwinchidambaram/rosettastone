@@ -614,9 +614,7 @@ def test_migration_resume_admin_can_access_any(engine, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_migration_optimization_trace_fragment_owner_forbidden(
-    engine, monkeypatch
-):
+def test_migration_optimization_trace_fragment_owner_forbidden(engine, monkeypatch):
     """Multi-user: UI fragment endpoint enforces ownership."""
     with Session(engine) as session:
         migration = MigrationRecord(
@@ -673,9 +671,7 @@ def test_migration_test_cases_table_owner_forbidden(engine, monkeypatch):
     assert resp.status_code == 403
 
 
-def test_migration_optimizer_history_fragment_owner_forbidden(
-    engine, monkeypatch
-):
+def test_migration_optimizer_history_fragment_owner_forbidden(engine, monkeypatch):
     """Multi-user: UI optimizer history fragment enforces ownership."""
     with Session(engine) as session:
         migration = MigrationRecord(

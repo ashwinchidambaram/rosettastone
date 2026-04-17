@@ -231,7 +231,9 @@ class TestMetricsCache:
 
     # ------------------------------------------------------------------
 
-    def test_metrics_cache_hit_for_concluded_test(self, multi_user_client, engine, sample_migration):
+    def test_metrics_cache_hit_for_concluded_test(
+        self, multi_user_client, engine, sample_migration
+    ):
         """Second GET /metrics for a concluded test returns the cached value without re-querying DB."""
         ab_test_id = self._setup_ab_test(multi_user_client, engine, sample_migration)
         self._clear_cache(ab_test_id)
@@ -287,7 +289,9 @@ class TestMetricsCache:
         assert resp2.status_code == 200
         assert resp2.json()["total_results"] == 0
 
-    def test_metrics_cache_invalidated_on_conclude(self, multi_user_client, engine, sample_migration):
+    def test_metrics_cache_invalidated_on_conclude(
+        self, multi_user_client, engine, sample_migration
+    ):
         """After POST /conclude, the cached running-test entry is evicted and next GET is fresh."""
         ab_test_id = self._setup_ab_test(multi_user_client, engine, sample_migration)
         self._clear_cache(ab_test_id)
@@ -543,9 +547,7 @@ class TestCommitResults:
 
         with Session(eng) as s:
             rows = list(
-                s.exec(
-                    select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)
-                ).all()
+                s.exec(select(ABTestResult).where(ABTestResult.ab_test_id == ab_test_id)).all()
             )
         assert len(rows) == 3
         winners = {r.winner for r in rows}

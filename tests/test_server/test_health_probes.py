@@ -1,4 +1,5 @@
 """Tests for health probe endpoints."""
+
 import pytest
 
 
@@ -65,13 +66,9 @@ def test_liveness_always_200(client):
     optional components (DB, Redis, task worker) must not affect liveness.
     """
     resp = client.get("/api/v1/health/live")
-    assert resp.status_code == 200, (
-        f"Liveness probe must always return 200, got {resp.status_code}"
-    )
+    assert resp.status_code == 200, f"Liveness probe must always return 200, got {resp.status_code}"
     body = resp.json()
-    assert body.get("status") == "ok", (
-        f"Liveness body must have status='ok', got: {body!r}"
-    )
+    assert body.get("status") == "ok", f"Liveness body must have status='ok', got: {body!r}"
 
 
 def test_readiness_returns_component_status(client):
@@ -89,9 +86,7 @@ def test_readiness_returns_component_status(client):
     data = resp.json()
     assert "components" in data, f"Readiness response must include 'components', got: {data!r}"
     components = data["components"]
-    assert isinstance(components, dict), (
-        f"'components' must be a dict, got: {type(components)}"
-    )
+    assert isinstance(components, dict), f"'components' must be a dict, got: {type(components)}"
     # At minimum database must be reported
     assert "database" in components, (
         f"'database' must be present in components, got keys: {list(components.keys())}"
@@ -112,13 +107,9 @@ def test_health_endpoint_returns_200(client):
     compatibility and does not gate traffic like the readiness probe).
     """
     resp = client.get("/api/v1/health")
-    assert resp.status_code == 200, (
-        f"Basic health endpoint must return 200, got {resp.status_code}"
-    )
+    assert resp.status_code == 200, f"Basic health endpoint must return 200, got {resp.status_code}"
     data = resp.json()
-    assert isinstance(data, dict), (
-        f"Health response must be a JSON object, got: {type(data)}"
-    )
+    assert isinstance(data, dict), f"Health response must be a JSON object, got: {type(data)}"
     # Must be parseable — no exception means we're good
     assert len(data) > 0, "Health response body must not be empty"
 

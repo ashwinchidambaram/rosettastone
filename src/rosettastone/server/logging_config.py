@@ -30,10 +30,20 @@ def get_request_id() -> str:
 # ---------------------------------------------------------------------------
 
 # Extra fields that receive first-class treatment in the JSON output
-_KNOWN_EXTRAS = frozenset({
-    "request_id", "migration_id", "duration_ms", "cost_usd", "stage",
-    "total_tokens", "stage_durations", "baseline_score", "confidence_score", "recommendation",
-})
+_KNOWN_EXTRAS = frozenset(
+    {
+        "request_id",
+        "migration_id",
+        "duration_ms",
+        "cost_usd",
+        "stage",
+        "total_tokens",
+        "stage_durations",
+        "baseline_score",
+        "confidence_score",
+        "recommendation",
+    }
+)
 
 # Fields that are always present on a LogRecord — we exclude them from the
 # generic "extras" sweep so we don't duplicate them.
@@ -99,8 +109,13 @@ class JsonFormatter(logging.Formatter):
 
         # Other first-class extras
         for key in (
-            "duration_ms", "cost_usd", "stage",
-            "total_tokens", "baseline_score", "confidence_score", "recommendation",
+            "duration_ms",
+            "cost_usd",
+            "stage",
+            "total_tokens",
+            "baseline_score",
+            "confidence_score",
+            "recommendation",
         ):
             val = record.__dict__.get(key)
             if val is not None:

@@ -181,9 +181,7 @@ def test_audit_log_single_user_returns_all(engine, monkeypatch):
     assert user_ids_in_response == {1, 2, 3, None}
 
 
-def test_audit_log_multi_user_non_admin_sees_only_own(
-    engine, monkeypatch
-):
+def test_audit_log_multi_user_non_admin_sees_only_own(engine, monkeypatch):
     """Multi-user mode: non-admin user only sees their own audit entries.
 
     This is the core IDOR fix. A non-admin user requesting their audit
@@ -404,9 +402,7 @@ def test_audit_log_multi_user_empty_for_user_with_no_entries(engine, monkeypatch
         session.commit()
 
     # Create a client authenticated as user 99 (who has no entries)
-    client_user99 = _create_multi_user_client(
-        engine, monkeypatch, user_id=99, role="viewer"
-    )
+    client_user99 = _create_multi_user_client(engine, monkeypatch, user_id=99, role="viewer")
 
     # Fetch audit log as user 99
     resp = client_user99.get("/api/v1/audit-log")

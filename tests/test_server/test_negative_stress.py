@@ -222,9 +222,7 @@ class TestFileUploadAbuse:
 
     def test_upload_binary_file(self, client: TestClient, engine) -> None:
         """Random binary data with .jsonl extension must be rejected (non-UTF-8)."""
-        resp = _post_migration_form(
-            client, data=os.urandom(1024), filename="random.jsonl"
-        )
+        resp = _post_migration_form(client, data=os.urandom(1024), filename="random.jsonl")
         assert resp.status_code == 422
         assert "UTF-8" in resp.text
 
@@ -449,9 +447,7 @@ class TestTemplateRenderingEdgeCases:
         assert resp.status_code == 200
         assert "0%" in resp.text
 
-    def test_migration_detail_extremely_long_model_names(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_migration_detail_extremely_long_model_names(self, client: TestClient, engine) -> None:
         """Model names with 2000 characters do not crash the template."""
         long_name = "x" * 2000
         mid = _create_migration_record(engine, source_model=long_name, target_model=long_name)
@@ -858,9 +854,7 @@ class TestAPIEndpointAbuse:
 class TestStateMachineViolations:
     """P1: Verify migration status transitions are safe and consistent."""
 
-    def test_cannot_retrigger_complete_migration_via_api(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_cannot_retrigger_complete_migration_via_api(self, client: TestClient, engine) -> None:
         """No PUT/PATCH endpoint exists to change a completed migration's status."""
         mid = _create_migration_record(engine)
         resp = client.post(f"/api/v1/migrations/{mid}", json={"status": "running"})
@@ -971,9 +965,7 @@ class TestMiscEdgeCases:
     def test_cost_page_zero_cost_no_crash(self, client: TestClient, engine) -> None:
         with Session(engine) as session:
             session.add(
-                MigrationRecord(
-                    source_model="a", target_model="b", status="complete", cost_usd=0.0
-                )
+                MigrationRecord(source_model="a", target_model="b", status="complete", cost_usd=0.0)
             )
             session.commit()
         resp = client.get("/ui/costs")
@@ -1032,9 +1024,7 @@ class TestMiscEdgeCases:
         with Session(engine) as session:
             for i in range(3):
                 session.add(
-                    MigrationRecord(
-                        source_model=f"s{i}", target_model=f"t{i}", status="complete"
-                    )
+                    MigrationRecord(source_model=f"s{i}", target_model=f"t{i}", status="complete")
                 )
             session.commit()
         resp = client.get("/api/v1/migrations?offset=3&limit=20")
@@ -1074,17 +1064,13 @@ class TestLargePayloadRejected:
             json=large_config,
             headers={"Content-Type": "application/json"},
         )
-        assert resp.status_code < 500, (
-            f"Server crashed with {resp.status_code} on large payload"
-        )
+        assert resp.status_code < 500, f"Server crashed with {resp.status_code} on large payload"
 
 
 class TestSQLInjectionInQueryParams:
     """P0 (security): Verify SQLModel parameterization prevents SQL injection."""
 
-    def test_sql_injection_in_query_params_does_not_crash(
-        self, client: TestClient, engine
-    ) -> None:
+    def test_sql_injection_in_query_params_does_not_crash(self, client: TestClient, engine) -> None:
         """SQL injection via query param does not manufacture extra rows."""
         with Session(engine) as session:
             for status in ("complete", "pending"):
@@ -1101,9 +1087,7 @@ class TestSQLInjectionInQueryParams:
         resp = client.get(f"/api/v1/migrations?status={injection}")
         assert resp.status_code == 200, f"Unexpected status: {resp.status_code}"
         items = resp.json().get("items", [])
-        assert len(items) <= 2, (
-            f"SQL injection expanded the result set to {len(items)} items"
-        )
+        assert len(items) <= 2, f"SQL injection expanded the result set to {len(items)} items"
 
     def test_sql_injection_in_migration_id(self, client: TestClient) -> None:
         """Injection string as migration ID returns 422 or 404, not 500."""
@@ -1127,9 +1111,7 @@ class TestConcurrentMigrationCreation:
         db_url = f"sqlite:///{db_file}"
 
         # Create schema once on the main thread.
-        shared_engine = create_engine(
-            db_url, echo=False, connect_args={"check_same_thread": False}
-        )
+        shared_engine = create_engine(db_url, echo=False, connect_args={"check_same_thread": False})
         SQLModel.metadata.create_all(shared_engine)
 
         def create_migration(i: int) -> int:

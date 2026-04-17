@@ -9,17 +9,27 @@ without blocking each other. These tests verify:
 Important: WAL mode only applies to file-based SQLite. In-memory SQLite
 ignores the journal_mode PRAGMA. Always use tmp_path fixtures for DB files.
 Always call reset_engine() before and after tests to avoid engine state leakage.
+
+These tests are skipped when DATABASE_URL is set (i.e. PostgreSQL CI) because
+PRAGMA is SQLite-specific syntax.
 """
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 
+import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
 from rosettastone.server.database import get_engine, reset_engine
 from rosettastone.server.models import MigrationRecord
+
+_skip_on_postgres = pytest.mark.skipif(
+    os.environ.get("DATABASE_URL", "").startswith("postgresql"),
+    reason="SQLite-specific tests — skipped when DATABASE_URL targets PostgreSQL",
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -45,6 +55,7 @@ def _make_file_engine(db_path: str):
 # ---------------------------------------------------------------------------
 
 
+@_skip_on_postgres
 class TestWALModeEnabled:
     def test_wal_mode_enabled(self, tmp_path, monkeypatch) -> None:
         """get_engine() must configure SQLite WAL mode on a file-based DB.
@@ -75,6 +86,7 @@ class TestWALModeEnabled:
             reset_engine()
 
 
+@_skip_on_postgres
 class TestConcurrentReadDuringWrite:
     def test_concurrent_read_during_write(self, tmp_path) -> None:
         """Reader thread must never see 'database is locked' while writer inserts rows.
@@ -146,6 +158,7 @@ class TestConcurrentReadDuringWrite:
         )
 
 
+@_skip_on_postgres
 class TestPragmaBusyTimeout:
     def test_pragma_busy_timeout(self, tmp_path) -> None:
         """SQLite busy_timeout should be configured to a positive value (if set).

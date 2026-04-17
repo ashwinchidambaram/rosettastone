@@ -13,17 +13,28 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlmodel import Session, select  # noqa: E402
 
 from rosettastone.server.app import create_app  # noqa: E402
+from rosettastone.server.database import get_session  # noqa: E402
 from rosettastone.server.models import MigrationRecord, TestCaseRecord  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# UI-only client fixture (no database needed for dummy-data UI tests)
+# UI-only client fixture (uses test engine so tables exist on Postgres)
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture
-def ui_client() -> TestClient:
-    """Create a test client for UI endpoints (no database dependency)."""
+def ui_client(engine) -> TestClient:
+    """Create a test client for UI endpoints backed by the test engine.
+
+    Endpoints fall back to DUMMY data when the DB is empty, but they still need
+    the tables to exist (otherwise Postgres raises ``UndefinedTable``).
+    """
     app = create_app()
+
+    def _override_session():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_session] = _override_session
     return TestClient(app)
 
 
@@ -479,9 +490,7 @@ class TestUIEndpoints:
         assert 'href="/ui/costs"' in body
         assert 'href="/ui/alerts"' in body
 
-    def test_models_page_contains_alerts_banner(
-        self, client: TestClient, sample_migration
-    ) -> None:
+    def test_models_page_contains_alerts_banner(self, client: TestClient, sample_migration) -> None:
         # Register a model so we get the full models.html with the alerts banner.
         # sample_migration is a completed migration with recommendation="GO", which triggers an alert.
         client.post("/api/v1/models", json={"model_id": "openai/gpt-4o"})

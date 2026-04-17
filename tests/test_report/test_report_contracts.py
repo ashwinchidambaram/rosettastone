@@ -20,6 +20,7 @@ def _weasyprint_available() -> bool:
     except ImportError:
         return False
 
+
 # ---------------------------------------------------------------------------
 # Individual generator acceptance tests
 # ---------------------------------------------------------------------------

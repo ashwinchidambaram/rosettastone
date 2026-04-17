@@ -503,10 +503,7 @@ class TestCompositeEvaluatorEvaluate:
 def _clear_semantic_module_cache() -> None:
     """Remove cached bertscore / embedding modules so imports re-run inside _score_semantic."""
     for key in list(sys.modules.keys()):
-        if (
-            "rosettastone.evaluate.bertscore" in key
-            or "rosettastone.evaluate.embedding" in key
-        ):
+        if "rosettastone.evaluate.bertscore" in key or "rosettastone.evaluate.embedding" in key:
             del sys.modules[key]
 
 
@@ -597,9 +594,9 @@ class TestScoreSemanticFallbackLogging:
 
         assert len(result) > 0
         all_output = "\n".join(captured)
-        assert "EmbeddingEvaluator unavailable" in all_output or "ExactMatchEvaluator" in all_output, (
-            f"Expected ExactMatch fallback log, got: {all_output!r}"
-        )
+        assert (
+            "EmbeddingEvaluator unavailable" in all_output or "ExactMatchEvaluator" in all_output
+        ), f"Expected ExactMatch fallback log, got: {all_output!r}"
 
     def test_score_semantic_no_fallback_log_on_happy_path(self) -> None:
         """When BERTScore is available and works, no fallback INFO log messages appear."""
@@ -671,11 +668,11 @@ class TestBatchBERTScoreAlignment:
 
         # Completions mirror the expected responses (so JSON pairs score perfectly)
         responses = [
-            "ST-0 answer",       # short_text
-            '{"k": "v"}',        # json
-            "ST-2 answer",       # short_text
-            '{"k": "v"}',        # json
-            "ST-4 answer",       # short_text
+            "ST-0 answer",  # short_text
+            '{"k": "v"}',  # json
+            "ST-2 answer",  # short_text
+            '{"k": "v"}',  # json
+            "ST-4 answer",  # short_text
         ]
         mock_completion.side_effect = [make_litellm_response(r) for r in responses]
 
@@ -755,9 +752,7 @@ class TestBatchBERTScoreAlignment:
         assert len(results) == 1
         result = results[0]
         # The single free-text pair must receive exactly the batch BERTScore value
-        assert "bertscore_f1" in result.scores, (
-            "Expected bertscore_f1 in scores but it was missing"
-        )
+        assert "bertscore_f1" in result.scores, "Expected bertscore_f1 in scores but it was missing"
         assert abs(result.scores["bertscore_f1"] - expected_bert_score) < 1e-9, (
             f"Expected bertscore_f1={expected_bert_score}, got {result.scores['bertscore_f1']}"
         )

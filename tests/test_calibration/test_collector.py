@@ -58,19 +58,11 @@ def test_generate_synthetic_pairs_seed_reproducibility():
     pairs_a = generate_synthetic_pairs(output_type="long_text", n_pairs=30, seed=seed)
     pairs_b = generate_synthetic_pairs(output_type="long_text", n_pairs=30, seed=seed)
 
-    assert len(pairs_a) == len(pairs_b), (
-        f"Expected same length: {len(pairs_a)} vs {len(pairs_b)}"
-    )
+    assert len(pairs_a) == len(pairs_b), f"Expected same length: {len(pairs_a)} vs {len(pairs_b)}"
     for i, (a, b) in enumerate(zip(pairs_a, pairs_b)):
-        assert a.prompt == b.prompt, (
-            f"Pair {i}: prompt mismatch — {a.prompt!r} vs {b.prompt!r}"
-        )
-        assert a.source_response == b.source_response, (
-            f"Pair {i}: source_response mismatch"
-        )
-        assert a.target_response == b.target_response, (
-            f"Pair {i}: target_response mismatch"
-        )
+        assert a.prompt == b.prompt, f"Pair {i}: prompt mismatch — {a.prompt!r} vs {b.prompt!r}"
+        assert a.source_response == b.source_response, f"Pair {i}: source_response mismatch"
+        assert a.target_response == b.target_response, f"Pair {i}: target_response mismatch"
         assert a.scores.composite == b.scores.composite, (
             f"Pair {i}: composite score mismatch — {a.scores.composite} vs {b.scores.composite}"
         )
@@ -127,6 +119,4 @@ def test_stratified_sample_preserves_types():
     sampled = stratified_sample(pairs, n_per_bucket=3, seed=7)
 
     for i, item in enumerate(sampled):
-        assert isinstance(item, LabeledPair), (
-            f"Item {i}: expected LabeledPair, got {type(item)}"
-        )
+        assert isinstance(item, LabeledPair), f"Item {i}: expected LabeledPair, got {type(item)}"
