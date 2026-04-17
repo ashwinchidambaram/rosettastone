@@ -171,35 +171,39 @@ class TestAuditLogAccessControl:
 
         assert resp.status_code == 404
 
-    def test_audit_log_any_user_can_read_all_entries(self, engine, monkeypatch) -> None:
-        """In multi-user mode, user 2 can read audit entries created by user 1's actions.
+    def test_audit_log_non_admin_only_sees_own_entries(self, engine, monkeypatch) -> None:
+        """In multi-user mode, non-admin users only see their own audit entries.
 
-        This documents the IDOR / over-broad access vulnerability: the audit log
-        endpoint applies no per-user scoping, so any authenticated user can read the
-        full audit history of every other user.
+        This verifies the fix for the IDOR vulnerability: the audit log endpoint
+        now enforces per-user scoping. Non-admin users cannot see other users' audit entries.
         """
-        # Seed an audit entry attributed to user 1
+        # Seed audit entries for different users
         with Session(engine) as sess:
             log_audit(sess, "migration", 1, "create", user_id=1)
+            log_audit(sess, "migration", 2, "create", user_id=2)
+            log_audit(sess, "migration", 3, "create", user_id=3)
             sess.commit()
 
         client = _multi_user_client(engine, monkeypatch)
 
-        # User 2 reads the audit log — they should see user 1's entry
+        # User 2 reads the audit log — they should only see their own entries
         resp = client.get("/api/v1/audit-log", headers=_auth_header(2))
 
         assert resp.status_code == 200
         data = resp.json()
-        # The entry belongs to user_id=1, yet user 2 can see it — IDOR confirmed
-        assert data["total"] >= 1
+        # User 2 should only see 1 entry (their own)
+        assert data["total"] == 1
         user_ids_in_response = {item["user_id"] for item in data["items"]}
-        assert 1 in user_ids_in_response, (
-            "User 2 must be able to read user 1's audit entries "
-            "(documents the IDOR vulnerability in audit log access)"
+        assert user_ids_in_response == {2}, (
+            "User 2 should only see their own audit entries, not other users' entries"
         )
 
     def test_audit_log_user_id_filter_param(self, engine, monkeypatch) -> None:
-        """The user_id query parameter filters audit log entries to a specific user."""
+        """The user_id query parameter filters audit log entries to a specific user.
+
+        Non-admin users can only filter to their own user_id. Admin users can filter
+        to any user_id.
+        """
         # Seed entries for two different users
         with Session(engine) as sess:
             log_audit(sess, "migration", 1, "create", user_id=10)
@@ -209,7 +213,7 @@ class TestAuditLogAccessControl:
 
         client = _multi_user_client(engine, monkeypatch)
 
-        # Filter to user_id=10
+        # Non-admin user 10 filters to their own user_id=10
         resp = client.get("/api/v1/audit-log?user_id=10", headers=_auth_header(10))
 
         assert resp.status_code == 200
@@ -220,8 +224,19 @@ class TestAuditLogAccessControl:
                 f"Filter returned entry with user_id={item['user_id']}, expected 10"
             )
 
-        # Filter to user_id=20
-        resp2 = client.get("/api/v1/audit-log?user_id=20", headers=_auth_header(20))
+        # Non-admin user 10 tries to filter to user_id=20 — should be empty
+        # because the endpoint adds a mandatory condition for the user's own id
+        resp2 = client.get("/api/v1/audit-log?user_id=20", headers=_auth_header(10))
         data2 = resp2.json()
-        assert data2["total"] == 1
-        assert data2["items"][0]["user_id"] == 20
+        # When a non-admin tries to filter by another user's id, both conditions
+        # must match (current user AND requested user), so we get 0 results
+        assert data2["total"] == 0, (
+            "Non-admin user 10 should not see user 20's entries, "
+            "even when filtering by user_id=20"
+        )
+
+        # Admin user 1 can filter by any user_id
+        resp3 = client.get("/api/v1/audit-log?user_id=20", headers=_auth_header(1, role="admin"))
+        data3 = resp3.json()
+        assert data3["total"] == 1
+        assert data3["items"][0]["user_id"] == 20
