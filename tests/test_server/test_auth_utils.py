@@ -30,7 +30,7 @@ def test_verify_password_wrong():
 def test_create_jwt_returns_string():
     from rosettastone.server.auth_utils import create_jwt
 
-    token = create_jwt(user_id=1, role="admin", secret="testsecret")
+    token = create_jwt(user_id=1, role="admin", secret="test-secret-long-enough-for-hmac-sha256")
     assert isinstance(token, str)
     assert len(token) > 0
 
@@ -38,8 +38,8 @@ def test_create_jwt_returns_string():
 def test_decode_jwt_roundtrip():
     from rosettastone.server.auth_utils import create_jwt, decode_jwt
 
-    token = create_jwt(user_id=1, role="admin", secret="testsecret")
-    payload = decode_jwt(token, "testsecret")
+    token = create_jwt(user_id=1, role="admin", secret="test-secret-long-enough-for-hmac-sha256")
+    payload = decode_jwt(token, "test-secret-long-enough-for-hmac-sha256")
     assert payload["sub"] == "1"
     assert payload["role"] == "admin"
 
@@ -49,9 +49,9 @@ def test_decode_jwt_expired_token():
 
     from rosettastone.server.auth_utils import create_jwt, decode_jwt
 
-    token = create_jwt(user_id=42, role="viewer", secret="testsecret", expires_in_seconds=-1)
+    token = create_jwt(user_id=42, role="viewer", secret="test-secret-long-enough-for-hmac-sha256", expires_in_seconds=-1)
     with pytest.raises(jwt.ExpiredSignatureError):
-        decode_jwt(token, "testsecret")
+        decode_jwt(token, "test-secret-long-enough-for-hmac-sha256")
 
 
 def test_decode_jwt_invalid_token():
@@ -60,7 +60,7 @@ def test_decode_jwt_invalid_token():
     from rosettastone.server.auth_utils import decode_jwt
 
     with pytest.raises(jwt.InvalidTokenError):
-        decode_jwt("not.a.token", "testsecret")
+        decode_jwt("not.a.token", "test-secret-long-enough-for-hmac-sha256")
 
 
 def test_decode_jwt_wrong_secret():
@@ -68,6 +68,6 @@ def test_decode_jwt_wrong_secret():
 
     from rosettastone.server.auth_utils import create_jwt, decode_jwt
 
-    token = create_jwt(user_id=7, role="editor", secret="secret1")
+    token = create_jwt(user_id=7, role="editor", secret="test-wrong-secret1-long-enough-for-hmac")
     with pytest.raises(jwt.InvalidSignatureError):
-        decode_jwt(token, "secret2")
+        decode_jwt(token, "test-wrong-secret2-long-enough-for-hmac")

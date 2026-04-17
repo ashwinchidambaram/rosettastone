@@ -36,7 +36,7 @@ def _make_temp_db_client(monkeypatch, multi_user: bool = True) -> TestClient:
 
     if multi_user:
         monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
-        monkeypatch.setenv("ROSETTASTONE_JWT_SECRET", "test-secret-key-1234567890")
+        monkeypatch.setenv("ROSETTASTONE_JWT_SECRET", "test-secret-key-1234567890-long-enough-hmac")
     else:
         monkeypatch.delenv("ROSETTASTONE_MULTI_USER", raising=False)
 
