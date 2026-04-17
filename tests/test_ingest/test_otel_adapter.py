@@ -660,9 +660,7 @@ def test_otel_deterministic_output_regardless_of_span_order(tmp_path):
         f"Expected same number of pairs: {len(sorted_a)} vs {len(sorted_b)}"
     )
     for i, (pa, pb) in enumerate(zip(sorted_a, sorted_b)):
-        assert pa.prompt == pb.prompt, (
-            f"Pair {i}: prompt mismatch — {pa.prompt!r} vs {pb.prompt!r}"
-        )
+        assert pa.prompt == pb.prompt, f"Pair {i}: prompt mismatch — {pa.prompt!r} vs {pb.prompt!r}"
         assert pa.response == pb.response, (
             f"Pair {i}: response mismatch — {pa.response!r} vs {pb.response!r}"
         )
@@ -739,9 +737,7 @@ def test_otel_multiple_resource_spans(tmp_path):
 
     result = OTelAdapter(otlp_file, _SOURCE_MODEL).load()
 
-    assert len(result) == 3, (
-        f"Expected 3 pairs from 2 resourceSpans (2+1 spans), got {len(result)}"
-    )
+    assert len(result) == 3, f"Expected 3 pairs from 2 resourceSpans (2+1 spans), got {len(result)}"
     prompts = {p.prompt for p in result}
     assert "Resource1 Q1" in prompts, f"Expected 'Resource1 Q1' in prompts: {prompts!r}"
     assert "Resource1 Q2" in prompts, f"Expected 'Resource1 Q2' in prompts: {prompts!r}"
@@ -783,9 +779,7 @@ def test_otel_span_with_only_events_extracts_prompt(tmp_path):
 
     result = OTelAdapter(otlp_file, _SOURCE_MODEL).load()
 
-    assert len(result) == 1, (
-        f"Expected 1 pair from event-only span, got {len(result)}"
-    )
+    assert len(result) == 1, f"Expected 1 pair from event-only span, got {len(result)}"
     assert result[0].prompt == "Events-only prompt", (
         f"Expected prompt extracted from event, got: {result[0].prompt!r}"
     )
@@ -800,7 +794,7 @@ def test_otel_large_attribute_value(tmp_path):
     Large attribute values must not cause memory issues, truncation errors,
     or unexpected exceptions during parsing.
     """
-    large_prompt = "A" * 12_000   # 12 KB string — well above any reasonable attribute limit
+    large_prompt = "A" * 12_000  # 12 KB string — well above any reasonable attribute limit
     large_completion = "B" * 10_500  # 10.5 KB response
 
     span = _gen_ai_span(prompt=large_prompt, completion=large_completion)
@@ -846,9 +840,7 @@ def test_otel_non_genai_span_skipped(tmp_path):
 
     result = OTelAdapter(otlp_file, _SOURCE_MODEL).load()
 
-    assert len(result) == 1, (
-        f"Expected 1 pair (non-gen_ai span skipped), got {len(result)}"
-    )
+    assert len(result) == 1, f"Expected 1 pair (non-gen_ai span skipped), got {len(result)}"
     assert result[0].prompt == "Valid gen_ai prompt", (
         f"Expected only the gen_ai span's prompt, got: {result[0].prompt!r}"
     )

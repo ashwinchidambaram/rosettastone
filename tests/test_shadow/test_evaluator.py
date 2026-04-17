@@ -118,8 +118,13 @@ class TestScoreShadowLogs:
 
         assert isinstance(result, dict)
         for expected_key in (
-            "win_rate", "total_pairs", "wins", "non_deterministic_count",
-            "cost_usd", "per_type_scores", "warnings",
+            "win_rate",
+            "total_pairs",
+            "wins",
+            "non_deterministic_count",
+            "cost_usd",
+            "per_type_scores",
+            "warnings",
         ):
             assert expected_key in result, f"Missing key: {expected_key}"
         assert result["total_pairs"] == 1

@@ -128,6 +128,7 @@ class TaskWorker:
                 .where(TaskQueue.status == "queued")
                 .order_by(TaskQueue.priority.desc(), TaskQueue.created_at.asc())  # type: ignore[attr-defined]
                 .limit(1)
+                .with_for_update(skip_locked=True)
             ).first()
             if task is None:
                 return None

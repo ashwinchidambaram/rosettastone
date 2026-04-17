@@ -203,9 +203,7 @@ def test_large_dataset_pagination(redis_client, redis_url):
     adapter = RedisAdapter(redis_url=redis_url, source_model=_SOURCE_MODEL)
     pairs = adapter.load()
 
-    assert len(pairs) == 200, (
-        f"Expected 200 pairs from paginated SCAN, got {len(pairs)}"
-    )
+    assert len(pairs) == 200, f"Expected 200 pairs from paginated SCAN, got {len(pairs)}"
 
 
 def test_expired_key_handled(redis_client, redis_url):
@@ -224,10 +222,6 @@ def test_expired_key_handled(redis_client, redis_url):
     adapter = RedisAdapter(redis_url=redis_url, source_model=_SOURCE_MODEL)
     pairs = adapter.load()
 
-    assert len(pairs) == 2, (
-        f"Expected 2 pairs after one key expired, got {len(pairs)}"
-    )
+    assert len(pairs) == 2, f"Expected 2 pairs after one key expired, got {len(pairs)}"
     loaded_prompts = {p.prompt for p in pairs}
-    assert "Question 1" not in loaded_prompts, (
-        "Expired key's prompt should not appear in results"
-    )
+    assert "Question 1" not in loaded_prompts, "Expired key's prompt should not appear in results"

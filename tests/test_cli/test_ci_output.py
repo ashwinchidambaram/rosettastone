@@ -49,7 +49,13 @@ class TestFormatCiJson:
         )
         parsed = json.loads(format_ci_json(result))
 
-        float_fields = ["confidence_score", "baseline_score", "improvement", "cost_usd", "duration_seconds"]
+        float_fields = [
+            "confidence_score",
+            "baseline_score",
+            "improvement",
+            "cost_usd",
+            "duration_seconds",
+        ]
         for field in float_fields:
             value = parsed[field]
             # Check that rounding to 4 places doesn't change the value
@@ -231,15 +237,23 @@ class TestFormatQualityDiff:
 
     def test_format_quality_diff_positive_delta_rendered(self):
         """Positive delta (improvement) is shown with + sign."""
-        current = migration_result_factory(confidence_score=0.90, baseline_score=0.70, improvement=0.20)
-        base = migration_result_factory(confidence_score=0.80, baseline_score=0.65, improvement=0.15)
+        current = migration_result_factory(
+            confidence_score=0.90, baseline_score=0.70, improvement=0.20
+        )
+        base = migration_result_factory(
+            confidence_score=0.80, baseline_score=0.65, improvement=0.15
+        )
         output = format_quality_diff(current, baseline=base)
         assert "+" in output  # positive delta indicator
 
     def test_format_quality_diff_negative_delta(self):
         """Negative delta (regression) is shown with - sign."""
-        current = migration_result_factory(confidence_score=0.75, baseline_score=0.60, improvement=0.05)
-        base = migration_result_factory(confidence_score=0.85, baseline_score=0.70, improvement=0.15)
+        current = migration_result_factory(
+            confidence_score=0.75, baseline_score=0.60, improvement=0.05
+        )
+        base = migration_result_factory(
+            confidence_score=0.85, baseline_score=0.70, improvement=0.15
+        )
         output = format_quality_diff(current, baseline=base)
         assert "-" in output  # negative delta indicator
 

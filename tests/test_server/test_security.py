@@ -14,11 +14,25 @@ from rosettastone.server.app import _JWT_SECRET_DEFAULT, create_app
 # ---------------------------------------------------------------------------
 
 
-def _make_client(monkeypatch, env: dict[str, str]) -> TestClient:
-    """Create a TestClient with the given environment variables set."""
+def _make_client(monkeypatch, env: dict[str, str], engine=None) -> TestClient:
+    """Create a TestClient with the given environment variables set.
+
+    When *engine* is provided, ``get_session`` is overridden so that queries
+    use the test database (required for endpoints that touch the DB on Postgres).
+    """
     for key, value in env.items():
         monkeypatch.setenv(key, value)
     app = create_app()
+    if engine is not None:
+        from sqlmodel import Session
+
+        from rosettastone.server.database import get_session
+
+        def _override():
+            with Session(engine) as session:
+                yield session
+
+        app.dependency_overrides[get_session] = _override
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -137,7 +151,7 @@ class TestCORSBehavior:
 
 
 class TestCSRFCookieSecureFlag:
-    def test_csrf_cookie_secure_flag_set_when_behind_https(self, monkeypatch) -> None:
+    def test_csrf_cookie_secure_flag_set_when_behind_https(self, monkeypatch, engine) -> None:
         """CSRF cookie must have Secure flag when ROSETTASTONE_BEHIND_HTTPS=true.
 
         Uses ROSETTASTONE_MULTI_USER (not API key) to enable CSRF without triggering
@@ -147,20 +161,20 @@ class TestCSRFCookieSecureFlag:
         monkeypatch.setenv("ROSETTASTONE_JWT_SECRET", "a" * 64)
         monkeypatch.setenv("ROSETTASTONE_BEHIND_HTTPS", "true")
         monkeypatch.delenv("ROSETTASTONE_API_KEY", raising=False)
-        client = _make_client(monkeypatch, {})
+        client = _make_client(monkeypatch, {}, engine=engine)
         # GET any UI path that is not excluded from CSRF middleware
         resp = client.get("/ui/alerts")
         set_cookie = resp.headers.get("set-cookie", "")
         assert "rosettastone_csrf" in set_cookie
         assert "secure" in set_cookie.lower()
 
-    def test_csrf_cookie_no_secure_flag_without_https(self, monkeypatch) -> None:
+    def test_csrf_cookie_no_secure_flag_without_https(self, monkeypatch, engine) -> None:
         """CSRF cookie must NOT have Secure flag when ROSETTASTONE_BEHIND_HTTPS is not set."""
         monkeypatch.setenv("ROSETTASTONE_MULTI_USER", "true")
         monkeypatch.setenv("ROSETTASTONE_JWT_SECRET", "a" * 64)
         monkeypatch.delenv("ROSETTASTONE_BEHIND_HTTPS", raising=False)
         monkeypatch.delenv("ROSETTASTONE_API_KEY", raising=False)
-        client = _make_client(monkeypatch, {})
+        client = _make_client(monkeypatch, {}, engine=engine)
         resp = client.get("/ui/alerts")
         set_cookie = resp.headers.get("set-cookie", "")
         if "rosettastone_csrf" in set_cookie:
@@ -236,8 +250,8 @@ class TestCSPNonce:
         csp2 = resp2.headers.get("content-security-policy", "")
         assert csp1 != csp2, "Each request must produce a unique nonce"
 
-    def test_csp_style_src_retains_unsafe_inline(self, monkeypatch) -> None:
-        """style-src must keep 'unsafe-inline' since Tailwind uses inline styles."""
+    def test_csp_style_src_uses_nonce_not_unsafe_inline(self, monkeypatch) -> None:
+        """style-src must use nonce-based CSP instead of 'unsafe-inline'."""
         client = _make_client(monkeypatch, {})
         resp = client.get("/api/v1/health")
         csp = resp.headers.get("content-security-policy", "")
@@ -247,9 +261,10 @@ class TestCSPNonce:
             if directive.startswith("style-src"):
                 style_src = directive
                 break
-        assert "'unsafe-inline'" in style_src, (
-            f"style-src must retain 'unsafe-inline' for Tailwind, got: {style_src}"
+        assert "'unsafe-inline'" not in style_src, (
+            f"style-src must not use 'unsafe-inline', got: {style_src}"
         )
+        assert "nonce-" in style_src, f"style-src must include a nonce, got: {style_src}"
 
 
 # ---------------------------------------------------------------------------

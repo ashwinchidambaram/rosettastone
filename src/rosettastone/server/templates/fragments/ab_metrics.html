@@ -32,11 +32,12 @@
 <!-- Win rate comparison bar -->
 <div class="mt-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
   <div class="text-sm font-medium mb-2">Win Rate Comparison</div>
+  {% set pct_a = (metrics.win_rate_a * 100) %}
+  {% set pct_b = (metrics.win_rate_b * 100) %}
+  <style nonce="{{ request.state.csp_nonce }}">.ab-bar-a { width: {{ pct_a }}%; } .ab-bar-b { width: {{ pct_b }}%; }</style>
   <div class="flex h-6 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
-    {% set pct_a = (metrics.win_rate_a * 100) %}
-    {% set pct_b = (metrics.win_rate_b * 100) %}
-    <div class="bg-blue-500 h-full" style="width: {{ pct_a }}%"></div>
-    <div class="bg-purple-500 h-full" style="width: {{ pct_b }}%"></div>
+    <div class="bg-blue-500 h-full ab-bar-a"></div>
+    <div class="bg-purple-500 h-full ab-bar-b"></div>
   </div>
   <div class="flex justify-between mt-1 text-xs text-gray-500">
     <span>A: {{ '%.1f' | format(pct_a) }}%</span>

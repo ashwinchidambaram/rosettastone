@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Costs{% endblock %}
 
+{% block head_extra %}
+<style nonce="{{ request.state.csp_nonce }}">
+    .status-running { background: rgba(212,165,116,0.15); color: #D4A574; }
+    .status-complete { background: rgba(139,157,131,0.15); color: #8B9D83; }
+    .status-failed { background: rgba(212,116,94,0.15); color: #D4745E; }
+    .status-other { background: rgba(189,189,189,0.15); color: #BDBDBD; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="pb-16 px-8 max-w-7xl mx-auto pt-8">
 
@@ -72,13 +81,14 @@
     <div class="bg-surface-container-low p-10 rounded-2xl space-y-8">
         {% set bar_colors = ["#D4745E", "#8B9D83", "#D4A574"] %}
         {% for item in costs.by_model %}
+        <style nonce="{{ request.state.csp_nonce }}">.cost-bar-{{ loop.index }} { width: {{ item.pct }}%; background-color: {{ bar_colors[loop.index0 % 3] }}; opacity: 0.4; }</style>
         <div class="space-y-3">
             <div class="flex justify-between items-end">
                 <span class="font-['JetBrains_Mono'] text-sm text-on-surface">{{ item.model }}</span>
                 <span class="font-['JetBrains_Mono'] text-sm text-[#E8DCC4] font-bold">{{ item.cost }} ({{ item.pct }}%)</span>
             </div>
             <div class="h-10 w-full bg-[#2a2a2a] rounded-full overflow-hidden">
-                <div class="h-full rounded-r-lg" style="width: {{ item.pct }}%; background-color: {{ bar_colors[loop.index0 % 3] }}; opacity: 0.4;"></div>
+                <div class="h-full rounded-r-lg cost-bar-{{ loop.index }}"></div>
             </div>
         </div>
         {% endfor %}
@@ -152,13 +162,13 @@
                     <td class="px-6 py-4 text-right font-['JetBrains_Mono'] text-[#E8DCC4] font-bold">${{ "%.4f"|format(run.total_cost_usd) }}</td>
                     <td class="px-6 py-4 text-center">
                         {% if run.status == "running" %}
-                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold" style="background-color: #D4A574/15; color: #D4A574; background: rgba(212,165,116,0.15);">running</span>
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold status-running">running</span>
                         {% elif run.status == "complete" %}
-                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold" style="background: rgba(139,157,131,0.15); color: #8B9D83;">complete</span>
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold status-complete">complete</span>
                         {% elif run.status == "failed" %}
-                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold" style="background: rgba(212,116,94,0.15); color: #D4745E;">failed</span>
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold status-failed">failed</span>
                         {% else %}
-                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold" style="background: rgba(189,189,189,0.15); color: #BDBDBD;">{{ run.status }}</span>
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold status-other">{{ run.status }}</span>
                         {% endif %}
                     </td>
                 </tr>

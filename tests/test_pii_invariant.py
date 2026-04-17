@@ -98,8 +98,7 @@ def _find_raise_statements_with_pii(filepath: Path) -> list[tuple[int, str]]:
                 violations.append(
                     (
                         node.lineno,
-                        f"raise statement embeds PII variable in exception: "
-                        f"{ast.unparse(child)!r}",
+                        f"raise statement embeds PII variable in exception: {ast.unparse(child)!r}",
                     )
                 )
                 break  # one violation per raise statement is enough

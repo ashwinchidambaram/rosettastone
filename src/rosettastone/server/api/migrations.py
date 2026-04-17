@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, Upl
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, func, select
 
-from rosettastone.server.api.utils import _get_migration_or_404
+from rosettastone.server.api.utils import _get_migration_with_owner_check
 from rosettastone.server.database import get_session
 from rosettastone.server.models import (
     GEPAIterationRecord,
@@ -23,7 +23,6 @@ from rosettastone.server.models import (
 )
 from rosettastone.server.rate_limit import check_rate_limit
 from rosettastone.server.rbac import (
-    check_resource_owner,
     get_current_user_id,
     is_admin_user,
     require_role,
@@ -48,43 +47,6 @@ _SENSITIVE_CONFIG_KEYS = frozenset({"lm_extra_kwargs"})
 # represents a reasonable midpoint rather than being sourced from DEFAULT_THRESHOLDS.
 _DIAGNOSTIC_METRIC_THRESHOLD = 0.7
 
-
-# ---------------------------------------------------------------------------
-# Dummy data for UI shell
-# ---------------------------------------------------------------------------
-
-DUMMY_MODELS = [
-    {
-        "id": "openai/gpt-4o",
-        "provider": "OpenAI",
-        "status": "active",
-        "context": "128K",
-        "cost_per_1m": "$2.50",
-    },
-    {
-        "id": "anthropic/claude-sonnet-4",
-        "provider": "Anthropic",
-        "status": "active",
-        "context": "200K",
-        "cost_per_1m": "$3.00",
-    },
-    {
-        "id": "openai/gpt-4o-mini",
-        "provider": "OpenAI",
-        "status": "active",
-        "context": "128K",
-        "cost_per_1m": "$0.15",
-    },
-    {
-        "id": "openai/gpt-4o-0613",
-        "provider": "OpenAI",
-        "status": "deprecated",
-        "context": "8K",
-        "cost_per_1m": "$5.00",
-        "retirement_date": "Apr 15, 2026",
-        "replacement": "openai/gpt-4o",
-    },
-]
 
 DUMMY_MIGRATIONS = [
     {
@@ -293,32 +255,6 @@ DUMMY_MIGRATIONS = [
         "target_latency_p95": None,
         "projected_source_cost_per_call": None,
         "projected_target_cost_per_call": None,
-    },
-]
-
-DUMMY_ALERTS: list[dict[str, Any]] = [
-    {
-        "type": "deprecation",
-        "model": "gpt-4o-0613",
-        "date": "Apr 15, 2026",
-        "days_left": 26,
-        "message": "Model retiring in 26 days",
-        "action": "Start migration to gpt-4o",
-    },
-    {
-        "type": "price_change",
-        "model": "claude-sonnet-4",
-        "old_price": "$3.00",
-        "new_price": "$2.50",
-        "message": "Price decreased 17%",
-        "action": "No action needed",
-    },
-    {
-        "type": "new_model",
-        "model": "claude-opus-4.6",
-        "date": "Feb 5, 2026",
-        "message": "New model available",
-        "action": "+12% reasoning improvement over claude-opus-4",
     },
 ]
 
@@ -896,8 +832,7 @@ async def get_migration(
     session: Session = Depends(get_session),
 ) -> MigrationDetail:
     """Get migration detail by ID."""
-    record = _get_migration_or_404(migration_id, session)
-    check_resource_owner(record.owner_id, request)
+    record = _get_migration_with_owner_check(migration_id, session, request)
     return _migration_to_detail(record, session)
 
 
@@ -907,10 +842,11 @@ async def get_migration(
 )
 async def get_optimizer_history(
     migration_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> list[GEPAIterationOut]:
     """Get GEPA optimizer iteration history for a migration, sorted by iteration asc."""
-    _get_migration_or_404(migration_id, session)
+    _get_migration_with_owner_check(migration_id, session, request)
     records = session.exec(
         select(GEPAIterationRecord)
         .where(GEPAIterationRecord.migration_id == migration_id)
@@ -1009,6 +945,7 @@ async def create_migration(
 )
 async def list_test_cases(
     migration_id: int,
+    request: Request,
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     phase: str | None = Query(None),
@@ -1017,7 +954,7 @@ async def list_test_cases(
     session: Session = Depends(get_session),
 ) -> PaginatedResponse[TestCaseSummary]:
     """List test cases for a migration with optional filters."""
-    _get_migration_or_404(migration_id, session)
+    _get_migration_with_owner_check(migration_id, session, request)
 
     # Build base query
     conditions = [TestCaseRecord.migration_id == migration_id]
@@ -1050,10 +987,11 @@ async def list_test_cases(
 async def get_test_case(
     migration_id: int,
     tc_id: int,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> TestCaseDetail:
     """Get a single test case detail."""
-    _get_migration_or_404(migration_id, session)
+    _get_migration_with_owner_check(migration_id, session, request)
 
     tc = session.get(TestCaseRecord, tc_id)
     if tc is None or tc.migration_id != migration_id:
@@ -1064,6 +1002,7 @@ async def get_test_case(
 @router.get("/api/v1/migrations/{migration_id}/regressions")
 async def get_migration_regressions(
     migration_id: int,
+    request: Request,
     session: Session = Depends(get_session),
     _user_id: str = Depends(get_current_user_id),
 ) -> dict[str, Any]:
@@ -1074,7 +1013,7 @@ async def get_migration_regressions(
     """
     from rosettastone.decision.recommendation import DEFAULT_THRESHOLDS
 
-    record = _get_migration_or_404(migration_id, session)
+    record = _get_migration_with_owner_check(migration_id, session, request)
 
     stored_win_thresholds: dict[str, float] = {}
     if record.config_json:
@@ -1161,8 +1100,7 @@ async def get_optimization_trace(
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
     """Return the GEPA score trajectory for a migration."""
-    record = _get_migration_or_404(migration_id, session)
-    check_resource_owner(record.owner_id, request)
+    record = _get_migration_with_owner_check(migration_id, session, request)
     history = json.loads(record.optimization_score_history_json or "[]")
     return {
         "migration_id": migration_id,
@@ -1179,7 +1117,7 @@ async def optimization_trace_fragment(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """HTMX fragment: GEPA score trajectory chart for the migration detail page."""
-    record = _get_migration_or_404(migration_id, session)
+    record = _get_migration_with_owner_check(migration_id, session, request)
     history = json.loads(record.optimization_score_history_json or "[]")
     templates = request.app.state.templates
     return templates.TemplateResponse(  # type: ignore[no-any-return]
@@ -1399,8 +1337,7 @@ async def get_migration_diagnostics(
     _user_id: str = Depends(get_current_user_id),
 ) -> MigrationDiagnostics:
     """Return comprehensive migration diagnostics — scores, counts, regressions, safety."""
-    record = _get_migration_or_404(migration_id, session)
-    check_resource_owner(record.owner_id, request)
+    record = _get_migration_with_owner_check(migration_id, session, request)
     if record.status not in ("complete", "dry_run_complete"):
         raise HTTPException(
             status_code=422,
@@ -1416,7 +1353,7 @@ async def diagnostics_fragment(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """HTMX fragment: diagnostics panel for the migration detail page."""
-    record = _get_migration_or_404(migration_id, session)
+    record = _get_migration_with_owner_check(migration_id, session, request)
     if record.status not in ("complete", "dry_run_complete"):
         return HTMLResponse("<p class='text-sm text-on-surface-variant p-4'>Not available yet.</p>")
     diag = _build_diagnostics(record, session)
@@ -1445,7 +1382,7 @@ async def stream_migration_progress(
     """
     from rosettastone.server.progress import register_client, unregister_client
 
-    record = _get_migration_or_404(migration_id, session)
+    record = _get_migration_with_owner_check(migration_id, session, request)
 
     async def event_generator() -> Any:
         # Send catch-up: current state from DB
@@ -1527,8 +1464,7 @@ def resume_migration(
     session: Session = Depends(get_session),
 ) -> MigrationSummary:
     """Re-enqueue a failed migration from its last checkpoint."""
-    record = _get_migration_or_404(migration_id, session)
-    check_resource_owner(record.owner_id, request)
+    record = _get_migration_with_owner_check(migration_id, session, request)
 
     if record.status != "failed":
         raise HTTPException(status_code=409, detail="Migration is not in failed state")
@@ -1566,8 +1502,9 @@ async def dashboard(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """Models dashboard page."""
+    from rosettastone.server.api.alerts import _alert_to_template_dict, _generate_alerts
     from rosettastone.server.api.models import _model_to_template_dict
-    from rosettastone.server.models import RegisteredModel
+    from rosettastone.server.models import Alert, RegisteredModel
 
     # Query registered models ordered by most recent first
     stmt = select(RegisteredModel).order_by(RegisteredModel.added_at.desc())  # type: ignore[attr-defined]
@@ -1581,11 +1518,18 @@ async def dashboard(
             {"active_nav": "models"},
         )
 
-    models = [_model_to_template_dict(r) for r in records] if records else DUMMY_MODELS
+    models = [_model_to_template_dict(r) for r in records]
+
+    # Query recent alerts
+    _generate_alerts(session)
+    alert_stmt = select(Alert).order_by(Alert.created_at.desc()).limit(5)  # type: ignore[attr-defined]
+    alert_records = list(session.exec(alert_stmt).all())
+    alerts = [_alert_to_template_dict(a) for a in alert_records]
+
     return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "models.html",
-        {"models": models, "alerts": DUMMY_ALERTS, "active_nav": "models"},
+        {"models": models, "alerts": alerts, "active_nav": "models"},
     )
 
 
@@ -2106,7 +2050,7 @@ async def test_cases_table_fragment(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """HTMX partial for filterable test case grid."""
-    _get_migration_or_404(migration_id, session)
+    _get_migration_with_owner_check(migration_id, session, request)
 
     conditions = [TestCaseRecord.migration_id == migration_id]
     if outcome == "win":
@@ -2213,8 +2157,7 @@ async def ui_resume_migration(
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """Handle Resume button POST from migration detail page."""
-    record = _get_migration_or_404(migration_id, session)
-    check_resource_owner(record.owner_id, request)
+    record = _get_migration_with_owner_check(migration_id, session, request)
 
     if record.status != "failed":
         raise HTTPException(status_code=409, detail="Migration is not in failed state")
@@ -2251,7 +2194,7 @@ async def optimizer_history_fragment(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """HTMX fragment: optimizer iteration history for a completed migration."""
-    _get_migration_or_404(migration_id, session)
+    _get_migration_with_owner_check(migration_id, session, request)
     records = session.exec(
         select(GEPAIterationRecord)
         .where(GEPAIterationRecord.migration_id == migration_id)

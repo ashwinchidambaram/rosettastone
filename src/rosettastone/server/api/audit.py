@@ -12,6 +12,7 @@ from sqlmodel import Session, func, select
 
 from rosettastone.server.database import get_session
 from rosettastone.server.models import AuditLog
+from rosettastone.server.rbac import _is_multi_user, get_current_user_id, is_admin_user
 from rosettastone.server.schemas import AuditLogEntry, PaginatedResponse
 
 router = APIRouter()
@@ -48,6 +49,7 @@ def log_audit(
 
 @router.get("/api/v1/audit-log", response_model=PaginatedResponse[AuditLogEntry])
 def list_audit_log(
+    request: Request,
     resource_type: str | None = Query(None),
     action: str | None = Query(None),
     user_id: int | None = Query(None),
@@ -59,6 +61,10 @@ def list_audit_log(
 ) -> PaginatedResponse[AuditLogEntry]:
     """List audit log entries with optional filters, ordered by created_at DESC."""
     conditions = []
+
+    # Scope to current user in multi-user mode (non-admin)
+    if _is_multi_user() and not is_admin_user(request):
+        conditions.append(AuditLog.user_id == get_current_user_id(request))
 
     if resource_type is not None:
         conditions.append(AuditLog.resource_type == resource_type)
@@ -116,6 +122,11 @@ async def audit_log_page(
 ) -> HTMLResponse:
     """Render the audit log UI page with optional filters."""
     conditions = []
+
+    # Scope to current user in multi-user mode (non-admin)
+    if _is_multi_user() and not is_admin_user(request):
+        conditions.append(AuditLog.user_id == get_current_user_id(request))
+
     if resource_type:
         conditions.append(AuditLog.resource_type == resource_type)
     if action:

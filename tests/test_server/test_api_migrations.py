@@ -13,17 +13,28 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlmodel import Session, select  # noqa: E402
 
 from rosettastone.server.app import create_app  # noqa: E402
+from rosettastone.server.database import get_session  # noqa: E402
 from rosettastone.server.models import MigrationRecord, TestCaseRecord  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# UI-only client fixture (no database needed for dummy-data UI tests)
+# UI-only client fixture (uses test engine so tables exist on Postgres)
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture
-def ui_client() -> TestClient:
-    """Create a test client for UI endpoints (no database dependency)."""
+def ui_client(engine) -> TestClient:
+    """Create a test client for UI endpoints backed by the test engine.
+
+    Endpoints fall back to DUMMY data when the DB is empty, but they still need
+    the tables to exist (otherwise Postgres raises ``UndefinedTable``).
+    """
     app = create_app()
+
+    def _override_session():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_session] = _override_session
     return TestClient(app)
 
 
@@ -445,7 +456,7 @@ class TestUIEndpoints:
         body = resp.text
         assert "Classification" in body
         assert "0.72" in body
-        assert "Bertscore" in body  # dynamic label: bertscore key → title-cased
+        assert "BERTScore" in body  # dynamic label: bertscore key → mapped via _METRIC_LABELS
 
     def test_case_fragment_dummy_fallback(self, ui_client: TestClient) -> None:
         """Returns 200 with dummy fallback when TC is not in the DB."""
@@ -479,8 +490,9 @@ class TestUIEndpoints:
         assert 'href="/ui/costs"' in body
         assert 'href="/ui/alerts"' in body
 
-    def test_models_page_contains_alerts_banner(self, client: TestClient) -> None:
+    def test_models_page_contains_alerts_banner(self, client: TestClient, sample_migration) -> None:
         # Register a model so we get the full models.html with the alerts banner.
+        # sample_migration is a completed migration with recommendation="GO", which triggers an alert.
         client.post("/api/v1/models", json={"model_id": "openai/gpt-4o"})
         resp = client.get("/ui/")
         assert resp.status_code == 200
@@ -993,10 +1005,10 @@ def test_migration_detail_has_total_tokens(client, session, engine):
 
     from sqlmodel import Session as _Session
 
-    from rosettastone.server.models import MigrationRecord as _MR
+    from rosettastone.server.models import MigrationRecord as _MigrationRecord
 
     with _Session(engine) as s:
-        record = _MR(
+        record = _MigrationRecord(
             source_model="openai/gpt-4o",
             target_model="anthropic/claude-sonnet-4",
             status="complete",
@@ -1015,8 +1027,7 @@ def test_migration_detail_has_total_tokens(client, session, engine):
 
     resp = client.get(f"/api/v1/migrations/{migration_id}")
     assert resp.status_code == 200
-    data = resp.json()
-    # The key assertion: total_tokens is stored and accessible on the record
+    assert resp.json() is not None
     assert record.total_tokens == 1500
 
 
@@ -1025,10 +1036,10 @@ def test_get_optimization_trace_empty(client, engine):
 
     from sqlmodel import Session as _Session
 
-    from rosettastone.server.models import MigrationRecord as _MR
+    from rosettastone.server.models import MigrationRecord as _MigrationRecord
 
     with _Session(engine) as s:
-        record = _MR(
+        record = _MigrationRecord(
             source_model="openai/gpt-4o",
             target_model="anthropic/claude-sonnet-4",
             status="complete",
@@ -1059,7 +1070,7 @@ def test_get_optimization_trace_with_data(client, engine):
 
     from sqlmodel import Session as _Session
 
-    from rosettastone.server.models import MigrationRecord as _MR
+    from rosettastone.server.models import MigrationRecord as _MigrationRecord
 
     history = [
         {"iteration_num": 1, "mean_score": 0.6123, "timestamp_iso": "2026-04-05T10:00:00+00:00"},
@@ -1068,7 +1079,7 @@ def test_get_optimization_trace_with_data(client, engine):
     ]
 
     with _Session(engine) as s:
-        record = _MR(
+        record = _MigrationRecord(
             source_model="openai/gpt-4o",
             target_model="anthropic/claude-sonnet-4",
             status="complete",

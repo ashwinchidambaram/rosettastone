@@ -2,7 +2,7 @@
 {% block title %}Pipeline Migrations{% endblock %}
 
 {% block head_extra %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
     .card-glow-pipeline:hover {
         box-shadow: 0 0 15px -3px rgba(212, 116, 94, 0.15);
     }

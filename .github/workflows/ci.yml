@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
-      - run: uv sync --dev
+      - run: uv sync --dev --all-extras
       - run: uv run ruff check src/ tests/
       - run: uv run ruff format --check src/ tests/
 
@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
-      - run: uv sync --dev
+      - run: uv sync --dev --all-extras
       - run: uv run mypy src/rosettastone/
 
   test:
@@ -54,7 +54,7 @@ jobs:
       - run: uv sync --dev --all-extras
       - name: Run tests against PostgreSQL
         env:
-          DATABASE_URL: postgresql://rosettastone:rosettastone@localhost:5432/rosettastone_test
+          DATABASE_URL: postgresql+psycopg://rosettastone:rosettastone@localhost:5432/rosettastone_test
         run: uv run pytest tests/ -q --ignore=tests/test_e2e --ignore=tests/test_alembic.py
 
   e2e:

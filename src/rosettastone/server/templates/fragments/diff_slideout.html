@@ -26,34 +26,36 @@
     } %}
     {% for metric_name, score in diff.scores.items() %}
     {% set is_composite = metric_name | lower in ('composite', 'composite_score') %}
+    {% set bar_pct = [score * 100, 100] | min | int %}
+    <style nonce="{{ request.state.csp_nonce }}">.diff-bar-{{ loop.index }} { width: {{ bar_pct }}%; }</style>
     <div class="space-y-2">
         <div class="flex justify-between text-[11px] font-mono text-on-surface/60 uppercase tracking-widest">
             <span>{{ _METRIC_LABELS.get(metric_name, metric_name | replace('_', ' ') | title) }}</span>
             <span class="{% if is_composite %}text-[#D4A574] font-bold{% else %}text-on-surface{% endif %}">{{ score }}</span>
         </div>
         <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-            {% set bar_pct = [score * 100, 100] | min | int %}
             {% if is_composite %}
-            <div class="h-full bg-[#D4A574] rounded-full" style="width: {{ bar_pct }}%"></div>
+            <div class="h-full bg-[#D4A574] rounded-full diff-bar-{{ loop.index }}"></div>
             {% elif score >= 0.8 %}
-            <div class="h-full bg-[#8B9D83] rounded-full" style="width: {{ bar_pct }}%"></div>
+            <div class="h-full bg-[#8B9D83] rounded-full diff-bar-{{ loop.index }}"></div>
             {% elif score >= 0.6 %}
-            <div class="h-full bg-[#D4A574]/70 rounded-full" style="width: {{ bar_pct }}%"></div>
+            <div class="h-full bg-[#D4A574]/70 rounded-full diff-bar-{{ loop.index }}"></div>
             {% else %}
-            <div class="h-full bg-[#D85650]/70 rounded-full" style="width: {{ bar_pct }}%"></div>
+            <div class="h-full bg-[#D85650]/70 rounded-full diff-bar-{{ loop.index }}"></div>
             {% endif %}
         </div>
     </div>
     {% endfor %}
     {% else %}
     {# Fallback: show composite score only when scores dict is empty #}
+    <style nonce="{{ request.state.csp_nonce }}">.diff-bar-fallback { width: {{ (diff.composite_score * 100)|int }}%; }</style>
     <div class="space-y-2">
         <div class="flex justify-between text-[11px] font-mono text-on-surface/60 uppercase tracking-widest">
             <span>Composite</span>
             <span class="text-[#D4A574] font-bold">{{ diff.composite_score }}</span>
         </div>
         <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-            <div class="h-full bg-[#D4A574] rounded-full" style="width: {{ (diff.composite_score * 100)|int }}%"></div>
+            <div class="h-full bg-[#D4A574] rounded-full diff-bar-fallback"></div>
         </div>
     </div>
     {% endif %}
@@ -88,13 +90,14 @@ function switchDiffTab(tab) {
     {% if diff.expected and diff.expected != 'Content not stored (run with --store-prompt-content)' %}
     <!-- PII Warning Banner -->
     <div class="m-6 p-4 bg-[#D4A574]/10 border-l-4 border-[#D4A574] flex items-center gap-3" role="alert">
-        <span class="material-symbols-outlined text-[#D4A574] text-sm" style="font-variation-settings: 'FILL' 1;" aria-hidden="true">warning</span>
+        <span class="material-symbols-outlined text-[#D4A574] text-sm icon-fill" aria-hidden="true">warning</span>
         <p class="text-[14px] text-[#D4A574] font-medium">Content may contain sensitive data from production prompts</p>
     </div>
 
-    <style>
+    <style nonce="{{ request.state.csp_nonce }}">
         .diff-del { background-color: rgba(216,86,80,0.20); color: #D85650; border-radius: 2px; padding: 0 2px; }
         .diff-add { background-color: rgba(139,157,131,0.20); color: #8B9D83; border-radius: 2px; padding: 0 2px; }
+        .icon-fill { font-variation-settings: 'FILL' 1; }
     </style>
 
     <!-- Side-by-side Diff View -->

@@ -159,9 +159,7 @@ class GEPAOptimizer(Optimizer):
                             f"gepa_auto complexity."
                         ),
                     )
-                raise TimeoutError(
-                    f"GEPA timed out after {timeout}s with no intermediate result"
-                )
+                raise TimeoutError(f"GEPA timed out after {timeout}s with no intermediate result")
         else:
             # Default path: run GEPA directly — no external timeout.
             # GEPA terminates naturally when it exhausts its max_metric_calls budget.

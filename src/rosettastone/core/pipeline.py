@@ -191,7 +191,10 @@ def optimize_prompt(
 
         optimizer = GEPAOptimizer()
         return optimizer.optimize(
-            train, val, config, on_iteration=on_iteration,
+            train,
+            val,
+            config,
+            on_iteration=on_iteration,
             iteration_history_out=iteration_history_out,
         )
 

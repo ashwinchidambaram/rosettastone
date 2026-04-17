@@ -2,10 +2,11 @@
 {% block title %}Migration Detail{% endblock %}
 
 {% block head_extra %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
     .no-scrollbar::-webkit-scrollbar {
         display: none;
     }
+    .icon-fill { font-variation-settings: 'FILL' 1; }
 </style>
 <script nonce="{{ request.state.csp_nonce }}">
 function showPersonaView(view) {
@@ -119,7 +120,7 @@ function showPersonaView(view) {
 </div>
 
 <!-- Executive summary target (hidden initially) -->
-<div id="executive-summary" style="display:none" class="mb-6"></div>
+<div id="executive-summary" class="hidden mb-6"></div>
 
 <div id="engineer-view">
 
@@ -241,7 +242,7 @@ function showPersonaView(view) {
             <div class="flex flex-col md:flex-row gap-8 items-start">
                 <div class="flex-1">
                     <div class="flex items-center gap-3 text-success mb-4">
-                        <span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        <span class="material-symbols-outlined text-3xl icon-fill">check_circle</span>
                         <h2 class="text-2xl font-bold font-headline">Safe to ship</h2>
                     </div>
                     <p class="text-on-surface/80 leading-relaxed mb-8 max-w-2xl">
@@ -360,11 +361,11 @@ function showPersonaView(view) {
         <div class="mt-8">
           <h3 class="text-base font-semibold mb-4 text-on-surface-variant uppercase tracking-widest text-[11px] font-mono">Score Distribution</h3>
           <div class="flex flex-wrap gap-6">
-            <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex flex-col items-center" style="min-width:200px">
+            <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex flex-col items-center min-w-[200px]">
               <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Win Rate</p>
               <canvas id="winRateChart3" width="180" height="180"></canvas>
             </div>
-            <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex-1" style="min-width:300px">
+            <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex-1 min-w-[300px]">
               <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Score Distribution</p>
               <canvas id="scoreHistChart3" height="180"></canvas>
             </div>
@@ -708,11 +709,11 @@ function showPersonaView(view) {
 <div class="mt-8 mb-16">
   <h3 class="text-base font-semibold mb-4 text-on-surface-variant uppercase tracking-widest text-[11px] font-mono">Score Distribution</h3>
   <div class="flex flex-wrap gap-6">
-    <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex flex-col items-center" style="min-width:200px">
+    <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex flex-col items-center min-w-[200px]">
       <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Win Rate</p>
       <canvas id="winRateChart" width="180" height="180"></canvas>
     </div>
-    <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex-1" style="min-width:300px">
+    <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex-1 min-w-[300px]">
       <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Score Distribution</p>
       <canvas id="scoreHistChart" height="180"></canvas>
     </div>
@@ -945,11 +946,11 @@ function showPersonaView(view) {
 <div class="mt-8 mb-16">
   <h3 class="text-base font-semibold mb-4 text-on-surface-variant uppercase tracking-widest text-[11px] font-mono">Score Distribution</h3>
   <div class="flex flex-wrap gap-6">
-    <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex flex-col items-center" style="min-width:200px">
+    <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex flex-col items-center min-w-[200px]">
       <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Win Rate</p>
       <canvas id="winRateChart2" width="180" height="180"></canvas>
     </div>
-    <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex-1" style="min-width:300px">
+    <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4 flex-1 min-w-[300px]">
       <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">Score Distribution</p>
       <canvas id="scoreHistChart2" height="180"></canvas>
     </div>
@@ -1252,7 +1253,7 @@ function showPersonaView(view) {
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="document.getElementById('deploy-modal').classList.add('hidden')"></div>
     <div class="relative bg-surface-container-high border border-outline-variant/20 rounded-2xl shadow-2xl max-w-md w-full p-8">
         <div class="flex items-center gap-3 mb-4">
-            <span class="material-symbols-outlined text-success text-3xl" style="font-variation-settings:'FILL' 1;" aria-hidden="true">rocket_launch</span>
+            <span class="material-symbols-outlined text-success text-3xl icon-fill" aria-hidden="true">rocket_launch</span>
             <h3 id="deploy-modal-title" class="text-xl font-bold text-on-surface font-headline">Ready to deploy</h3>
         </div>
         <p class="text-on-surface-variant leading-relaxed mb-6">

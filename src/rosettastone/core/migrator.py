@@ -319,7 +319,10 @@ class Migrator:
                 t0 = time.time()
                 try:
                     optimized_prompt = optimize_prompt(
-                        train, val, self.config, self._gepa_iteration_callback,
+                        train,
+                        val,
+                        self.config,
+                        self._gepa_iteration_callback,
                         iteration_history_out=_iteration_history,
                     )
                 except GEPATimeoutWithResult as exc:
@@ -352,7 +355,10 @@ class Migrator:
             t0 = time.time()
             try:
                 optimized_prompt = optimize_prompt(
-                    train, val, self.config, self._gepa_iteration_callback,
+                    train,
+                    val,
+                    self.config,
+                    self._gepa_iteration_callback,
                     iteration_history_out=_iteration_history,
                 )
             except GEPATimeoutWithResult as exc:
@@ -403,7 +409,10 @@ class Migrator:
         else:
             t0 = time.time()
             validation = evaluate_optimized(
-                test, optimized_prompt, self.config, ctx=ctx,
+                test,
+                optimized_prompt,
+                self.config,
+                ctx=ctx,
                 eval_pair_callback=self._eval_pair_callback,
             )
             ctx.timing["validation_eval"] = time.time() - t0
