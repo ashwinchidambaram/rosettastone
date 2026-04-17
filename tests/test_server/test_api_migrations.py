@@ -445,7 +445,7 @@ class TestUIEndpoints:
         body = resp.text
         assert "Classification" in body
         assert "0.72" in body
-        assert "Bertscore" in body  # dynamic label: bertscore key → title-cased
+        assert "BERTScore" in body  # dynamic label: bertscore key → mapped via _METRIC_LABELS
 
     def test_case_fragment_dummy_fallback(self, ui_client: TestClient) -> None:
         """Returns 200 with dummy fallback when TC is not in the DB."""
@@ -993,10 +993,10 @@ def test_migration_detail_has_total_tokens(client, session, engine):
 
     from sqlmodel import Session as _Session
 
-    from rosettastone.server.models import MigrationRecord as _MR
+    from rosettastone.server.models import MigrationRecord as _MigrationRecord
 
     with _Session(engine) as s:
-        record = _MR(
+        record = _MigrationRecord(
             source_model="openai/gpt-4o",
             target_model="anthropic/claude-sonnet-4",
             status="complete",
@@ -1015,8 +1015,7 @@ def test_migration_detail_has_total_tokens(client, session, engine):
 
     resp = client.get(f"/api/v1/migrations/{migration_id}")
     assert resp.status_code == 200
-    data = resp.json()
-    # The key assertion: total_tokens is stored and accessible on the record
+    assert resp.json() is not None
     assert record.total_tokens == 1500
 
 
@@ -1025,10 +1024,10 @@ def test_get_optimization_trace_empty(client, engine):
 
     from sqlmodel import Session as _Session
 
-    from rosettastone.server.models import MigrationRecord as _MR
+    from rosettastone.server.models import MigrationRecord as _MigrationRecord
 
     with _Session(engine) as s:
-        record = _MR(
+        record = _MigrationRecord(
             source_model="openai/gpt-4o",
             target_model="anthropic/claude-sonnet-4",
             status="complete",
@@ -1059,7 +1058,7 @@ def test_get_optimization_trace_with_data(client, engine):
 
     from sqlmodel import Session as _Session
 
-    from rosettastone.server.models import MigrationRecord as _MR
+    from rosettastone.server.models import MigrationRecord as _MigrationRecord
 
     history = [
         {"iteration_num": 1, "mean_score": 0.6123, "timestamp_iso": "2026-04-05T10:00:00+00:00"},
@@ -1068,7 +1067,7 @@ def test_get_optimization_trace_with_data(client, engine):
     ]
 
     with _Session(engine) as s:
-        record = _MR(
+        record = _MigrationRecord(
             source_model="openai/gpt-4o",
             target_model="anthropic/claude-sonnet-4",
             status="complete",

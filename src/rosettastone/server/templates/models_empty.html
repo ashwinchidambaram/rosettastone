@@ -2,7 +2,7 @@
 {% block title %}Welcome{% endblock %}
 
 {% block head_extra %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
     .empty-glow {
         background: radial-gradient(circle at center, rgba(212, 116, 94, 0.05) 0%, transparent 70%);
     }

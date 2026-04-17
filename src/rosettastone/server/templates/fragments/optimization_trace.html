@@ -2,7 +2,7 @@
 <div class="bg-surface-container-low rounded-xl border border-outline-variant/20 p-4">
   <p class="text-[11px] font-mono uppercase tracking-widest text-on-surface-variant mb-3">GEPA Score Trajectory</p>
   {% if iteration_nums %}
-  <div style="position:relative;height:150px;">
+  <div class="relative h-[150px]">
     <canvas id="gepaTraceChart"></canvas>
   </div>
   <script nonce="{{ request.state.csp_nonce }}">

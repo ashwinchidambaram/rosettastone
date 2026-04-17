@@ -3,8 +3,8 @@
   <!-- Sparkline -->
   <div class="flex items-end h-10 mb-3 gap-px">
     {% for r in records %}
-    <span class="inline-block w-2 bg-blue-400 dark:bg-blue-600 rounded-sm mx-px"
-          style="height: {{ (r.mean_score * 40) | int }}px"
+    <style nonce="{{ request.state.csp_nonce }}">.opt-bar-{{ loop.index }} { height: {{ (r.mean_score * 40) | int }}px; }</style>
+    <span class="inline-block w-2 bg-blue-400 dark:bg-blue-600 rounded-sm mx-px opt-bar-{{ loop.index }}"
           title="Iter {{ r.iteration }}: {{ '%.1f' | format(r.mean_score * 100) }}%"></span>
     {% endfor %}
   </div>

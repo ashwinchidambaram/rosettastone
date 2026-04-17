@@ -236,8 +236,8 @@ class TestCSPNonce:
         csp2 = resp2.headers.get("content-security-policy", "")
         assert csp1 != csp2, "Each request must produce a unique nonce"
 
-    def test_csp_style_src_retains_unsafe_inline(self, monkeypatch) -> None:
-        """style-src must keep 'unsafe-inline' since Tailwind uses inline styles."""
+    def test_csp_style_src_uses_nonce_not_unsafe_inline(self, monkeypatch) -> None:
+        """style-src must use nonce-based CSP instead of 'unsafe-inline'."""
         client = _make_client(monkeypatch, {})
         resp = client.get("/api/v1/health")
         csp = resp.headers.get("content-security-policy", "")
@@ -247,8 +247,11 @@ class TestCSPNonce:
             if directive.startswith("style-src"):
                 style_src = directive
                 break
-        assert "'unsafe-inline'" in style_src, (
-            f"style-src must retain 'unsafe-inline' for Tailwind, got: {style_src}"
+        assert "'unsafe-inline'" not in style_src, (
+            f"style-src must not use 'unsafe-inline', got: {style_src}"
+        )
+        assert "nonce-" in style_src, (
+            f"style-src must include a nonce, got: {style_src}"
         )
 
 

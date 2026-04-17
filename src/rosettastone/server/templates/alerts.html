@@ -2,8 +2,9 @@
 {% block title %}Alerts{% endblock %}
 
 {% block head_extra %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
     .ghost-border { border: 1px solid rgba(163, 140, 134, 0.15); }
+    .icon-fill { font-variation-settings: 'FILL' 1; }
 </style>
 {% endblock %}
 
@@ -17,7 +18,7 @@
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
             <div class="space-y-4">
                 <div class="flex items-center gap-4 text-[#D85650]">
-                    <span class="material-symbols-outlined text-5xl" style="font-variation-settings: 'FILL' 1;" aria-hidden="true">warning</span>
+                    <span class="material-symbols-outlined text-5xl icon-fill" aria-hidden="true">warning</span>
                     <span class="font-['JetBrains_Mono'] text-sm tracking-widest uppercase opacity-80">System Priority: Omega</span>
                 </div>
                 <h1 class="text-5xl md:text-7xl font-black tracking-tighter leading-none text-on-surface">

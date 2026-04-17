@@ -966,7 +966,7 @@ class TestMiscEdgeCases:
     def test_diff_fragment_fallback_to_dummy(self, client: TestClient) -> None:
         resp = client.get("/ui/fragments/diff/999/999")
         assert resp.status_code == 200
-        assert "Bertscore" in resp.text
+        assert "BERTScore" in resp.text  # _METRIC_LABELS maps 'bertscore' → 'BERTScore'
 
     def test_cost_page_zero_cost_no_crash(self, client: TestClient, engine) -> None:
         with Session(engine) as session:

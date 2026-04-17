@@ -203,8 +203,8 @@ class TestUIFragments:
         response = client.get("/ui/fragments/diff/999/999")
         assert response.status_code == 200
         body = response.text
-        # Dummy data has bertscore key; template renders it via dynamic loop as "Bertscore"
-        assert "Bertscore" in body
+        # Dummy data has bertscore key; _METRIC_LABELS maps it to "BERTScore"
+        assert "BERTScore" in body
 
     def test_diff_fragment_with_real_data(
         self, client, engine, sample_migration, sample_test_cases
@@ -214,8 +214,8 @@ class TestUIFragments:
         response = client.get(f"/ui/fragments/diff/{sample_migration.id}/{tc.id}")
         assert response.status_code == 200
         body = response.text
-        # scores_json has bertscore key; dynamic loop renders it as "Bertscore"
-        assert "Bertscore" in body
+        # scores_json has bertscore key; _METRIC_LABELS maps it to "BERTScore"
+        assert "BERTScore" in body
         # Real data: scores rendered as numbers
         assert "0." in body  # composite_score is a float like 0.85
 

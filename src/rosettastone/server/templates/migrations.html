@@ -2,7 +2,7 @@
 {% block title %}Migrations{% endblock %}
 
 {% block head_extra %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
     .card-glow-sage:hover {
         box-shadow: 0 0 15px -3px rgba(185, 204, 176, 0.2);
     }
