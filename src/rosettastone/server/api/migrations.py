@@ -48,43 +48,6 @@ _SENSITIVE_CONFIG_KEYS = frozenset({"lm_extra_kwargs"})
 _DIAGNOSTIC_METRIC_THRESHOLD = 0.7
 
 
-# ---------------------------------------------------------------------------
-# Dummy data for UI shell
-# ---------------------------------------------------------------------------
-
-DUMMY_MODELS = [
-    {
-        "id": "openai/gpt-4o",
-        "provider": "OpenAI",
-        "status": "active",
-        "context": "128K",
-        "cost_per_1m": "$2.50",
-    },
-    {
-        "id": "anthropic/claude-sonnet-4",
-        "provider": "Anthropic",
-        "status": "active",
-        "context": "200K",
-        "cost_per_1m": "$3.00",
-    },
-    {
-        "id": "openai/gpt-4o-mini",
-        "provider": "OpenAI",
-        "status": "active",
-        "context": "128K",
-        "cost_per_1m": "$0.15",
-    },
-    {
-        "id": "openai/gpt-4o-0613",
-        "provider": "OpenAI",
-        "status": "deprecated",
-        "context": "8K",
-        "cost_per_1m": "$5.00",
-        "retirement_date": "Apr 15, 2026",
-        "replacement": "openai/gpt-4o",
-    },
-]
-
 DUMMY_MIGRATIONS = [
     {
         "id": 1,
@@ -292,32 +255,6 @@ DUMMY_MIGRATIONS = [
         "target_latency_p95": None,
         "projected_source_cost_per_call": None,
         "projected_target_cost_per_call": None,
-    },
-]
-
-DUMMY_ALERTS: list[dict[str, Any]] = [
-    {
-        "type": "deprecation",
-        "model": "gpt-4o-0613",
-        "date": "Apr 15, 2026",
-        "days_left": 26,
-        "message": "Model retiring in 26 days",
-        "action": "Start migration to gpt-4o",
-    },
-    {
-        "type": "price_change",
-        "model": "claude-sonnet-4",
-        "old_price": "$3.00",
-        "new_price": "$2.50",
-        "message": "Price decreased 17%",
-        "action": "No action needed",
-    },
-    {
-        "type": "new_model",
-        "model": "claude-opus-4.6",
-        "date": "Feb 5, 2026",
-        "message": "New model available",
-        "action": "+12% reasoning improvement over claude-opus-4",
     },
 ]
 
@@ -1565,8 +1502,9 @@ async def dashboard(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """Models dashboard page."""
+    from rosettastone.server.api.alerts import _alert_to_template_dict, _generate_alerts
     from rosettastone.server.api.models import _model_to_template_dict
-    from rosettastone.server.models import RegisteredModel
+    from rosettastone.server.models import Alert, RegisteredModel
 
     # Query registered models ordered by most recent first
     stmt = select(RegisteredModel).order_by(RegisteredModel.added_at.desc())  # type: ignore[attr-defined]
@@ -1580,11 +1518,18 @@ async def dashboard(
             {"active_nav": "models"},
         )
 
-    models = [_model_to_template_dict(r) for r in records] if records else DUMMY_MODELS
+    models = [_model_to_template_dict(r) for r in records]
+
+    # Query recent alerts
+    _generate_alerts(session)
+    alert_stmt = select(Alert).order_by(Alert.created_at.desc()).limit(5)  # type: ignore[attr-defined]
+    alert_records = list(session.exec(alert_stmt).all())
+    alerts = [_alert_to_template_dict(a) for a in alert_records]
+
     return request.app.state.templates.TemplateResponse(  # type: ignore[no-any-return]
         request,
         "models.html",
-        {"models": models, "alerts": DUMMY_ALERTS, "active_nav": "models"},
+        {"models": models, "alerts": alerts, "active_nav": "models"},
     )
 
 

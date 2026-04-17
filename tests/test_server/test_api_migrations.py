@@ -479,8 +479,11 @@ class TestUIEndpoints:
         assert 'href="/ui/costs"' in body
         assert 'href="/ui/alerts"' in body
 
-    def test_models_page_contains_alerts_banner(self, client: TestClient) -> None:
+    def test_models_page_contains_alerts_banner(
+        self, client: TestClient, sample_migration
+    ) -> None:
         # Register a model so we get the full models.html with the alerts banner.
+        # sample_migration is a completed migration with recommendation="GO", which triggers an alert.
         client.post("/api/v1/models", json={"model_id": "openai/gpt-4o"})
         resp = client.get("/ui/")
         assert resp.status_code == 200
