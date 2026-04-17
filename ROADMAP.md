@@ -1,13 +1,57 @@
 # RosettaStone — Roadmap & Remaining Work
 
-**Last updated:** 2026-04-03
-**Current state:** Phase 1-4 substantially complete. Bug fix pass done. Pending: end-to-end validation, production hardening, Tier 2 measurement science.
+**Last updated:** 2026-04-17
+**Current state:** Phase 1-4 substantially complete. P0 production hardening complete. Pending: production validation, P1 hardening, Tier 2 measurement science.
+
+---
+
+## Completed
+
+The following items were previously listed as outstanding but are now fully implemented.
+
+### Production Hardening (P0)
+
+| Item | What Was Done |
+|------|---------------|
+| P0.1 Intermediate DB Writes + Checkpointing | `_make_progress_writer()` in `tasks.py` writes `current_stage`, `stage_progress`, `overall_progress` at each stage boundary. `_make_checkpoint_writer()` persists stage output. Resume logic in `migrator.py`. |
+| P0.2 DB-Backed Task Queue | `TaskQueue` table in `models.py`. `TaskWorker` in `task_worker.py`. `TaskDispatcher` in `task_dispatch.py` with RQ fallback. Stale task recovery on startup. |
+| P0.3 Security Hardening | `RuntimeError` if JWT secret is default in multi-user mode. Nonce-based CSP for scripts and styles. CORS via `ROSETTASTONE_CORS_ORIGINS` env var. CSRF double-submit cookie. |
+| P0.4 Cost Guardrails Mid-Run | `CostLimitExceeded` exception. Pre-run cap check in `migrator.py`. Mid-run enforcement via LiteLLM success callback. Per-user budget tracking in `costs.py`. |
+| P0.5 Multi-User Data Isolation | `owner_id` on `MigrationRecord`, `PipelineRecord`, `ABTest`. List endpoints filter by owner. Detail endpoints use `check_resource_owner()`. Admin bypass. Audit log scoped. All 14 migration sub-endpoints secured. |
+
+### Deferred Code Review Items (Resolved)
+
+| ID | Resolution |
+|----|------------|
+| B3 | Checkpoint/resume is fully implemented for `baseline_eval` and `validation_eval` — both have restore logic. |
+| B4 | `chart.min.js` inlined from static bundle via `Markup()`. PDF path uses weasyprint. |
+| BG4 | Edge case handled with `max(1, ...)` and pop-from-val fallback. Well-tested. |
+| S3 | Audit log scoped to user. All migration endpoints use `check_resource_owner()`. Fixed as part of P0.5. |
+| T2 | 31 tests, 654 lines in `test_embedder.py`. |
+| T4 | `test_auth_jwt.py`, `test_auth_csrf.py`, `test_auth_utils.py` all exist. |
+| X2 | Scanner → safety_warnings → make_recommendation → NO_GO chain is correctly wired. |
+| C3 | `with_for_update(skip_locked=True)` added to `_claim_next_task()`. |
+
+### Web UI — Previously Marked as "501 Stubs"
+
+All report endpoints are fully implemented. The prior "501 stub" label was misleading — these are graceful degradation paths for optional deps (`weasyprint`, `sentry`), not unimplemented stubs.
+
+| Endpoint | Implementation |
+|----------|----------------|
+| HTML report | `report/html_generator.py` |
+| PDF report | `report/pdf_generator.py` (requires weasyprint) |
+| Executive report | `report/narrative.py` |
+| Markdown report | Fully implemented |
+| `RegisteredModel` CRUD | `api/models.py` — list, create, delete, info, import-from-migrations |
+| Alert system | `api/alerts.py` — list, generate, mark-read, delete |
+| Per-prompt regression | `PromptRegression` type in `types.py`, regressions endpoint in `migrations.py` |
+| Dashboard data | `DUMMY_MODELS`/`DUMMY_ALERTS` removed — dashboard queries real DB |
 
 ---
 
 ## Immediate — Validate the Fence Fix
 
-A migration with fixed JSON evaluator (fence-stripping) has not been run yet. The v6 migration ran before the fix and still scored 0%.
+A migration with the fixed JSON evaluator (fence-stripping) has not been run yet. The v6 migration ran before the fix and still scored 0%.
 
 **Run v7 migration** (note: use `--reflection-model` pointing to your local endpoint, since `gpt-4o` fails on 10.0.10.66):
 
@@ -27,126 +71,54 @@ Expected: `json_valid > 0.0`, non-zero composite scores, valid GO/CONDITIONAL/NO
 
 ---
 
-## Deferred Code Review Items
-
-Surviving items from the 5-agent code review (`issues.md`). All high-priority bugs were fixed (T1–T12). These remain:
-
-| ID | Issue | Why Deferred | Priority |
-|----|-------|-------------|----------|
-| B3 | Checkpoint/resume is a no-op for baseline_eval + validation_eval | Complex rewrite; current behavior re-runs (not dangerous) | Medium |
-| B4 | HTML report `chart_js_source` missing in PDF path | Non-critical; PDF charts broken | Low |
-| BG4 | `split_data` returns empty val set for ≤2 pairs | Only triggers with exactly 2 pairs after dedup | Low |
-| S3 | IDOR on audit log + migration detail (no user scoping) | Requires owner_id on MigrationRecord (see P0 below) | High — blocked on P0.5 |
-| T2 | `cluster/embedder.py` has zero test coverage | Deferred; embedder is used but untested | Medium |
-| T4 | Auth middleware multi-user + API-key simultaneous mode untested | Test gap | Low |
-| X2 | PII invariant not enforced systematically (no lint rule) | Should add test assertion or CI check | Medium |
-| C3 | task_worker TOCTOU race | Agent found it's likely atomic via SQLAlchemy; verify before fixing | Low |
-
----
-
-## Production Readiness — P0 (Blocking)
-
-From `docs/production-roadmap.md`. These must be done before any real deployment.
-
-### P0.1 — Intermediate DB Writes + Checkpointing
-**Files:** `src/rosettastone/server/api/tasks.py`, `src/rosettastone/core/migrator.py`, `src/rosettastone/server/pipeline_runner.py`
-
-`run_migration_background` writes to DB exactly twice (start + end). For a 45-minute migration, zero intermediate state exists. A server restart loses all progress.
-
-**Fix:** Write `current_stage`, `stage_progress`, and `overall_progress` to `MigrationRecord` at each pipeline stage boundary. This unblocks SSE streaming, checkpointing, and cost enforcement mid-run.
-
-### P0.2 — DB-Backed Task Queue
-**Files:** `src/rosettastone/server/task_dispatch.py`, new `task_queue` table
-
-`ThreadPoolExecutor(max_workers=1)` provides zero persistence. Process restart = silent job loss.
-
-**Fix:** Add a `task_queue` DB table. Polling worker picks up pending tasks. Survives restarts. (RQ as phase 2 upgrade after this works.)
-
-### P0.3 — Security Hardening
-**Files:** `src/rosettastone/server/app.py`, `src/rosettastone/server/api/auth.py`
-
-- `_JWT_SECRET_DEFAULT = "dev-secret-change-in-production"` is used silently in multi-user mode — critical auth bypass
-- CSP allows `unsafe-inline` for scripts
-- No CORS policy
-
-**Fix:** Hard error if JWT secret is default in multi-user mode. Nonce-based CSP. Explicit CORS origins.
-
-### P0.4 — Cost Guardrails Mid-Run
-**Files:** `src/rosettastone/core/migrator.py`, `src/rosettastone/server/api/tasks.py`
-
-Preflight estimates cost but nothing enforces a cap once the migration is running. A misconfigured run can spend hundreds of dollars.
-
-**Fix:** Track live cost via LiteLLM callbacks, abort if `max_cost_usd` exceeded mid-run.
-
-### P0.5 — Multi-User Data Isolation
-**Files:** `src/rosettastone/server/models.py`, all API endpoints
-
-`MigrationRecord`, `PipelineRecord`, `ABTest` have no `owner_id`. All authenticated users see all migrations. Fixes S3 (IDOR) as a side effect.
-
-**Fix:** Add `owner_id: int | None` FK to these tables. Scope all list/detail queries to session user.
-
-> **Note:** P0.1–P0.5 all touch `MigrationRecord`. Do a single consolidated Alembic migration adding all new columns at once to avoid conflicts.
-
----
-
 ## Production Readiness — P1 (High Value)
 
 ### P1.1 — Structured Logging + Correlation IDs
-No request-ID middleware, no structured JSON logging. Debugging production failures is nearly impossible.
+`RequestIDMiddleware` exists but there is no structured JSON logging. Debugging production failures requires structured log output and correlation IDs threaded through request context.
 
 ### P1.2 — PostgreSQL Validation + CI Job
-Postgres branching exists in `database.py` but the full 1663-test suite runs only against SQLite. No CI job exercises Postgres.
+Postgres branching exists in `database.py` but the full test suite runs only against SQLite. No CI job exercises Postgres end-to-end.
 
 ### P1.3 — Streaming / Live Progress (SSE)
-Users stare at a spinner for 45+ minutes. Requires P0.1 (intermediate DB writes) first.
+SSE endpoint and progress writer both exist but are not fully wired together. Users still see a spinner for long migrations. P0.1 (intermediate DB writes) is now complete, so this is unblocked.
 
 ### P1.4 — Rate Limiting (per-user)
-Threading lock added (T9). Still missing: per-user rate limit on migration submission. One user can monopolize the single executor.
+Threading lock added (T9 fix). Still missing: per-user rate limit on migration submission. One user can still monopolize the task queue.
 
-### P1.5 — Backup Strategy
-SQLite WAL mode makes naive `cp` dangerous. Need `sqlite3 .backup` automation + runbook.
+### P1.5 — SQLite Backup Automation
+SQLite WAL mode makes naive `cp` dangerous. Need `sqlite3 .backup` automation and a runbook.
 
 ---
 
-## Web UI Wiring (Phase 3 Remaining)
-
-From `docs/plans/phase3-next-steps.md`:
+## Web UI — Remaining Wiring
 
 | Priority | Task | Status |
 |----------|------|--------|
-| P0 | Wire HTML report endpoint (`GET /migrations/{id}/report/html`) | 501 stub → `report/html_generator.py` |
-| P0 | Wire PDF report endpoint (`GET /migrations/{id}/report/pdf`) | 501 stub → `report/pdf_generator.py` |
-| P0 | Wire executive report API | 501 stub → `report/narrative.py` |
-| P1 | `RegisteredModel` table + models backend | Landing page shows hardcoded dummy data |
-| P2 | Cost tracking aggregation | `cost_usd` exists per-migration, not aggregated |
-| P3 | Alert system (`Alert` table, deprecation/price detection) | Pure dummy data |
+| P2 | Cost tracking aggregation | `cost_usd` exists per-migration; full aggregation across users/time TBD |
 | P4 | Migration trigger from UI | "New migration" button is non-functional |
-| P5 | Starlette TemplateResponse signature fix | Deprecation warning |
+| P5 | Starlette TemplateResponse signature fix | Deprecation warning still present |
 | P5 | Consolidate Jinja2Templates instances | Multiple instances across server |
-| P5 | Mobile responsive nav | Not in current Stitch designs |
+| P5 | Mobile responsive nav | Not in current designs |
 
 ---
 
 ## Tier 2 — Measurement Science
 
-From `docs/tier2-plan.md`. Requires P0 production foundation first.
+Requires P1 production foundation to be meaningful in production.
 
 ### T2.1 — Human-Labeled Validation Dataset
-The four hardcoded win thresholds (`json: 0.95`, `classification: 0.90`, `short_text: 0.80`, `long_text: 0.75`) were set by engineering intuition, never validated against ground truth.
+The four hardcoded win thresholds (`json: 0.95`, `classification: 0.90`, `short_text: 0.80`, `long_text: 0.75`) were set by engineering intuition, not validated against ground truth. Infrastructure in `src/rosettastone/calibration/` is in place; no labeled data exists yet.
 
-**Work:** Build label schema (binary PRODUCTION_SAFE + diagnostic Likert dimensions), collect ~500 labeled pairs across output types, run ROC calibration to replace hardcoded thresholds with data-driven ones. Infrastructure in `src/rosettastone/calibration/` is mostly in place.
+**Work:** Build label schema (binary PRODUCTION_SAFE + diagnostic Likert dimensions), collect ~500 labeled pairs across output types, run ROC calibration to replace hardcoded thresholds.
 
 ### T2.2 — Multi-Run Evaluation
 `eval_runs` config field and aggregation strategy are wired in `config.py` but the pipeline only runs evaluation once. Need to actually run N times and aggregate (median/mean/p25).
 
-### T2.3 — Per-Prompt Regression Report
-Current report shows aggregate metrics. Should show per-pair pass/fail with drill-down to identify which prompts regress.
+### T2.4 — Actual End-to-End Cost Tracking
+Cost is estimated via preflight and tracked mid-run via LiteLLM callbacks, but reliable per-migration actual cost (not estimated) is not yet surfaced in reports or the UI.
 
-### T2.4 — Actual Cost Tracking
-Cost is estimated via preflight but actual cost per migration isn't reliably tracked end-to-end.
-
-### T2.5 — Shadow Deployment (complete the proxy)
-`src/rosettastone/shadow/` has logger, evaluator, config. `scripts/shadow_proxy.py` exists but isn't wired into the main server or documented. Needs: integration with server routes, documentation, and production-hardening.
+### T2.5 — Shadow Deployment Proxy
+`src/rosettastone/shadow/` has logger, evaluator, and config. `scripts/shadow_proxy.py` exists but is not wired into the main server. Needs: server route integration, documentation, and production-hardening.
 
 ---
 
@@ -154,9 +126,9 @@ Cost is estimated via preflight but actual cost per migration isn't reliably tra
 
 | Item | Notes |
 |------|-------|
-| Model compatibility matrix | Zero model pairs formally E2E certified |
-| E2E validation with Ollama | Free local testing path |
-| RQ integration (job queue phase 2) | Upgrade from DB-backed polling |
+| Model compatibility matrix | No model pairs formally E2E certified |
+| E2E validation with Ollama | Free local testing path; unblocked now |
+| RQ integration (job queue phase 2) | Upgrade from DB-backed polling to RQ |
 | Deprecation handling | Alerts when source/target model deprecated |
 | PyPI publishing | Last step; only after everything else stable |
 
@@ -165,10 +137,12 @@ Cost is estimated via preflight but actual cost per migration isn't reliably tra
 ## Recommendation: Order of Attack
 
 1. **Run v7 migration** (background, 3-5h) — validates the fence fix is working
-2. **P0 production hardening** — single consolidated Alembic migration + intermediate DB writes + task queue; this is the highest-leverage batch
-3. **Wire report 501 stubs** — quickest wins for UI usability
-4. **T2.5 shadow proxy** — complete the shadow deployment story
-5. **T2.1 calibration dataset** — label collection + threshold calibration
-6. **Models backend + cost tracking** — rounds out the UI
-7. **P1 items** — SSE streaming, Postgres CI, structured logging
-8. **PyPI** — last
+2. **P1.3 SSE live progress** — now unblocked by P0.1; highest user-visible win
+3. **T2.5 shadow proxy** — complete the shadow deployment story; low-risk wiring
+4. **T2.1 calibration dataset** — label collection + threshold calibration
+5. **P1.1 structured logging** — necessary before any real production usage
+6. **P1.2 Postgres CI job** — catches SQLite-only regressions
+7. **Web UI wiring** — cost aggregation, migration trigger button
+8. **T2.2 multi-run eval + T2.4 actual cost tracking** — measurement quality
+9. **P1.4 rate limiting + P1.5 backup** — operational hygiene
+10. **PyPI** — last
