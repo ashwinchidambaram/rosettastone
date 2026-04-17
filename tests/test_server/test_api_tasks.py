@@ -521,7 +521,7 @@ class TestMigrationDetailStates:
         assert resp.status_code == 200
         body = resp.text
         assert "Queued for execution" in body
-        assert "hx-trigger" in body
+        assert "overall-progress" in body
 
     def test_running_state_shows_progress(self, client: TestClient, engine) -> None:
         with Session(engine) as session:
@@ -539,7 +539,7 @@ class TestMigrationDetailStates:
         assert resp.status_code == 200
         body = resp.text
         assert "in progress" in body
-        assert "every 5s" in body
+        assert "overall-progress" in body
 
     def test_failed_state_shows_error(self, client: TestClient, engine) -> None:
         with Session(engine) as session:
