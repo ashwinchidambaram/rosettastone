@@ -20,6 +20,14 @@ import httpx
 import pytest
 from playwright.sync_api import Page, sync_playwright
 
+# httpx re-exports httpcore exceptions; import both so we can catch stale-
+# connection errors regardless of which layer surfaces them.
+try:
+    import httpcore as _httpcore  # type: ignore[import-untyped]
+    _STALE_CONN_EXCEPTIONS = (httpx.RemoteProtocolError, _httpcore.RemoteProtocolError)
+except ImportError:
+    _STALE_CONN_EXCEPTIONS = (httpx.RemoteProtocolError,)  # type: ignore[assignment]
+
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent.parent
 
 BASE_URL = "http://localhost:8766"
@@ -63,13 +71,28 @@ def _create_running_migration(base_url: str, **kwargs: object) -> int:
     return resp.json()["id"]
 
 
+def _new_httpx_client() -> httpx.Client:
+    """Return a new httpx.Client with keep-alive disabled.
+
+    Using ``Connection: close`` on every request prevents the client from
+    pooling TCP connections across tests.  This eliminates the
+    ``RemoteProtocolError: Server disconnected without sending a response``
+    flakiness that occurs when the pool tries to reuse a stale connection
+    that the server already closed on its side.
+    """
+    return httpx.Client(
+        timeout=10,
+        headers={"Connection": "close"},
+    )
+
+
 class SSEEventInjector:
     """Injects SSE events through test endpoints and handles synchronization."""
 
     def __init__(self, base_url: str, migration_id: int) -> None:
         self.base_url = base_url
         self.migration_id = migration_id
-        self._client = httpx.Client(timeout=10)
+        self._client = _new_httpx_client()
 
     def wait_for_sse_connection(self, timeout: float = 10.0) -> None:
         """Poll until at least one SSE client is connected for this migration."""
@@ -86,10 +109,25 @@ class SSEEventInjector:
         )
 
     def emit(self, event: dict) -> None:  # type: ignore[type-arg]
-        """Inject an SSE event into the progress hub."""
-        self._client.post(
-            f"{self.base_url}/test/emit-event/{self.migration_id}", json=event
-        )
+        """Inject an SSE event into the progress hub.
+
+        Retries once with a fresh connection on stale-connection errors
+        (``RemoteProtocolError``).  This is a condition-based retry — not a
+        fixed sleep — because the error itself is the condition that triggers
+        creating a new connection.
+        """
+        try:
+            self._client.post(
+                f"{self.base_url}/test/emit-event/{self.migration_id}", json=event
+            )
+        except _STALE_CONN_EXCEPTIONS:
+            # The pooled connection was stale (server closed it).  Open a
+            # fresh client and retry exactly once.
+            self._client.close()
+            self._client = _new_httpx_client()
+            self._client.post(
+                f"{self.base_url}/test/emit-event/{self.migration_id}", json=event
+            )
 
     def close(self) -> None:
         self._client.close()
