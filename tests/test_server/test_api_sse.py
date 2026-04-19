@@ -251,3 +251,30 @@ class TestEventCallbackShapes:
 
         asyncio.run(_run())
         progress_mod._queues.clear()
+
+    def test_terminal_emits_use_type_progress_not_status(self):
+        """run_migration_background terminal emits use type='progress' so JS reload handler fires.
+
+        The JS migration_detail.html only checks for terminal status inside the
+        ``if (eventType === 'progress')`` branch, so terminal events must use
+        ``type: 'progress'``.  This test verifies that neither the completion
+        nor the error emit path uses ``"type": "status"`` in any emit_progress
+        call.
+        """
+        import inspect
+
+        from rosettastone.server.api import tasks
+
+        source = inspect.getsource(tasks.run_migration_background)
+
+        # Confirm the old wire format is gone
+        assert '"type": "status"' not in source, (
+            'Found "type": "status" in run_migration_background — '
+            "terminal events must use type='progress' so the JS reload handler fires"
+        )
+
+        # Confirm the correct wire format is present for both terminal paths
+        assert source.count('"type": "progress"') >= 2, (
+            "Expected at least 2 occurrences of '\"type\": \"progress\"' in "
+            "run_migration_background (completion + error paths)"
+        )
