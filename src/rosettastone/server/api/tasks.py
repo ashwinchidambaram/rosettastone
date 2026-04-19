@@ -476,7 +476,13 @@ def run_migration_background(
 
         emit_progress(
             migration_id,
-            {"type": "status", "status": final_status, "migration_id": migration_id},
+            {
+                "type": "progress",
+                "status": final_status,
+                "migration_id": migration_id,
+                "overall_progress": 1.0,
+                "current_stage": "complete",
+            },
         )
 
     except Exception as exc:
@@ -498,6 +504,8 @@ def run_migration_background(
         else:
             error_status = "failed"
 
+        record_overall_progress: float = 0.0
+        record_current_stage: str = "failed"
         try:
             with Session(engine) as session:
                 record = session.get(MigrationRecord, migration_id)
@@ -519,6 +527,10 @@ def run_migration_background(
                     log_audit(session, "migration", migration_id, "failed")
                 session.add(record)
                 session.commit()
+                # Capture scalar values before the session closes to avoid
+                # DetachedInstanceError when constructing the SSE payload below.
+                record_overall_progress = record.overall_progress or 0.0
+                record_current_stage = record.current_stage or "failed"
         except Exception as commit_err:
             logger.error(
                 "Failed to update migration %d status: %s",
@@ -532,7 +544,13 @@ def run_migration_background(
 
         emit_progress(
             migration_id,
-            {"type": "status", "status": error_status, "migration_id": migration_id},
+            {
+                "type": "progress",
+                "status": error_status,
+                "migration_id": migration_id,
+                "overall_progress": record_overall_progress,
+                "current_stage": record_current_stage,
+            },
         )
 
     finally:

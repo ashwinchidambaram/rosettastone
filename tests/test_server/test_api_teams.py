@@ -10,7 +10,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from rosettastone.server.app import create_app
 from rosettastone.server.database import get_session
 
-_JWT_SECRET = "test-teams-secret"
+_JWT_SECRET = "test-teams-secret-long-enough-for-hmac-sha"
 
 
 # ---------------------------------------------------------------------------

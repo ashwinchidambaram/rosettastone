@@ -355,6 +355,7 @@ class TestJWTDefaultSecretTransition:
         app = create_app()
         assert app is not None
 
+    @pytest.mark.filterwarnings("ignore::jwt.warnings.InsecureKeyLengthWarning")
     def test_jwt_with_default_secret_is_valid_token(self) -> None:
         """Tokens signed with the default dev secret are cryptographically valid.
 

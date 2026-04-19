@@ -11,7 +11,7 @@ from rosettastone.server.app import create_app
 from rosettastone.server.database import get_session
 from rosettastone.server.models import MigrationRecord
 
-_JWT_SECRET = "test-approvals-secret"
+_JWT_SECRET = "test-approvals-secret-long-enough-for-hmac"
 
 
 # ---------------------------------------------------------------------------

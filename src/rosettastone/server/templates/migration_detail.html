@@ -126,11 +126,7 @@ function showPersonaView(view) {
 
 {% if migration.status in ['pending', 'running'] %}
 {# ─── PENDING / RUNNING STATE ─── #}
-<div id="migration-status"
-     hx-get="/ui/migrations/{{ migration.id }}"
-     hx-trigger="every 5s"
-     hx-select="#migration-status"
-     hx-swap="outerHTML">
+<div id="migration-status">
 <div class="flex flex-col items-center justify-center py-24 text-center">
     <div class="relative mb-8">
         <div class="w-20 h-20 rounded-full border-4 border-[#D4A574]/20 border-t-[#D4A574] animate-spin"></div>
@@ -145,9 +141,21 @@ function showPersonaView(view) {
         Running preflight checks, baseline evaluation, GEPA optimization, and validation. This may take several minutes.
         {% endif %}
     </p>
-    <div class="flex items-center gap-2 text-xs text-on-surface-variant/60 font-label">
-        <span class="material-symbols-outlined text-sm">schedule</span>
-        Auto-refreshing every 5 seconds
+    <!-- Overall progress bar + stage label + ETA (populated by SSE events) -->
+    <div class="w-full max-w-md mt-4">
+        <div class="flex justify-between text-xs text-on-surface-variant mb-1">
+            <span id="current-stage" class="font-label"></span>
+            <span id="eta-display" class="font-label"></span>
+        </div>
+        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+            <div id="overall-progress"
+                 class="bg-[#D4A574] h-2.5 rounded-full transition-all duration-500"
+                 style="width: 0%"
+                 role="progressbar"
+                 aria-valuenow="0"
+                 aria-valuemin="0"
+                 aria-valuemax="100"></div>
+        </div>
     </div>
     <!-- Live cost and warning indicators (populated by SSE events) -->
     <div class="flex items-center gap-4 mt-3">
@@ -173,6 +181,11 @@ function showPersonaView(view) {
         </thead>
         <tbody id="gepa-iterations-tbody" data-prev-score=""></tbody>
       </table>
+    </div>
+    <!-- Eval pair progress (shown during baseline/validation eval) -->
+    <div id="eval-pair-panel" class="hidden mt-3 text-sm text-on-surface-variant font-label">
+        <span class="material-symbols-outlined text-sm align-middle">assessment</span>
+        Evaluating: <span id="eval-pair-counter" class="font-mono">0/0</span> pairs
     </div>
 </div>
 </div>
@@ -1173,73 +1186,94 @@ function showPersonaView(view) {
   es.onmessage = function(event) {
     try {
       var data = JSON.parse(event.data);
+      var eventType = data.type || 'progress';
 
-      // Update overall progress bar if present
-      var progressBar = document.getElementById('overall-progress');
-      if (progressBar && data.overall_progress !== undefined) {
-        var pct = Math.round(data.overall_progress * 100);
-        progressBar.style.width = pct + '%';
-        progressBar.setAttribute('aria-valuenow', pct);
-      }
+      if (eventType === 'progress') {
+        // Update overall progress bar
+        var progressBar = document.getElementById('overall-progress');
+        if (progressBar && data.overall_progress !== undefined) {
+          var pct = Math.round(data.overall_progress * 100);
+          progressBar.style.width = pct + '%';
+          progressBar.setAttribute('aria-valuenow', pct);
+        }
 
-      // Update live cost
-      if (data.total_cost_usd !== undefined && data.total_cost_usd > 0) {
-        var costEl = document.getElementById('live-cost');
-        if (costEl) costEl.textContent = 'Cost: $' + data.total_cost_usd.toFixed(2);
-      }
+        // Update stage name
+        var stageEl = document.getElementById('current-stage');
+        if (stageEl && data.current_stage) {
+          stageEl.textContent = data.current_stage.replace(/_/g, ' ');
+        }
 
-      // Update warning count
-      if (data.warning_count !== undefined && data.warning_count > 0) {
-        var warnEl = document.getElementById('live-warnings');
-        if (warnEl) warnEl.textContent = data.warning_count + ' warning' + (data.warning_count > 1 ? 's' : '');
-      }
+        // Update ETA
+        var etaEl = document.getElementById('eta-display');
+        if (etaEl && data.eta_seconds !== undefined) {
+          var mins = Math.ceil(data.eta_seconds / 60);
+          etaEl.textContent = mins > 0 ? '~' + mins + ' min remaining' : '';
+        }
 
-      // If terminal status received, close stream and reload page
-      var terminal = ['complete', 'failed', 'cancelled', 'blocked', 'dry_run_complete'];
-      if (data.status && terminal.indexOf(data.status) !== -1) {
-        es.close();
-        window.location.reload();
-      }
-    } catch (e) {
-      // Ignore parse errors
-    }
-  };
+        // Update live cost
+        if (data.total_cost_usd !== undefined && data.total_cost_usd > 0) {
+          var costEl = document.getElementById('live-cost');
+          if (costEl) costEl.textContent = 'Cost: $' + data.total_cost_usd.toFixed(2);
+        }
 
-  es.addEventListener('gepa_iteration', function(e) {
-    try {
-      var data = JSON.parse(e.data);
-      var panel = document.getElementById('gepa-progress-panel');
-      if (panel) {
-        panel.classList.remove('hidden');
-        // Update counter
-        document.getElementById('gepa-iteration-counter').textContent =
-          data.iteration + ' / ' + data.total_iterations;
-        // Add row to table
-        var tbody = document.getElementById('gepa-iterations-tbody');
-        var prevScore = tbody.dataset.prevScore ? parseFloat(tbody.dataset.prevScore) : null;
-        var delta = prevScore !== null ? (data.running_mean_score - prevScore).toFixed(3) : '\u2014';
-        var sign = delta !== '\u2014' && parseFloat(delta) >= 0 ? '+' : '';
-        var row = '<tr>' +
-          '<td class="text-xs px-2 py-1 text-gray-600">' + data.iteration + '</td>' +
-          '<td class="text-xs px-2 py-1 font-mono">' + (data.running_mean_score * 100).toFixed(1) + '%</td>' +
-          '<td class="text-xs px-2 py-1 font-mono ' + (delta !== '\u2014' && parseFloat(delta) < 0 ? 'text-red-500' : 'text-green-600') + '">' + sign + delta + '</td>' +
-          '</tr>';
-        tbody.insertAdjacentHTML('beforeend', row);
-        tbody.dataset.prevScore = data.running_mean_score;
-        // Add sparkline bar
-        var sparkline = document.getElementById('gepa-sparkline');
-        if (sparkline) {
-          var bar = document.createElement('span');
-          bar.className = 'inline-block w-2 bg-blue-400 dark:bg-blue-600 rounded-sm mx-px';
-          bar.style.height = Math.round(data.running_mean_score * 40) + 'px';
-          bar.title = (data.running_mean_score * 100).toFixed(1) + '%';
-          sparkline.appendChild(bar);
+        // Update warning count
+        if (data.warning_count !== undefined && data.warning_count > 0) {
+          var warnEl = document.getElementById('live-warnings');
+          if (warnEl) warnEl.textContent = data.warning_count + ' warning' + (data.warning_count > 1 ? 's' : '');
+        }
+
+        // Hide eval-pair panel when stage advances past evaluation
+        var evalPanel = document.getElementById('eval-pair-panel');
+        if (evalPanel && data.current_stage && data.current_stage !== 'baseline_eval' && data.current_stage !== 'validation_eval') {
+          evalPanel.classList.add('hidden');
+        }
+
+        // Terminal status: close stream and reload page
+        var terminal = ['complete', 'failed', 'cancelled', 'blocked', 'dry_run_complete'];
+        if (data.status && terminal.indexOf(data.status) !== -1) {
+          es.close();
+          window.location.reload();
+        }
+
+      } else if (eventType === 'gepa_iteration') {
+        var panel = document.getElementById('gepa-progress-panel');
+        if (panel) {
+          panel.classList.remove('hidden');
+          document.getElementById('gepa-iteration-counter').textContent =
+            data.iteration + ' / ' + data.total_iterations;
+          var tbody = document.getElementById('gepa-iterations-tbody');
+          var prevScore = tbody.dataset.prevScore ? parseFloat(tbody.dataset.prevScore) : null;
+          var delta = prevScore !== null ? (data.running_mean_score - prevScore).toFixed(3) : '\u2014';
+          var sign = delta !== '\u2014' && parseFloat(delta) >= 0 ? '+' : '';
+          var row = '<tr>' +
+            '<td class="text-xs px-2 py-1 text-gray-600">' + data.iteration + '</td>' +
+            '<td class="text-xs px-2 py-1 font-mono">' + (data.running_mean_score * 100).toFixed(1) + '%</td>' +
+            '<td class="text-xs px-2 py-1 font-mono ' + (delta !== '\u2014' && parseFloat(delta) < 0 ? 'text-red-500' : 'text-green-600') + '">' + sign + delta + '</td>' +
+            '</tr>';
+          tbody.insertAdjacentHTML('beforeend', row);
+          tbody.dataset.prevScore = data.running_mean_score;
+          var sparkline = document.getElementById('gepa-sparkline');
+          if (sparkline) {
+            var bar = document.createElement('span');
+            bar.className = 'inline-block w-2 bg-blue-400 dark:bg-blue-600 rounded-sm mx-px';
+            bar.style.height = Math.round(data.running_mean_score * 40) + 'px';
+            bar.title = (data.running_mean_score * 100).toFixed(1) + '%';
+            sparkline.appendChild(bar);
+          }
+        }
+
+      } else if (eventType === 'eval_pair') {
+        var evalPanel = document.getElementById('eval-pair-panel');
+        if (evalPanel) {
+          evalPanel.classList.remove('hidden');
+          document.getElementById('eval-pair-counter').textContent =
+            data.pair_index + '/' + data.total_pairs;
         }
       }
     } catch (e) {
       // Ignore parse errors
     }
-  });
+  };
 
   es.onerror = function() {
     es.close();
